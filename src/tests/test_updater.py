@@ -146,11 +146,17 @@ def test_update_ide_success_linux() -> None:
                         "missing_ag_updater.updater.download_file",
                         side_effect=mock_download_write_tar,
                     ):
-                        with tempfile.TemporaryDirectory() as target_ide_dir:
-                            launcher = os.path.join(target_ide_dir, "bin_launcher", "ide-launch")
-                            res = update_ide(target_ide_dir, launcher, force=True)
-                            assert res is True
-                            assert os.path.exists(os.path.join(target_ide_dir, "bin", "antigravity-ide"))
+                        with patch("missing_ag_updater.updater.install_ide_desktop") as mock_desktop:
+                            with patch("missing_ag_updater.updater.install_ide_nautilus") as mock_nautilus:
+                                with tempfile.TemporaryDirectory() as target_ide_dir:
+                                    launcher = os.path.join(target_ide_dir, "bin_launcher", "ide-launch")
+                                    res = update_ide(target_ide_dir, launcher, force=True)
+                                    assert res is True
+                                    assert os.path.exists(os.path.join(target_ide_dir, "bin", "antigravity-ide"))
+                                    mock_desktop.assert_called_once_with(ide_dir=target_ide_dir, launcher_path=launcher)
+                                    mock_nautilus.assert_called_once_with(
+                                        ide_dir=target_ide_dir, launcher_path=launcher
+                                    )
 
 
 def test_update_ide_empty_releases() -> None:
@@ -234,10 +240,12 @@ def test_update_hub_success_linux() -> None:
                         "missing_ag_updater.updater.download_file",
                         side_effect=mock_download_write_tar_hub,
                     ):
-                        with tempfile.TemporaryDirectory() as target_hub_dir:
-                            launcher = os.path.join(target_hub_dir, "bin_launcher", "hub-launch")
-                            res = update_hub(target_hub_dir, launcher)
-                            assert res is True
+                        with patch("missing_ag_updater.updater.install_hub_desktop") as mock_desktop:
+                            with tempfile.TemporaryDirectory() as target_hub_dir:
+                                launcher = os.path.join(target_hub_dir, "bin_launcher", "hub-launch")
+                                res = update_hub(target_hub_dir, launcher)
+                                assert res is True
+                                mock_desktop.assert_called_once_with(hub_dir=target_hub_dir, launcher_path=launcher)
 
 
 def test_update_hub_invalid_tarball() -> None:

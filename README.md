@@ -232,6 +232,36 @@ Once updated, you can launch the Antigravity tools using their standard terminal
   agy
   ```
 
+## Nautilus Context Menu Integration (Linux)
+
+On Linux systems running GNOME, the installer automatically writes a context menu extension for the Nautilus file manager, allowing you to right-click folders or files and select **"Open in Antigravity IDE"**.
+
+For Nautilus to load this extension, you must have the `nautilus-python` package installed on your system.
+
+### Prerequisites
+
+Install the `nautilus-python` bindings using your distribution's package manager:
+
+- **Fedora**:
+  ```bash
+  sudo dnf install nautilus-python
+  ```
+- **Ubuntu / Debian**:
+  ```bash
+  sudo apt install python3-nautilus
+  ```
+- **Arch Linux**:
+  ```bash
+  sudo pacman -S python-nautilus
+  ```
+
+### Activating the Context Menu
+
+After installing the package, restart Nautilus to reload all python extensions:
+```bash
+nautilus -q
+```
+
 ## Development
 
 The project includes a `Makefile` to simplify development tasks:

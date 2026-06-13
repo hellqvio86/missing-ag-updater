@@ -12,6 +12,8 @@ def install_ide_nautilus(ide_dir: str, launcher_path: Optional[str]) -> None:
     exec_path = launcher_path or os.path.join(ide_dir, "bin", "antigravity-ide")
     nautilus_content = f"""import subprocess
 from urllib.parse import unquote, urlparse
+import gi
+gi.require_version('Nautilus', '4.0')
 from gi.repository import Nautilus, GObject
 
 class OpenInAntigravityIDE(GObject.GObject, Nautilus.MenuProvider):
@@ -21,6 +23,9 @@ class OpenInAntigravityIDE(GObject.GObject, Nautilus.MenuProvider):
         if parsed.scheme != 'file':
             return None
         return unquote(parsed.path)
+
+    def _activate(self, menu_item, path):
+        subprocess.Popen(['{exec_path}', path])
 
     def get_file_items(self, files):
         if not files or len(files) != 1:
@@ -33,7 +38,7 @@ class OpenInAntigravityIDE(GObject.GObject, Nautilus.MenuProvider):
             label='Open in Antigravity IDE',
             tip='Open this folder or file in Antigravity IDE'
         )
-        item.connect('activate', lambda _item: subprocess.Popen(['{exec_path}', path]))
+        item.connect('activate', self._activate, path)
         return [item]
 
     def get_background_items(self, folder):
@@ -45,7 +50,7 @@ class OpenInAntigravityIDE(GObject.GObject, Nautilus.MenuProvider):
             label='Open Folder in Antigravity IDE',
             tip='Open the current folder in Antigravity IDE'
         )
-        item.connect('activate', lambda _item: subprocess.Popen(['{exec_path}', path]))
+        item.connect('activate', self._activate, path)
         return [item]
 """
     try:
