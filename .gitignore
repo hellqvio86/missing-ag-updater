@@ -4,3 +4,5 @@ __pycache__/
 *.pyd
 .DS_Store
 *.tar.gz
+.venv/
+*.egg-info/

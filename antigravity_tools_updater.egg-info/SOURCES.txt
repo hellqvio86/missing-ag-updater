@@ -1,9 +1,0 @@
-LICENSE
-README.md
-pyproject.toml
-update.py
-antigravity_tools_updater.egg-info/PKG-INFO
-antigravity_tools_updater.egg-info/SOURCES.txt
-antigravity_tools_updater.egg-info/dependency_links.txt
-antigravity_tools_updater.egg-info/entry_points.txt
-antigravity_tools_updater.egg-info/top_level.txt
