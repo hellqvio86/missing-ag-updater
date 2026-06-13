@@ -31,14 +31,14 @@ This repository contains a Python utility to check for and apply updates to the 
 
 ### For Users (via pipx)
 
-You can install the tool globally into an isolated virtual environment using `pipx`:
+The recommended way to install and run the tool in an isolated environment is via `pipx`:
 
 ```bash
-# Install directly from the GitHub repository:
-pipx install git+https://github.com/hellqvio86/missing-ag-updater.git
-
-# Or install from PyPI (once published):
+# Install the stable release from PyPI (recommended):
 pipx install missing-ag-updater
+
+# Alternatively, install the development version directly from GitHub:
+pipx install git+https://github.com/hellqvio86/missing-ag-updater.git
 ```
 
 Once installed, the `antigravity-updater` command will be globally available.
