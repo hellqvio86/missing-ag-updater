@@ -74,3 +74,40 @@ antigravity-updater \
   --dir-hub "/home/sandbox/opt/Hub" \
   --path-cli "/home/sandbox/bin/agy"
 ```
+
+---
+
+## Enforced Code Style & Development Standards
+
+If you are an AI agent contributing code or writing tests for this repository, you must adhere to the following standards:
+
+1. **Coding Style & Formatting**:
+   * All code must conform to the formatting rules enforced by **Ruff**.
+   * Run code formatting before submitting:
+     ```bash
+     make format
+     ```
+   * Verify linting passes with:
+     ```bash
+     make lint
+     ```
+
+2. **Static Typing**:
+   * The codebase is **strictly typed**. All functions, arguments, and return types must be fully annotated using standard Python type hints.
+   * Run type checking on the source files:
+     ```bash
+     uv run mypy src
+     ```
+   * All type checks must pass cleanly with no warnings or errors.
+
+3. **Function Arguments**:
+   * Always prefer **named (keyword) arguments** when calling functions with multiple parameters (e.g. `update_ide(ide_dir=..., launcher_path=..., dry_run=...)`). This increases clarity and reduces signature mismatch risks.
+
+4. **Testing Requirements**:
+   * **Every new module or change requires corresponding tests** in the `src/tests/` directory.
+   * The test suite is executed using:
+     ```bash
+     make test
+     ```
+   * All tests must pass, and the coverage badge should be updated automatically by the test script.
+
