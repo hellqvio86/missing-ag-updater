@@ -15,7 +15,9 @@ from .const import (
     IDE_RELEASES_URL,
     OS_NAME,
 )
+from .desktop import install_hub_desktop, install_ide_desktop
 from .models import CliManifest, Release
+from .nautilus import install_ide_nautilus
 from .utils import (
     compute_sha512,
     download_file,
@@ -103,7 +105,15 @@ def get_download_url(app_type: str, version: str, exec_id: str) -> str:
     return ""
 
 
-def update_ide(ide_dir: str, launcher_path: Optional[str], *, dry_run: bool = False, force: bool = False) -> bool:
+def update_ide(
+    ide_dir: str,
+    launcher_path: Optional[str],
+    *,
+    dry_run: bool = False,
+    force: bool = False,
+    install_desktop: bool = True,
+    install_nautilus: bool = True,
+) -> bool:
     """Check and execute updates for Antigravity IDE."""
     print_status("Checking for Antigravity IDE updates...")
     current_ver = get_ide_version(ide_dir)
@@ -188,6 +198,12 @@ def update_ide(ide_dir: str, launcher_path: Optional[str], *, dry_run: bool = Fa
                     if os.path.exists(target_launcher):
                         update_symlink(target_launcher, launcher_path)
 
+                if install_desktop and OS_NAME == "linux":
+                    install_ide_desktop(ide_dir=ide_dir, launcher_path=launcher_path)
+
+                if install_nautilus and OS_NAME == "linux":
+                    install_ide_nautilus(ide_dir=ide_dir, launcher_path=launcher_path)
+
             print_success(f"Antigravity IDE successfully upgraded to version {latest_ver}!")
             return True
         except Exception as e:
@@ -195,7 +211,14 @@ def update_ide(ide_dir: str, launcher_path: Optional[str], *, dry_run: bool = Fa
             return False
 
 
-def update_hub(hub_dir: str, launcher_path: Optional[str], *, dry_run: bool = False, force: bool = False) -> bool:
+def update_hub(
+    hub_dir: str,
+    launcher_path: Optional[str],
+    *,
+    dry_run: bool = False,
+    force: bool = False,
+    install_desktop: bool = True,
+) -> bool:
     """Check and execute updates for Antigravity Hub."""
     print_status("Checking for Antigravity Hub updates...")
     current_ver = get_hub_version(hub_dir)
@@ -279,6 +302,9 @@ def update_hub(hub_dir: str, launcher_path: Optional[str], *, dry_run: bool = Fa
                     target_launcher = os.path.join(hub_dir, "antigravity")
                     if os.path.exists(target_launcher):
                         update_symlink(target_launcher, launcher_path)
+
+                if install_desktop and OS_NAME == "linux":
+                    install_hub_desktop(hub_dir=hub_dir, launcher_path=launcher_path)
 
             print_success(f"Antigravity Hub successfully upgraded to version {latest_ver}!")
             return True

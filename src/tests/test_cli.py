@@ -71,5 +71,7 @@ def test_main_force_and_check() -> None:
                         DEFAULT_IDE_LAUNCHER,
                         dry_run=True,
                         force=True,
+                        install_desktop=True,
+                        install_nautilus=True,
                     )
                     mock_exit.assert_called_once_with(0)

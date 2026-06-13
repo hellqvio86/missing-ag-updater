@@ -113,6 +113,7 @@ $ antigravity-updater
 ```text
 usage: python -m missing_ag_updater [-h] [--check] [--ide] [--hub] [--cli] [--force]
                  [--dir-ide DIR_IDE] [--dir-hub DIR_HUB] [--path-cli PATH_CLI]
+                 [--no-desktop] [--no-nautilus]
 
 Auto-updater utility for Google Antigravity developer tools (Cross-Platform).
 
@@ -126,7 +127,30 @@ options:
   --dir-ide DIR_IDE  Override path to Antigravity IDE folder/bundle
   --dir-hub DIR_HUB  Override path to Antigravity Hub folder/bundle
   --path-cli PATH_CLI Override path to Antigravity CLI binary
+  --no-desktop       Skip installing local .desktop files and application icons on Linux
+  --no-nautilus      Skip installing Nautilus context-menu integration on Linux
 ```
+
+### Environment Variables
+
+You can configure the behavior of the auto-updater using environment variables. These act as fallbacks if the corresponding CLI options are not explicitly provided:
+
+| CLI Option | Environment Variables | Type | Description |
+| :--- | :--- | :--- | :--- |
+| `--check` | `ANTIGRAVITY_CHECK` or `AG_CHECK` | Boolean | Check for available updates without installing (dry run) |
+| `--ide` | `ANTIGRAVITY_IDE` or `AG_IDE` | Boolean | Update only the Antigravity IDE |
+| `--hub` | `ANTIGRAVITY_HUB` or `AG_HUB` | Boolean | Update only the Antigravity Hub |
+| `--cli` | `ANTIGRAVITY_CLI` or `AG_CLI` | Boolean | Update only the Antigravity CLI |
+| `--force` | `ANTIGRAVITY_FORCE` or `AG_FORCE` | Boolean | Bypass version checks and active process warnings |
+| `--dir-ide` | `ANTIGRAVITY_DIR_IDE` or `AG_DIR_IDE` | String | Override path to Antigravity IDE folder/bundle |
+| `--dir-hub` | `ANTIGRAVITY_DIR_HUB` or `AG_DIR_HUB` | String | Override path to Antigravity Hub folder/bundle |
+| `--path-cli` | `ANTIGRAVITY_PATH_CLI` or `AG_PATH_CLI` | String | Override path to Antigravity CLI binary |
+| `--no-desktop` | `ANTIGRAVITY_DESKTOP` / `AG_DESKTOP` (Boolean, default `true`) or `ANTIGRAVITY_NO_DESKTOP` / `AG_NO_DESKTOP` (Boolean, default `false`) | Boolean | Set to `false` or `1` (for `NO_DESKTOP`) to skip installing local `.desktop` launcher and application icons on Linux |
+| `--no-nautilus` | `ANTIGRAVITY_NAUTILUS` / `AG_NAUTILUS` (Boolean, default `true`) or `ANTIGRAVITY_NO_NAUTILUS` / `AG_NO_NAUTILUS` (Boolean, default `false`) | Boolean | Set to `false` or `1` (for `NO_NAUTILUS`) to skip installing the Nautilus context-menu extension |
+
+> [!NOTE]
+> Boolean environment variables accept `1`, `true`, `yes`, or `on` as `True`, and any other value (or unset) as `False`.
+
 
 ### Examples
 

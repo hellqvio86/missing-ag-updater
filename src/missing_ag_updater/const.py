@@ -43,6 +43,10 @@ else:
 # Default Paths based on OS
 HOME = os.path.expanduser("~")
 
+USER_APPLICATIONS_DIR = os.path.join(HOME, ".local", "share", "applications")
+USER_ICONS_DIR = os.path.join(HOME, ".local", "share", "icons", "hicolor", "512x512", "apps")
+USER_NAUTILUS_DIR = os.path.join(HOME, ".local", "share", "nautilus-python", "extensions")
+
 DEFAULT_IDE_LAUNCHER: Optional[str] = None
 DEFAULT_HUB_LAUNCHER: Optional[str] = None
 

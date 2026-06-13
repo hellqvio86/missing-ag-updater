@@ -195,3 +195,52 @@ def update_symlink(target: str, link_name: str) -> None:
         print_success(f"Linked command: {link_name} -> {target}")
     except Exception as e:
         print_warning(f"Could not update symbolic link {link_name}: {e}")
+
+
+def extract_asar_icon(asar_path: str, dest_icon_path: str) -> bool:
+    """Extract icon.png from app.asar package and write to dest_icon_path."""
+    if not os.path.exists(asar_path):
+        return False
+    try:
+        with open(asar_path, "rb") as f:
+            header_size_data = f.read(8)
+            if len(header_size_data) < 8:
+                return False
+            header_size = struct.unpack("<I", header_size_data[4:8])[0]
+            f.seek(16)
+            header_json_data = f.read(header_size - 8)
+            header_json = json.loads(header_json_data.decode("utf-8"))
+            files = header_json.get("files", {})
+            icon_info = files.get("icon.png")
+            if not icon_info:
+                return False
+            offset = int(icon_info.get("offset"))
+            size = int(icon_info.get("size"))
+            data_start_offset = 8 + header_size
+            f.seek(data_start_offset + offset)
+            icon_data = f.read(size)
+            os.makedirs(os.path.dirname(dest_icon_path), exist_ok=True)
+            with open(dest_icon_path, "wb") as icon_file:
+                icon_file.write(icon_data)
+            return True
+    except Exception:
+        return False
+
+
+def refresh_linux_desktop_caches() -> None:
+    """Refresh the user-level desktop database and icon cache on Linux."""
+    from .const import USER_APPLICATIONS_DIR, USER_ICONS_DIR
+
+    if OS_NAME != "linux":
+        return
+    try:
+        if os.path.exists(USER_APPLICATIONS_DIR):
+            subprocess.run(["update-desktop-database", USER_APPLICATIONS_DIR], capture_output=True, check=False)
+    except Exception:
+        pass
+    try:
+        icon_parent = os.path.dirname(os.path.dirname(USER_ICONS_DIR))
+        if os.path.exists(icon_parent):
+            subprocess.run(["gtk-update-icon-cache", "-q", icon_parent], capture_output=True, check=False)
+    except Exception:
+        pass
