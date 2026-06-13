@@ -192,3 +192,102 @@ def test_update_symlink() -> None:
             update_symlink(new_target, link_name)
             assert os.path.islink(link_name)
             assert os.readlink(link_name) == new_target
+
+
+def test_download_file_success() -> None:
+    mock_response = MagicMock()
+    mock_response.__enter__.return_value = mock_response
+    mock_response.headers = {"content-length": "10"}
+    mock_response.read.side_effect = [b"0123456789", b""]
+
+    with patch("urllib.request.urlopen", return_value=mock_response):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dest = os.path.join(tmpdir, "downloaded.txt")
+            from missing_ag_updater.utils import download_file
+
+            download_file("http://example.com/file", dest)
+            with open(dest, "rb") as f:
+                assert f.read() == b"0123456789"
+
+
+def test_download_file_error() -> None:
+    with patch("urllib.request.urlopen", side_effect=Exception("network error")):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dest = os.path.join(tmpdir, "downloaded.txt")
+            from missing_ag_updater.utils import download_file
+
+            with pytest.raises(RuntimeError) as exc_info:
+                download_file("http://example.com/file", dest)
+            assert "Download error from http://example.com/file" in str(exc_info.value)
+
+
+def test_get_hub_version_exceptions() -> None:
+    with tempfile.TemporaryDirectory() as tmpdir:
+        # 1. Non-existent path
+        assert get_hub_version(os.path.join(tmpdir, "non-existent")) == "0.0.0"
+
+        # 2. Path exists but is empty / short header
+        asar_dir = os.path.join(tmpdir, "resources")
+        os.makedirs(asar_dir, exist_ok=True)
+        asar_path = os.path.join(asar_dir, "app.asar")
+        with open(asar_path, "wb") as f:
+            f.write(b"short")
+        assert get_hub_version(tmpdir) == "0.0.0"
+
+        # 3. Valid length but invalid JSON or error reading
+        with open(asar_path, "wb") as f:
+            f.write(struct.pack("<I", 4))
+            f.write(struct.pack("<I", 100))
+            f.write(struct.pack("<I", 96))
+            f.write(struct.pack("<I", 10))
+            f.write(b"invalidjson")
+        assert get_hub_version(tmpdir) == "0.0.0"
+
+
+def test_get_ide_version_darwin_and_exception() -> None:
+    # Darwin path product.json
+    with patch("missing_ag_updater.utils.OS_NAME", "darwin"):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Non-existent
+            assert get_ide_version(tmpdir) == "0.0.0"
+
+            # Valid
+            app_dir = os.path.join(tmpdir, "Contents", "Resources", "app")
+            os.makedirs(app_dir)
+            with open(os.path.join(app_dir, "product.json"), "w", encoding="utf-8") as f:
+                json.dump({"ideVersion": "2.0.4"}, f)
+            assert get_ide_version(tmpdir) == "2.0.4"
+
+            # Invalid json format raises exception and returns "0.0.0"
+            with open(os.path.join(app_dir, "product.json"), "w", encoding="utf-8") as f:
+                f.write("invalid json")
+            assert get_ide_version(tmpdir) == "0.0.0"
+
+
+def test_get_hub_version_darwin() -> None:
+    with patch("missing_ag_updater.utils.OS_NAME", "darwin"):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            assert get_hub_version(tmpdir) == "0.0.0"
+
+
+def test_get_cli_version_exception() -> None:
+    with patch("subprocess.run", side_effect=Exception("execution error")):
+        assert get_cli_version("/dummy/binary") == "0.0.0"
+
+
+def test_get_running_pids_exceptions() -> None:
+    with patch("missing_ag_updater.utils.OS_NAME", "windows"):
+        with patch("subprocess.run", side_effect=Exception("tasklist error")):
+            assert get_running_pids("test") == []
+
+    with patch("missing_ag_updater.utils.OS_NAME", "linux"):
+        with patch("subprocess.run", side_effect=Exception("pgrep error")):
+            assert get_running_pids("test") == []
+
+
+def test_update_symlink_exception() -> None:
+    with patch("missing_ag_updater.utils.OS_NAME", "linux"):
+        with patch("os.path.exists", return_value=True):
+            with patch("os.remove", side_effect=Exception("permission denied")):
+                # Should print a warning but not raise exception
+                update_symlink("target", "link")
