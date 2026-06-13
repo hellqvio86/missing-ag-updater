@@ -27,7 +27,23 @@ This repository contains a Python utility to check for and apply updates to the 
 - **Dry Run Support:** Check if any updates are available without changing any files.
 - **Development Tooling:** Complete with linter, test coverage, and environment creation via `uv`.
 
-## Installation & Setup
+## Installation
+
+### For Users (via pipx)
+
+You can install the tool globally into an isolated virtual environment using `pipx`:
+
+```bash
+# Install directly from the GitHub repository:
+pipx install git+https://github.com/hellqvio86/missing-ag-updater.git
+
+# Or install from PyPI (once published):
+pipx install missing-ag-updater
+```
+
+Once installed, the `antigravity-updater` command will be globally available.
+
+### For Developers
 
 Create the local virtual environment and install development tools (`pytest`, `ruff`) using `uv` and the provided `Makefile`:
 ```bash
