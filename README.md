@@ -69,6 +69,23 @@ options:
   ./update.py --cli
   ```
 
+## Launching the Applications
+
+Once updated, you can launch the Antigravity tools using their standard terminal commands:
+
+- **Antigravity IDE** (VS Code-based AI Editor):
+  ```bash
+  antigravity-ide
+  ```
+- **Antigravity Hub** (Standalone agent desktop application):
+  ```bash
+  antigravity
+  ```
+- **Antigravity CLI** (Terminal utility):
+  ```bash
+  agy
+  ```
+
 ## Development
 
 The project includes a `Makefile` to simplify development tasks:
