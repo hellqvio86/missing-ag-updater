@@ -10,21 +10,21 @@ Author: Antigravity AI Assistant
 Date: June 2026
 """
 
-import os
-import sys
-import json
-import urllib.request
-import urllib.error
-import shutil
-import tarfile
-import zipfile
-import struct
-import hashlib
 import argparse
-import subprocess
-import tempfile
+import hashlib
+import json
+import os
 import platform
-from typing import Optional, Dict, Any, Tuple
+import shutil
+import struct
+import subprocess
+import sys
+import tarfile
+import tempfile
+import urllib.error
+import urllib.request
+import zipfile
+from typing import Any, Optional
 
 # Color output helpers for premium terminal feedback
 COLOR_HEADER = '\033[95m'
@@ -85,20 +85,20 @@ HOME = os.path.expanduser("~")
 if OS_NAME == "linux":
     OPT_DIR = os.path.join(HOME, "opt")
     BIN_DIR = os.path.join(HOME, ".local", "bin")
-    
+
     DEFAULT_IDE_DIR = os.path.join(OPT_DIR, "Antigravity IDE")
     DEFAULT_HUB_DIR = os.path.join(OPT_DIR, "Antigravity-x64")
     DEFAULT_CLI_BINARY = os.path.join(BIN_DIR, "agy")
     DEFAULT_IDE_LAUNCHER = os.path.join(BIN_DIR, "antigravity-ide")
     DEFAULT_HUB_LAUNCHER = os.path.join(BIN_DIR, "antigravity")
-    
+
 elif OS_NAME == "darwin":
     DEFAULT_IDE_DIR = "/Applications/Antigravity IDE.app"
     DEFAULT_HUB_DIR = "/Applications/Antigravity.app"
     DEFAULT_CLI_BINARY = os.path.join(HOME, ".local", "bin", "agy")
     DEFAULT_IDE_LAUNCHER = None
     DEFAULT_HUB_LAUNCHER = None
-    
+
 elif OS_NAME == "windows":
     LOCALAPPDATA = os.environ.get("LOCALAPPDATA", os.path.join(HOME, "AppData", "Local"))
     DEFAULT_IDE_DIR = os.path.join(LOCALAPPDATA, "Programs", "antigravity-ide")
@@ -106,7 +106,7 @@ elif OS_NAME == "windows":
     DEFAULT_CLI_BINARY = os.path.join(LOCALAPPDATA, "Microsoft", "WindowsApps", "agy.exe")
     DEFAULT_IDE_LAUNCHER = None
     DEFAULT_HUB_LAUNCHER = None
-    
+
 else:
     DEFAULT_IDE_DIR = ""
     DEFAULT_HUB_DIR = ""
@@ -142,7 +142,7 @@ def get_ide_version(ide_dir: str) -> str:
         product_json_path = os.path.join(ide_dir, "Contents", "Resources", "app", "product.json")
     else:
         product_json_path = os.path.join(ide_dir, "resources", "app", "product.json")
-        
+
     if not os.path.exists(product_json_path):
         return "0.0.0"
     try:
@@ -159,7 +159,7 @@ def get_hub_version(hub_dir: str) -> str:
         asar_path = os.path.join(hub_dir, "Contents", "Resources", "app.asar")
     else:
         asar_path = os.path.join(hub_dir, "resources", "app.asar")
-        
+
     if not os.path.exists(asar_path):
         return "0.0.0"
     try:
@@ -217,7 +217,7 @@ def download_file(url: str, dest_path: str, label: str = "Downloading"):
             total_size = int(response.headers.get('content-length', 0))
             block_size = 1024 * 64
             downloaded = 0
-            
+
             with open(dest_path, 'wb') as f:
                 while True:
                     buffer = response.read(block_size)
@@ -230,7 +230,12 @@ def download_file(url: str, dest_path: str, label: str = "Downloading"):
                         bar_len = 40
                         filled_len = int(bar_len * downloaded // total_size)
                         bar = '█' * filled_len + '-' * (bar_len - filled_len)
-                        sys.stdout.write(f"\r{COLOR_BLUE}⠋{COLOR_ENDC} {label}: [{bar}] {percent}% ({downloaded / 1024 / 1024:.1f}/{total_size / 1024 / 1024:.1f} MB)")
+                        current_mb = downloaded / 1024 / 1024
+                        total_mb = total_size / 1024 / 1024
+                        sys.stdout.write(
+                            f"\r{COLOR_BLUE}⠋{COLOR_ENDC} {label}: [{bar}] {percent}% "
+                            f"({current_mb:.1f}/{total_mb:.1f} MB)"
+                        )
                         sys.stdout.flush()
                 sys.stdout.write("\n")
     except Exception as e:
@@ -271,20 +276,20 @@ def install_macos_dmg(dmg_path: str, dest_app_path: str) -> bool:
         # Attach DMG
         cmd = ["hdiutil", "attach", "-nobrowse", "-readonly", "-mountpoint", mountpoint, dmg_path]
         subprocess.run(cmd, check=True, capture_output=True)
-        
+
         # Locate .app bundle inside the DMG mountpoint
         apps = [f for f in os.listdir(mountpoint) if f.endswith(".app")]
         if not apps:
             print_error("No .app bundle found in the mounted DMG.")
             return False
-        
+
         source_app = os.path.join(mountpoint, apps[0])
         print_status(f"Installing {apps[0]} to {dest_app_path}...")
-        
+
         # Replace existing app bundle
         if os.path.exists(dest_app_path):
             shutil.rmtree(dest_app_path)
-            
+
         shutil.copytree(source_app, dest_app_path, symlinks=True)
         return True
     except Exception as e:
@@ -321,7 +326,7 @@ def get_download_url(app_type: str, version: str, exec_id: str) -> str:
             return f"https://edgedl.me.gvt1.com/edgedl/release2/j0qc3/antigravity/stable/{version}-{exec_id}/darwin-{arch}/Antigravity%20IDE.dmg"
         elif OS_NAME == "windows":
             return f"https://edgedl.me.gvt1.com/edgedl/release2/j0qc3/antigravity/stable/{version}-{exec_id}/windows-x64/Antigravity%20IDE.exe"
-            
+
     elif app_type == "hub":
         if OS_NAME == "linux":
             return f"https://storage.googleapis.com/antigravity-public/antigravity-hub/{version}-{exec_id}/linux-x64/Antigravity.tar.gz"
@@ -330,7 +335,7 @@ def get_download_url(app_type: str, version: str, exec_id: str) -> str:
             return f"https://storage.googleapis.com/antigravity-public/antigravity-hub/{version}-{exec_id}/darwin-{arch}/Antigravity.dmg"
         elif OS_NAME == "windows":
             return f"https://storage.googleapis.com/antigravity-public/antigravity-hub/{version}-{exec_id}/windows-x64/Antigravity-x64.exe"
-            
+
     return ""
 
 
@@ -338,13 +343,13 @@ def update_ide(ide_dir: str, launcher_path: Optional[str], dry_run: bool = False
     """Check and execute updates for Antigravity IDE."""
     print_status("Checking for Antigravity IDE updates...")
     current_ver = get_ide_version(ide_dir)
-    
+
     try:
         releases = fetch_json(IDE_RELEASES_URL)
         if not releases:
             print_error("No IDE releases found from update server.")
             return False
-        
+
         latest = releases[0]
         latest_ver = latest["version"]
         exec_id = latest["execution_id"]
@@ -375,14 +380,14 @@ def update_ide(ide_dir: str, launcher_path: Optional[str], dry_run: bool = False
     if not download_url:
         print_error(f"No IDE download URL resolved for current platform ({OS_NAME}).")
         return False
-        
+
     with tempfile.TemporaryDirectory() as tmpdir:
         filename = "ide.dmg" if OS_NAME == "darwin" else ("ide.exe" if OS_NAME == "windows" else "ide.tar.gz")
         archive_path = os.path.join(tmpdir, filename)
-        
+
         try:
             download_file(download_url, archive_path, label="Downloading Antigravity IDE")
-            
+
             if OS_NAME == "darwin":
                 # macOS dmg installation
                 res = install_macos_dmg(archive_path, ide_dir)
@@ -398,7 +403,7 @@ def update_ide(ide_dir: str, launcher_path: Optional[str], dry_run: bool = False
                 print_status("Extracting archive...")
                 with tarfile.open(archive_path, 'r:gz') as tar:
                     tar.extractall(path=tmpdir)
-                
+
                 extracted_folder = os.path.join(tmpdir, "Antigravity IDE")
                 if not os.path.exists(extracted_folder):
                     print_error("Failed to find 'Antigravity IDE' directory inside the archive.")
@@ -409,13 +414,13 @@ def update_ide(ide_dir: str, launcher_path: Optional[str], dry_run: bool = False
                 if os.path.exists(ide_dir):
                     shutil.rmtree(ide_dir)
                 shutil.move(extracted_folder, ide_dir)
-                
+
                 # Update launchers
                 if launcher_path:
                     target_launcher = os.path.join(ide_dir, "bin", "antigravity-ide")
                     if os.path.exists(target_launcher):
                         update_symlink(target_launcher, launcher_path)
-                        
+
             print_success(f"Antigravity IDE successfully upgraded to version {latest_ver}!")
             return True
         except Exception as e:
@@ -427,13 +432,13 @@ def update_hub(hub_dir: str, launcher_path: Optional[str], dry_run: bool = False
     """Check and execute updates for Antigravity Hub."""
     print_status("Checking for Antigravity Hub updates...")
     current_ver = get_hub_version(hub_dir)
-    
+
     try:
         releases = fetch_json(HUB_RELEASES_URL)
         if not releases:
             print_error("No Hub releases found from update server.")
             return False
-        
+
         latest = releases[0]
         latest_ver = latest["version"]
         exec_id = latest["execution_id"]
@@ -464,14 +469,14 @@ def update_hub(hub_dir: str, launcher_path: Optional[str], dry_run: bool = False
     if not download_url:
         print_error(f"No Hub download URL resolved for current platform ({OS_NAME}).")
         return False
-        
+
     with tempfile.TemporaryDirectory() as tmpdir:
         filename = "hub.dmg" if OS_NAME == "darwin" else ("hub.exe" if OS_NAME == "windows" else "hub.tar.gz")
         archive_path = os.path.join(tmpdir, filename)
-        
+
         try:
             download_file(download_url, archive_path, label="Downloading Antigravity Hub")
-            
+
             if OS_NAME == "darwin":
                 # macOS dmg installation
                 res = install_macos_dmg(archive_path, hub_dir)
@@ -487,7 +492,7 @@ def update_hub(hub_dir: str, launcher_path: Optional[str], dry_run: bool = False
                 print_status("Extracting archive...")
                 with tarfile.open(archive_path, 'r:gz') as tar:
                     tar.extractall(path=tmpdir)
-                
+
                 extracted_folder = os.path.join(tmpdir, "Antigravity-x64")
                 if not os.path.exists(extracted_folder):
                     print_error("Failed to find 'Antigravity-x64' directory inside the archive.")
@@ -498,13 +503,13 @@ def update_hub(hub_dir: str, launcher_path: Optional[str], dry_run: bool = False
                 if os.path.exists(hub_dir):
                     shutil.rmtree(hub_dir)
                 shutil.move(extracted_folder, hub_dir)
-                
+
                 # Update launchers
                 if launcher_path:
                     target_launcher = os.path.join(hub_dir, "antigravity")
                     if os.path.exists(target_launcher):
                         update_symlink(target_launcher, launcher_path)
-                        
+
             print_success(f"Antigravity Hub successfully upgraded to version {latest_ver}!")
             return True
         except Exception as e:
@@ -516,7 +521,7 @@ def update_cli(cli_binary: str, dry_run: bool = False, force: bool = False) -> b
     """Check and execute updates for Antigravity CLI."""
     print_status("Checking for Antigravity CLI updates...")
     current_ver = get_cli_version(cli_binary)
-    
+
     try:
         manifest = fetch_json(CLI_MANIFEST_URL)
         latest_ver = manifest["version"]
@@ -541,7 +546,7 @@ def update_cli(cli_binary: str, dry_run: bool = False, force: bool = False) -> b
         archive_path = os.path.join(tmpdir, "cli_archive")
         try:
             download_file(download_url, archive_path, label="Downloading Antigravity CLI")
-            
+
             # Checksum Verification
             if expected_sha512:
                 print_status("Verifying checksum...")
@@ -550,12 +555,12 @@ def update_cli(cli_binary: str, dry_run: bool = False, force: bool = False) -> b
                     print_error("Security Check Failure: Checksum mismatch on CLI download archive.")
                     return False
                 print_success("Checksum verified.")
-                
+
             print_status("Extracting archive...")
-            
+
             binary_name = "agy.exe" if OS_NAME == "windows" else "antigravity"
             extracted_binary = os.path.join(tmpdir, binary_name)
-            
+
             # Handle Windows .zip vs Unix .tar.gz
             if download_url.endswith(".zip"):
                 with zipfile.ZipFile(archive_path, 'r') as zip_ref:
@@ -563,10 +568,14 @@ def update_cli(cli_binary: str, dry_run: bool = False, force: bool = False) -> b
             else:
                 with tarfile.open(archive_path, 'r:gz') as tar:
                     tar.extractall(path=tmpdir)
-            
+
             if not os.path.exists(extracted_binary):
                 # Try finding any file that matches 'antigravity' or 'agy' in the directory
-                potential = [os.path.join(tmpdir, f) for f in os.listdir(tmpdir) if f.startswith("antigravity") or f.startswith("agy")]
+                potential = [
+                    os.path.join(tmpdir, f)
+                    for f in os.listdir(tmpdir)
+                    if f.startswith("antigravity") or f.startswith("agy")
+                ]
                 if potential:
                     extracted_binary = potential[0]
                 else:
@@ -575,16 +584,16 @@ def update_cli(cli_binary: str, dry_run: bool = False, force: bool = False) -> b
 
             print_status("Installing CLI...")
             os.makedirs(os.path.dirname(cli_binary), exist_ok=True)
-            
+
             # Replace local binary
             if os.path.exists(cli_binary):
                 os.remove(cli_binary)
-                
+
             shutil.move(extracted_binary, cli_binary)
-            
+
             if OS_NAME != "windows":
                 os.chmod(cli_binary, 0o755)
-            
+
             print_success(f"Antigravity CLI successfully upgraded to version {latest_ver}!")
             return True
         except Exception as e:
@@ -602,39 +611,48 @@ def main():
     parser.add_argument("--hub", action="store_true", help="Update only the Antigravity Hub")
     parser.add_argument("--cli", action="store_true", help="Update only the Antigravity CLI")
     parser.add_argument("--force", action="store_true", help="Bypass version checks and active process warnings")
-    parser.add_argument("--dir-ide", type=str, default=DEFAULT_IDE_DIR, help="Override path to Antigravity IDE folder/bundle")
-    parser.add_argument("--dir-hub", type=str, default=DEFAULT_HUB_DIR, help="Override path to Antigravity Hub folder/bundle")
-    parser.add_argument("--path-cli", type=str, default=DEFAULT_CLI_BINARY, help="Override path to Antigravity CLI binary")
-    
+    parser.add_argument(
+        "--dir-ide", type=str, default=DEFAULT_IDE_DIR,
+        help="Override path to Antigravity IDE folder/bundle"
+    )
+    parser.add_argument(
+        "--dir-hub", type=str, default=DEFAULT_HUB_DIR,
+        help="Override path to Antigravity Hub folder/bundle"
+    )
+    parser.add_argument(
+        "--path-cli", type=str, default=DEFAULT_CLI_BINARY,
+        help="Override path to Antigravity CLI binary"
+    )
+
     args = parser.parse_args()
-    
+
     if OS_NAME == "unknown":
         print_error("Unsupported operating system.")
         sys.exit(1)
-        
+
     # If no specific component is selected, default to all components
     update_all = not (args.ide or args.hub or args.cli)
-    
+
     print(f"\n{COLOR_HEADER}{COLOR_BOLD}=== Antigravity Applications Auto-Updater ==={COLOR_ENDC}")
     print_info(f"Target Platform: {COLOR_BOLD}{OS_NAME} ({ARCH_NAME}){COLOR_ENDC}\n")
-    
+
     success = True
-    
+
     if args.ide or update_all:
         res = update_ide(args.dir_ide, DEFAULT_IDE_LAUNCHER, dry_run=args.check, force=args.force)
         success = success and res
         print()
-        
+
     if args.hub or update_all:
         res = update_hub(args.dir_hub, DEFAULT_HUB_LAUNCHER, dry_run=args.check, force=args.force)
         success = success and res
         print()
-        
+
     if args.cli or update_all:
         res = update_cli(args.path_cli, dry_run=args.check, force=args.force)
         success = success and res
         print()
-        
+
     if success:
         print_success("Operation completed successfully.")
         sys.exit(0)

@@ -1,0 +1,20 @@
+[project]
+name = "antigravity-updater"
+version = "0.1.0"
+description = "Auto-updater utility for Google Antigravity developer tools"
+requires-python = ">=3.9"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "ruff>=0.3.0",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = []
