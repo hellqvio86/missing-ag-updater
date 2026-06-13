@@ -59,6 +59,33 @@ python -m missing_ag_updater
 antigravity-updater
 ```
 
+### Example Output
+
+```text
+$ antigravity-updater
+
+=== Unofficial Antigravity Applications Auto-Updater (missing-ag-updater) ===
+⚠ This project is a community tool and is NOT affiliated with, sponsored by, or supported by Google.
+  Target Platform: linux (x64)
+
+⠋ Checking for Antigravity IDE updates...
+  Local IDE Version:  2.0.4
+  Latest IDE Version: 2.0.4
+✓ Antigravity IDE is up to date.
+
+⠋ Checking for Antigravity Hub updates...
+  Local Hub Version:  2.1.4
+  Latest Hub Version: 2.1.4
+✓ Antigravity Hub is up to date.
+
+⠋ Checking for Antigravity CLI updates...
+  Local CLI Version:  1.0.8
+  Latest CLI Version: 1.0.8
+✓ Antigravity CLI is up to date.
+
+✓ Operation completed successfully.
+```
+
 ### Options
 
 ```text
