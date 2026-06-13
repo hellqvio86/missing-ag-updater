@@ -15,7 +15,7 @@ format: .venv
 
 test: .venv
 	.venv/bin/pytest --cov=src/missing_ag_updater --cov-report=term-missing
-	.venv/bin/python3 tests/generate_badge.py
+	.venv/bin/python3 src/generate_badge.py
 
 build: .venv
 	uv build

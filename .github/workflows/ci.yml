@@ -93,7 +93,7 @@ jobs:
       - name: Generate coverage badge
         if: matrix.python-version == '3.12'
         run: |
-          uv run python tests/generate_badge.py
+          uv run python src/generate_badge.py
 
       - name: Commit and push coverage badge
         if: matrix.python-version == '3.12' && github.event_name == 'push' && github.ref == 'refs/heads/main'
