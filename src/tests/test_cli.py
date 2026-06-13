@@ -3,6 +3,7 @@ from unittest.mock import patch
 import pytest
 
 from missing_ag_updater.cli import main
+from missing_ag_updater.const import DEFAULT_IDE_LAUNCHER
 
 
 def test_main_unknown_os() -> None:
@@ -67,7 +68,7 @@ def test_main_force_and_check() -> None:
                         main()
                     mock_ide.assert_called_once_with(
                         "/custom/ide/path",
-                        "/home/hellqvio/.local/bin/antigravity-ide",
+                        DEFAULT_IDE_LAUNCHER,
                         dry_run=True,
                         force=True,
                     )

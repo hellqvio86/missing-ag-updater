@@ -169,7 +169,7 @@ def update_ide(ide_dir: str, launcher_path: Optional[str], *, dry_run: bool = Fa
                 # Linux tarball installation
                 print_status("Extracting archive...")
                 with tarfile.open(archive_path, "r:gz") as tar:
-                    tar.extractall(path=tmpdir)
+                    tar.extractall(path=tmpdir, filter="fully_trusted")
 
                 extracted_folder = os.path.join(tmpdir, "Antigravity IDE")
                 if not os.path.exists(extracted_folder):
@@ -261,7 +261,7 @@ def update_hub(hub_dir: str, launcher_path: Optional[str], *, dry_run: bool = Fa
                 # Linux tarball installation
                 print_status("Extracting archive...")
                 with tarfile.open(archive_path, "r:gz") as tar:
-                    tar.extractall(path=tmpdir)
+                    tar.extractall(path=tmpdir, filter="fully_trusted")
 
                 extracted_folder = os.path.join(tmpdir, "Antigravity-x64")
                 if not os.path.exists(extracted_folder):
@@ -338,7 +338,7 @@ def update_cli(cli_binary: str, *, dry_run: bool = False, force: bool = False) -
                     zip_ref.extractall(tmpdir)
             else:
                 with tarfile.open(archive_path, "r:gz") as tar:
-                    tar.extractall(path=tmpdir)
+                    tar.extractall(path=tmpdir, filter="fully_trusted")
 
             if not os.path.exists(extracted_binary):
                 # Try finding any file that matches 'antigravity' or 'agy' in the directory
