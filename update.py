@@ -27,13 +27,13 @@ import zipfile
 from typing import Any, Optional
 
 # Color output helpers for premium terminal feedback
-COLOR_HEADER = '\033[95m'
-COLOR_BLUE = '\033[94m'
-COLOR_GREEN = '\033[92m'
-COLOR_WARNING = '\033[93m'
-COLOR_FAIL = '\033[91m'
-COLOR_ENDC = '\033[0m'
-COLOR_BOLD = '\033[1m'
+COLOR_HEADER = "\033[95m"
+COLOR_BLUE = "\033[94m"
+COLOR_GREEN = "\033[92m"
+COLOR_WARNING = "\033[93m"
+COLOR_FAIL = "\033[91m"
+COLOR_ENDC = "\033[0m"
+COLOR_BOLD = "\033[1m"
 
 # Disable colors on Windows command prompt unless supported
 if sys.platform == "win32":
@@ -42,20 +42,26 @@ if sys.platform == "win32":
     if not sys.stdout.isatty():
         COLOR_HEADER = COLOR_BLUE = COLOR_GREEN = COLOR_WARNING = COLOR_FAIL = COLOR_ENDC = COLOR_BOLD = ""
 
+
 def print_status(msg: str):
     print(f"{COLOR_BLUE}⠋{COLOR_ENDC} {msg}")
+
 
 def print_success(msg: str):
     print(f"{COLOR_GREEN}✓{COLOR_ENDC} {msg}")
 
+
 def print_warning(msg: str):
     print(f"{COLOR_WARNING}⚠{COLOR_ENDC} {COLOR_WARNING}{msg}{COLOR_ENDC}")
+
 
 def print_error(msg: str):
     print(f"{COLOR_FAIL}✗{COLOR_ENDC} {COLOR_FAIL}{msg}{COLOR_ENDC}")
 
+
 def print_info(msg: str):
     print(f"  {msg}")
+
 
 # OS & Architecture detection
 OS = sys.platform
@@ -117,7 +123,9 @@ else:
 # API URLs
 IDE_RELEASES_URL = "https://antigravity-ide-auto-updater-974169037036.us-central1.run.app/releases"
 HUB_RELEASES_URL = "https://antigravity-hub-auto-updater-974169037036.us-central1.run.app/releases"
-CLI_MANIFEST_URL = f"https://antigravity-cli-auto-updater-974169037036.us-central1.run.app/manifests/{OS_NAME}_{CLI_ARCH}.json"
+CLI_MANIFEST_URL = (
+    f"https://antigravity-cli-auto-updater-974169037036.us-central1.run.app/manifests/{OS_NAME}_{CLI_ARCH}.json"
+)
 
 
 def is_app_running(keyword: str) -> bool:
@@ -146,7 +154,7 @@ def get_ide_version(ide_dir: str) -> str:
     if not os.path.exists(product_json_path):
         return "0.0.0"
     try:
-        with open(product_json_path, 'r', encoding='utf-8') as f:
+        with open(product_json_path, "r", encoding="utf-8") as f:
             product_json = json.load(f)
             return product_json.get("ideVersion", "0.0.0")
     except Exception:
@@ -163,24 +171,24 @@ def get_hub_version(hub_dir: str) -> str:
     if not os.path.exists(asar_path):
         return "0.0.0"
     try:
-        with open(asar_path, 'rb') as f:
+        with open(asar_path, "rb") as f:
             header_size_data = f.read(8)
             if len(header_size_data) < 8:
                 return "0.0.0"
-            header_size = struct.unpack('<I', header_size_data[4:8])[0]
+            header_size = struct.unpack("<I", header_size_data[4:8])[0]
             f.seek(16)
             header_json_data = f.read(header_size - 8)
-            header_json = json.loads(header_json_data.decode('utf-8'))
-            files = header_json.get('files', {})
-            package_json_info = files.get('package.json', {})
+            header_json = json.loads(header_json_data.decode("utf-8"))
+            files = header_json.get("files", {})
+            package_json_info = files.get("package.json", {})
             if not package_json_info:
                 return "0.0.0"
-            offset = int(package_json_info.get('offset'))
-            size = int(package_json_info.get('size'))
+            offset = int(package_json_info.get("offset"))
+            size = int(package_json_info.get("size"))
             data_start_offset = 8 + header_size
             f.seek(data_start_offset + offset)
-            pkg_json = json.loads(f.read(size).decode('utf-8'))
-            return pkg_json.get('version', "0.0.0")
+            pkg_json = json.loads(f.read(size).decode("utf-8"))
+            return pkg_json.get("version", "0.0.0")
     except Exception:
         return "0.0.0"
 
@@ -201,24 +209,24 @@ def get_cli_version(cli_binary: str) -> str:
 
 def fetch_json(url: str) -> Any:
     """Fetch JSON from a URL with custom user agent headers."""
-    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (AntigravityUpdater)'})
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (AntigravityUpdater)"})
     try:
         with urllib.request.urlopen(req, timeout=10) as response:
-            return json.loads(response.read().decode('utf-8'))
+            return json.loads(response.read().decode("utf-8"))
     except Exception as e:
         raise RuntimeError(f"Failed to query {url}: {e}")
 
 
 def download_file(url: str, dest_path: str, label: str = "Downloading"):
     """Download a file with a visually appealing text progress bar."""
-    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (AntigravityUpdater)'})
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (AntigravityUpdater)"})
     try:
         with urllib.request.urlopen(req, timeout=60) as response:
-            total_size = int(response.headers.get('content-length', 0))
+            total_size = int(response.headers.get("content-length", 0))
             block_size = 1024 * 64
             downloaded = 0
 
-            with open(dest_path, 'wb') as f:
+            with open(dest_path, "wb") as f:
                 while True:
                     buffer = response.read(block_size)
                     if not buffer:
@@ -229,7 +237,7 @@ def download_file(url: str, dest_path: str, label: str = "Downloading"):
                         percent = int(downloaded * 100 / total_size)
                         bar_len = 40
                         filled_len = int(bar_len * downloaded // total_size)
-                        bar = '█' * filled_len + '-' * (bar_len - filled_len)
+                        bar = "█" * filled_len + "-" * (bar_len - filled_len)
                         current_mb = downloaded / 1024 / 1024
                         total_mb = total_size / 1024 / 1024
                         sys.stdout.write(
@@ -246,7 +254,7 @@ def download_file(url: str, dest_path: str, label: str = "Downloading"):
 def compute_sha512(file_path: str) -> str:
     """Compute the SHA512 hash of a file."""
     h = hashlib.sha512()
-    with open(file_path, 'rb') as f:
+    with open(file_path, "rb") as f:
         while True:
             chunk = f.read(8192)
             if not chunk:
@@ -401,7 +409,7 @@ def update_ide(ide_dir: str, launcher_path: Optional[str], dry_run: bool = False
             else:
                 # Linux tarball installation
                 print_status("Extracting archive...")
-                with tarfile.open(archive_path, 'r:gz') as tar:
+                with tarfile.open(archive_path, "r:gz") as tar:
                     tar.extractall(path=tmpdir)
 
                 extracted_folder = os.path.join(tmpdir, "Antigravity IDE")
@@ -490,7 +498,7 @@ def update_hub(hub_dir: str, launcher_path: Optional[str], dry_run: bool = False
             else:
                 # Linux tarball installation
                 print_status("Extracting archive...")
-                with tarfile.open(archive_path, 'r:gz') as tar:
+                with tarfile.open(archive_path, "r:gz") as tar:
                     tar.extractall(path=tmpdir)
 
                 extracted_folder = os.path.join(tmpdir, "Antigravity-x64")
@@ -563,10 +571,10 @@ def update_cli(cli_binary: str, dry_run: bool = False, force: bool = False) -> b
 
             # Handle Windows .zip vs Unix .tar.gz
             if download_url.endswith(".zip"):
-                with zipfile.ZipFile(archive_path, 'r') as zip_ref:
+                with zipfile.ZipFile(archive_path, "r") as zip_ref:
                     zip_ref.extractall(tmpdir)
             else:
-                with tarfile.open(archive_path, 'r:gz') as tar:
+                with tarfile.open(archive_path, "r:gz") as tar:
                     tar.extractall(path=tmpdir)
 
             if not os.path.exists(extracted_binary):
@@ -604,7 +612,7 @@ def update_cli(cli_binary: str, dry_run: bool = False, force: bool = False) -> b
 def main():
     parser = argparse.ArgumentParser(
         description="Auto-updater utility for Google Antigravity developer tools (Cross-Platform).",
-        formatter_class=argparse.RawTextHelpFormatter
+        formatter_class=argparse.RawTextHelpFormatter,
     )
     parser.add_argument("--check", action="store_true", help="Check for available updates without installing")
     parser.add_argument("--ide", action="store_true", help="Update only the Antigravity IDE")
@@ -612,16 +620,13 @@ def main():
     parser.add_argument("--cli", action="store_true", help="Update only the Antigravity CLI")
     parser.add_argument("--force", action="store_true", help="Bypass version checks and active process warnings")
     parser.add_argument(
-        "--dir-ide", type=str, default=DEFAULT_IDE_DIR,
-        help="Override path to Antigravity IDE folder/bundle"
+        "--dir-ide", type=str, default=DEFAULT_IDE_DIR, help="Override path to Antigravity IDE folder/bundle"
     )
     parser.add_argument(
-        "--dir-hub", type=str, default=DEFAULT_HUB_DIR,
-        help="Override path to Antigravity Hub folder/bundle"
+        "--dir-hub", type=str, default=DEFAULT_HUB_DIR, help="Override path to Antigravity Hub folder/bundle"
     )
     parser.add_argument(
-        "--path-cli", type=str, default=DEFAULT_CLI_BINARY,
-        help="Override path to Antigravity CLI binary"
+        "--path-cli", type=str, default=DEFAULT_CLI_BINARY, help="Override path to Antigravity CLI binary"
     )
 
     args = parser.parse_args()

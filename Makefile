@@ -8,6 +8,10 @@ venv: .venv
 
 lint: .venv
 	.venv/bin/ruff check .
+	.venv/bin/ruff format --check .
+
+format: .venv
+	.venv/bin/ruff format .
 
 test: .venv
 	.venv/bin/pytest

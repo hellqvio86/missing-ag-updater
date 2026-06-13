@@ -30,31 +30,24 @@ def test_get_hub_version():
 
         # Create a dummy app.asar
         pkg_json = {"version": "2.1.4"}
-        pkg_data = json.dumps(pkg_json).encode('utf-8')
+        pkg_data = json.dumps(pkg_json).encode("utf-8")
 
-        header = {
-            "files": {
-                "package.json": {
-                    "size": len(pkg_data),
-                    "offset": "0"
-                }
-            }
-        }
-        header_data = json.dumps(header).encode('utf-8')
+        header = {"files": {"package.json": {"size": len(pkg_data), "offset": "0"}}}
+        header_data = json.dumps(header).encode("utf-8")
         # header_size includes 8 bytes of padding/sizes in header json size representation
         header_size = len(header_data) + 8
         padding_size = (8 + header_size) - (16 + len(header_data))
 
-        with open(asar_path, 'wb') as f:
+        with open(asar_path, "wb") as f:
             # write size headers
-            f.write(struct.pack('<I', 4))
-            f.write(struct.pack('<I', header_size))
-            f.write(struct.pack('<I', header_size - 4))
-            f.write(struct.pack('<I', len(header_data)))
+            f.write(struct.pack("<I", 4))
+            f.write(struct.pack("<I", header_size))
+            f.write(struct.pack("<I", header_size - 4))
+            f.write(struct.pack("<I", len(header_data)))
             f.write(header_data)
             # padding bytes to reach data offset
             if padding_size > 0:
-                f.write(b'\x00' * padding_size)
+                f.write(b"\x00" * padding_size)
             f.write(pkg_data)
 
         assert update.get_hub_version(tmpdir) == "2.1.4"
