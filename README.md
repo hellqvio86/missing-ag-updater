@@ -125,7 +125,9 @@ options:
 
 ## Default Installation Paths
 
-By default, the updater installs each component to the standard paths recommended for each operating system:
+When running an update, the tool first downloads the application packages (such as `.tar.gz`, `.dmg`, or `.exe` installers) to a **temporary system directory** (e.g. `/tmp` on Linux/macOS, or `%TEMP%` on Windows). Once the extraction and installation are complete, these temporary files are automatically deleted.
+
+After the update finishes, the permanent application files are stored in the following default paths:
 
 | Platform | Antigravity IDE Path | Antigravity Hub Path | Antigravity CLI Path | Launcher/Symlink Path |
 | :--- | :--- | :--- | :--- | :--- |
