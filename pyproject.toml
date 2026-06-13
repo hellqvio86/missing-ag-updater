@@ -1,5 +1,5 @@
 [project]
-name = "antigravity-tools-updater"
+name = "missing-ag-updater"
 version = "0.1.0"
 description = "Auto-updater utility for Google Antigravity developer tools (IDE, Hub, CLI)"
 readme = "README.md"

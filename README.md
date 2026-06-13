@@ -1,4 +1,7 @@
-# Antigravity Tools Updater
+# missing-ag-updater
+
+> [!IMPORTANT]
+> **Disclaimer:** This project is an unofficial, community-maintained utility. It is **NOT** affiliated with, sponsored by, or supported by Google LLC.
 
 This repository contains a Python utility to check for and apply updates to the Google Antigravity developer suite on Linux, macOS, and Windows.
 

@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 """
-Antigravity Applications Auto-Updater (Cross-Platform)
------------------------------------------------------
-A robust Python utility to check, download, and install updates for the
-Antigravity IDE, Antigravity Hub (Agent Desktop), and Antigravity CLI.
+missing-ag-updater (Cross-Platform)
+----------------------------------
+An unofficial, community-maintained Python utility to check, download, and
+install updates for the Antigravity IDE, Antigravity Hub, and Antigravity CLI.
 Supports Linux, macOS, and Windows.
 
-Author: Antigravity AI Assistant
-Date: June 2026
+Disclaimer: This tool is not affiliated with, sponsored by, or supported by Google.
 """
 
 import argparse
@@ -638,7 +637,12 @@ def main():
     # If no specific component is selected, default to all components
     update_all = not (args.ide or args.hub or args.cli)
 
-    print(f"\n{COLOR_HEADER}{COLOR_BOLD}=== Antigravity Applications Auto-Updater ==={COLOR_ENDC}")
+    print(
+        f"\n{COLOR_HEADER}{COLOR_BOLD}"
+        "=== Unofficial Antigravity Applications Auto-Updater (missing-ag-updater) ==="
+        f"{COLOR_ENDC}"
+    )
+    print_warning("This project is a community tool and is NOT affiliated with, sponsored by, or supported by Google.")
     print_info(f"Target Platform: {COLOR_BOLD}{OS_NAME} ({ARCH_NAME}){COLOR_ENDC}\n")
 
     success = True

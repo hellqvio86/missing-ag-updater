@@ -148,7 +148,7 @@ jobs:
     needs: [all-checks]
     environment:
       name: pypi
-      url: https://pypi.org/p/antigravity-tools-updater
+      url: https://pypi.org/p/missing-ag-updater
     if: github.event_name == 'release' && github.event.action == 'published' && needs.all-checks.outputs.success == 'true'
     steps:
       - name: Checkout code
