@@ -248,6 +248,15 @@ The project includes a `Makefile` to simplify development tasks:
   ```bash
   make clean
   ```
+
+### Git Hooks
+
+A local Git `pre-push` hook is configured to automatically run formatting, linting checks, and the unit test suite before code can be pushed to remote branches:
+
+- To run the pre-push checks manually:
+  ```bash
+  .git/hooks/pre-push
+  ```
 ## Other update antigravity projects
 [Opensnap Antigravity updater](https://github.com/opensnap/antigravity)
 
