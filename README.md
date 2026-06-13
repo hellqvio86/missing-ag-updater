@@ -1,5 +1,10 @@
-# missing-ag-updater
-
+# Missing-AG-Updater
+ __  __ _         _                     _    ____       _   _           _       _            
+|  \/  (_)___ ___(_)_ __   __ _        / \  / ___|     | | | |_ __   __| | __ _| |_ ___ _ __ 
+| |\/| | / __/ __| | '_ \ / _` |_____ / _ \| |  _ _____| | | | '_ \ / _` |/ _` | __/ _ \ '__|
+| |  | | \__ \__ \ | | | | (_| |_____/ ___ \ |_| |_____| |_| | |_) | (_| | (_| | ||  __/ |   
+|_|  |_|_|___/___/_|_| |_|\__, |    /_/   \_\____|      \___/| .__/ \__,_|\__,_|\__\___|_|   
+                          |___/                              |_| 
 [![CI/CD](https://github.com/hellqvio86/missing-ag-updater/actions/workflows/ci.yml/badge.svg)](https://github.com/hellqvio86/missing-ag-updater/actions/workflows/ci.yml)
 [![Coverage](coverage.svg)](https://github.com/hellqvio86/missing-ag-updater/actions)
 [![PyPI Version](https://img.shields.io/pypi/v/missing-ag-updater.svg)](https://pypi.org/project/missing-ag-updater/)
