@@ -139,6 +139,16 @@ You can override these default paths at execution time using the `--dir-ide`, `-
 
 ---
 
+## Upstream Sources (Where Google Stores the Binaries)
+
+All application packages are fetched directly from official Google distribution servers:
+
+* **Antigravity IDE**: Downloaded from Google's stable release CDN domains (`dl.google.com` and `edgedl.me.gvt1.com`).
+* **Antigravity Hub**: Downloaded from Google's public Google Cloud Storage bucket (`storage.googleapis.com/antigravity-public`).
+* **Antigravity CLI**: Downloaded from URLs specified in the official updates manifests hosted on Google Cloud.
+
+---
+
 ## How It Works
 
 The auto-updater acts as a secure, cross-platform layer to keep your local developer environment up to date:
