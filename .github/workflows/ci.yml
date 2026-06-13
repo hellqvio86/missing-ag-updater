@@ -1,8 +1,7 @@
 name: CI/CD
 
 permissions:
-  contents: write
-  id-token: write
+  contents: read
 
 on:
   push:
@@ -59,6 +58,8 @@ jobs:
   test:
     name: Test (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     if: |
       github.event_name != 'workflow_dispatch' ||
       inputs.job == 'all' ||
@@ -197,6 +198,9 @@ jobs:
   publish:
     name: Build and Publish
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
     needs: [all-checks]
     environment:
       name: pypi
