@@ -127,20 +127,30 @@ CLI_MANIFEST_URL = (
 )
 
 
-def is_app_running(keyword: str) -> bool:
-    """Check if any running processes match the specified keyword."""
+def get_running_pids(keyword: str) -> list[str]:
+    """Get list of running PIDs matching the specified keyword (excluding current process)."""
+    pids = []
+    my_pid = str(os.getpid())
     if OS_NAME == "windows":
         try:
-            res = subprocess.run(["tasklist"], capture_output=True, text=True)
-            return keyword.lower() in res.stdout.lower()
+            res = subprocess.run(["tasklist", "/NH", "/FO", "CSV"], capture_output=True, text=True)
+            for line in res.stdout.strip().split("\n"):
+                if not line.strip():
+                    continue
+                parts = [p.strip('"') for p in line.split(",")]
+                if len(parts) >= 2 and keyword.lower() in parts[0].lower():
+                    pids.append(parts[1])
         except Exception:
-            return False
+            pass
     else:
         try:
-            res = subprocess.run(["pgrep", "-f", keyword], capture_output=True)
-            return res.returncode == 0
+            res = subprocess.run(["pgrep", "-f", keyword], capture_output=True, text=True)
+            if res.returncode == 0:
+                pids = [pid.strip() for pid in res.stdout.strip().split("\n") if pid.strip()]
         except Exception:
-            return False
+            pass
+    # Exclude our own process PID to avoid false positives (e.g. matching launcher name)
+    return [pid for pid in pids if pid != my_pid]
 
 
 def get_ide_version(ide_dir: str) -> str:
@@ -376,8 +386,10 @@ def update_ide(ide_dir: str, launcher_path: Optional[str], dry_run: bool = False
         return True
 
     # Process safety checks
-    if is_app_running("Antigravity IDE") or is_app_running("antigravity-ide"):
-        print_warning("Antigravity IDE process is currently running.")
+    running_pids = get_running_pids("Antigravity IDE") or get_running_pids("antigravity-ide")
+    if running_pids:
+        pids_str = ", ".join(running_pids)
+        print_warning(f"Antigravity IDE process is currently running (PID: {pids_str}).")
         if not force:
             print_error("Aborting IDE upgrade. Please close the IDE or run with --force.")
             return False
@@ -465,8 +477,10 @@ def update_hub(hub_dir: str, launcher_path: Optional[str], dry_run: bool = False
         return True
 
     # Process safety checks
-    if is_app_running("Antigravity") or is_app_running("antigravity"):
-        print_warning("Antigravity Hub process is currently running.")
+    running_pids = get_running_pids("Antigravity") or get_running_pids("antigravity")
+    if running_pids:
+        pids_str = ", ".join(running_pids)
+        print_warning(f"Antigravity Hub process is currently running (PID: {pids_str}).")
         if not force:
             print_error("Aborting Hub upgrade. Please close the Hub desktop app or run with --force.")
             return False

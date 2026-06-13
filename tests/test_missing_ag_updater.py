@@ -75,3 +75,30 @@ def test_compute_sha512():
         assert missing_ag_updater.compute_sha512(tmp_name) == expected
     finally:
         os.remove(tmp_name)
+
+
+def test_get_running_pids():
+    import subprocess
+
+    # Test on Unix with a mock subprocess.run
+    with patch("missing_ag_updater.OS_NAME", "linux"):
+        with patch("subprocess.run") as mock_run:
+            mock_res = subprocess.CompletedProcess(args=[], returncode=0, stdout="1234\n5678\n")
+            mock_run.return_value = mock_res
+
+            pids = missing_ag_updater.get_running_pids("test")
+            current_pid = str(os.getpid())
+            expected = [pid for pid in ["1234", "5678"] if pid != current_pid]
+            assert pids == expected
+
+    # Test on Windows with tasklist mock
+    with patch("missing_ag_updater.OS_NAME", "windows"):
+        with patch("subprocess.run") as mock_run:
+            csv_output = '"Image Name","PID"\n"test.exe","4321"\n"other.exe","9999"\n'
+            mock_res = subprocess.CompletedProcess(args=[], returncode=0, stdout=csv_output)
+            mock_run.return_value = mock_res
+
+            pids = missing_ag_updater.get_running_pids("test")
+            current_pid = str(os.getpid())
+            expected = [pid for pid in ["4321"] if pid != current_pid]
+            assert pids == expected
