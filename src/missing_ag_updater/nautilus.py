@@ -13,8 +13,24 @@ def install_ide_nautilus(ide_dir: str, launcher_path: Optional[str]) -> None:
     nautilus_content = f"""import subprocess
 from urllib.parse import unquote, urlparse
 import gi
-gi.require_version('Nautilus', '4.0')
+try:
+    gi.require_version('Nautilus', '4.0')
+except ValueError:
+    pass
 from gi.repository import Nautilus, GObject
+
+try:
+    nautilus_version = gi.get_required_version('Nautilus')
+except ValueError:
+    nautilus_version = None
+
+if nautilus_version:
+    try:
+        major = int(nautilus_version.split('.')[0])
+        if major < 4:
+            raise ImportError("Nautilus 4.0 or greater is required")
+    except (ValueError, IndexError):
+        pass
 
 class OpenInAntigravityIDE(GObject.GObject, Nautilus.MenuProvider):
     def _path(self, file_info):
