@@ -1,7 +1,7 @@
 .PHONY: venv lint test clean
 
 .venv: pyproject.toml
-	uv venv
+	if [ ! -d .venv ]; then uv venv; fi
 	uv pip install -e . --group dev
 
 venv: .venv

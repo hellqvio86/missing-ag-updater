@@ -3,7 +3,7 @@ name = "antigravity-tools-updater"
 version = "0.1.0"
 description = "Auto-updater utility for Google Antigravity developer tools (IDE, Hub, CLI)"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.12"
 license = {text = "MIT"}
 authors = [
     {name = "hellqvio"}
