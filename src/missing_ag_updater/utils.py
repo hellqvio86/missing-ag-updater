@@ -4,8 +4,9 @@ import os
 import struct
 import subprocess
 import sys
-import urllib.request
 from typing import Any
+
+import requests
 
 from .const import (
     COLOR_BLUE,
@@ -128,42 +129,42 @@ def get_cli_version(cli_binary: str) -> str:
 
 def fetch_json(url: str) -> Any:
     """Fetch JSON from a URL with custom user agent headers."""
-    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (AntigravityUpdater)"})
+    headers = {"User-Agent": "Mozilla/5.0 (AntigravityUpdater)"}
     try:
-        with urllib.request.urlopen(req, timeout=10) as response:
-            return json.loads(response.read().decode("utf-8"))
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
+        return response.json()
     except Exception as e:
         raise RuntimeError(f"Failed to query {url}: {e}")
 
 
 def download_file(url: str, dest_path: str, *, label: str = "Downloading") -> None:
     """Download a file with a visually appealing text progress bar."""
-    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (AntigravityUpdater)"})
+    headers = {"User-Agent": "Mozilla/5.0 (AntigravityUpdater)"}
     try:
-        with urllib.request.urlopen(req, timeout=60) as response:
+        with requests.get(url, headers=headers, stream=True, timeout=60) as response:
+            response.raise_for_status()
             total_size = int(response.headers.get("content-length", 0))
             block_size = 1024 * 64
             downloaded = 0
 
             with open(dest_path, "wb") as f:
-                while True:
-                    buffer = response.read(block_size)
-                    if not buffer:
-                        break
-                    f.write(buffer)
-                    downloaded += len(buffer)
-                    if total_size:
-                        percent = int(downloaded * 100 / total_size)
-                        bar_len = 40
-                        filled_len = int(bar_len * downloaded // total_size)
-                        bar = "█" * filled_len + "-" * (bar_len - filled_len)
-                        current_mb = downloaded / 1024 / 1024
-                        total_mb = total_size / 1024 / 1024
-                        sys.stdout.write(
-                            f"\r{COLOR_BLUE}⠋{COLOR_ENDC} {label}: [{bar}] {percent}% "
-                            f"({current_mb:.1f}/{total_mb:.1f} MB)"
-                        )
-                        sys.stdout.flush()
+                for chunk in response.iter_content(chunk_size=block_size):
+                    if chunk:
+                        f.write(chunk)
+                        downloaded += len(chunk)
+                        if total_size:
+                            percent = int(downloaded * 100 / total_size)
+                            bar_len = 40
+                            filled_len = int(bar_len * downloaded // total_size)
+                            bar = "█" * filled_len + "-" * (bar_len - filled_len)
+                            current_mb = downloaded / 1024 / 1024
+                            total_mb = total_size / 1024 / 1024
+                            sys.stdout.write(
+                                f"\r{COLOR_BLUE}⠋{COLOR_ENDC} {label}: [{bar}] {percent}% "
+                                f"({current_mb:.1f}/{total_mb:.1f} MB)"
+                            )
+                            sys.stdout.flush()
                 sys.stdout.write("\n")
     except Exception as e:
         sys.stdout.write("\n")

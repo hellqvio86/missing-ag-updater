@@ -5,9 +5,10 @@ import struct
 import subprocess
 import tempfile
 from io import StringIO
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
+import responses
 
 from missing_ag_updater.utils import (
     compute_sha512,
@@ -152,19 +153,25 @@ def test_get_running_pids() -> None:
             assert pids == expected
 
 
+@responses.activate
 def test_fetch_json() -> None:
-    mock_response = MagicMock()
-    mock_response.read.return_value = b'{"key": "value"}'
-    mock_response.__enter__.return_value = mock_response
+    responses.add(
+        responses.GET,
+        "http://example.com/api",
+        json={"key": "value"},
+        status=200,
+    )
+    data = fetch_json("http://example.com/api")
+    assert data == {"key": "value"}
 
-    with patch("urllib.request.urlopen", return_value=mock_response):
-        data = fetch_json("http://example.com/api")
-        assert data == {"key": "value"}
-
-    with patch("urllib.request.urlopen", side_effect=Exception("network error")):
-        with pytest.raises(RuntimeError) as exc_info:
-            fetch_json("http://example.com/api")
-        assert "Failed to query http://example.com/api" in str(exc_info.value)
+    responses.add(
+        responses.GET,
+        "http://example.com/api-error",
+        status=500,
+    )
+    with pytest.raises(RuntimeError) as exc_info:
+        fetch_json("http://example.com/api-error")
+    assert "Failed to query http://example.com/api-error" in str(exc_info.value)
 
 
 def test_update_symlink() -> None:
@@ -194,31 +201,38 @@ def test_update_symlink() -> None:
             assert os.readlink(link_name) == new_target
 
 
+@responses.activate
 def test_download_file_success() -> None:
-    mock_response = MagicMock()
-    mock_response.__enter__.return_value = mock_response
-    mock_response.headers = {"content-length": "10"}
-    mock_response.read.side_effect = [b"0123456789", b""]
+    responses.add(
+        responses.GET,
+        "http://example.com/file",
+        body=b"0123456789",
+        headers={"content-length": "10"},
+        status=200,
+    )
+    with tempfile.TemporaryDirectory() as tmpdir:
+        dest = os.path.join(tmpdir, "downloaded.txt")
+        from missing_ag_updater.utils import download_file
 
-    with patch("urllib.request.urlopen", return_value=mock_response):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            dest = os.path.join(tmpdir, "downloaded.txt")
-            from missing_ag_updater.utils import download_file
-
-            download_file("http://example.com/file", dest)
-            with open(dest, "rb") as f:
-                assert f.read() == b"0123456789"
+        download_file("http://example.com/file", dest)
+        with open(dest, "rb") as f:
+            assert f.read() == b"0123456789"
 
 
+@responses.activate
 def test_download_file_error() -> None:
-    with patch("urllib.request.urlopen", side_effect=Exception("network error")):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            dest = os.path.join(tmpdir, "downloaded.txt")
-            from missing_ag_updater.utils import download_file
+    responses.add(
+        responses.GET,
+        "http://example.com/file",
+        status=404,
+    )
+    with tempfile.TemporaryDirectory() as tmpdir:
+        dest = os.path.join(tmpdir, "downloaded.txt")
+        from missing_ag_updater.utils import download_file
 
-            with pytest.raises(RuntimeError) as exc_info:
-                download_file("http://example.com/file", dest)
-            assert "Download error from http://example.com/file" in str(exc_info.value)
+        with pytest.raises(RuntimeError) as exc_info:
+            download_file("http://example.com/file", dest)
+        assert "Download error from http://example.com/file" in str(exc_info.value)
 
 
 def test_get_hub_version_exceptions() -> None:

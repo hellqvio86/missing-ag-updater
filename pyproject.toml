@@ -16,6 +16,7 @@ classifiers = [
 ]
 dependencies = [
     "pydantic>=2.0.0",
+    "requests>=2.31.0",
 ]
 
 [project.scripts]
@@ -34,6 +35,8 @@ dev = [
     "ruff>=0.3.0",
     "pytest-cov>=4.0.0",
     "mypy>=1.0.0",
+    "responses>=0.25.0",
+    "types-requests>=2.31.0.0",
 ]
 
 [tool.ruff]
