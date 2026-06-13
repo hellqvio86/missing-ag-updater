@@ -6,3 +6,7 @@ __pycache__/
 *.tar.gz
 .venv/
 *.egg-info/
+.coverage
+coverage.json
+.pytest_cache/
+.ruff_cache/
