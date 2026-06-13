@@ -216,7 +216,7 @@ The project includes a `Makefile` to simplify development tasks:
   make clean
   ```
 ## Other update antigravity projects
-[Opensnap Antigravity updater]([https://link-url-here.org](https://github.com/opensnap/antigravity))
+[Opensnap Antigravity updater](https://github.com/opensnap/antigravity)
 
 ## License
 
