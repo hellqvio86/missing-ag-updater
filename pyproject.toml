@@ -1,9 +1,25 @@
 [project]
-name = "antigravity-updater"
+name = "antigravity-tools-updater"
 version = "0.1.0"
-description = "Auto-updater utility for Google Antigravity developer tools"
+description = "Auto-updater utility for Google Antigravity developer tools (IDE, Hub, CLI)"
+readme = "README.md"
 requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = [
+    {name = "hellqvio"}
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
 dependencies = []
+
+[project.scripts]
+antigravity-updater = "update:main"
+
+[tool.setuptools]
+py-modules = ["update"]
 
 [dependency-groups]
 dev = [

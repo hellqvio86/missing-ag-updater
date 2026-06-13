@@ -44,7 +44,7 @@ def test_get_hub_version():
         # header_size includes 8 bytes of padding/sizes in header json size representation
         header_size = len(header_data) + 8
         padding_size = (8 + header_size) - (16 + len(header_data))
-        
+
         with open(asar_path, 'wb') as f:
             # write size headers
             f.write(struct.pack('<I', 4))
@@ -56,7 +56,7 @@ def test_get_hub_version():
             if padding_size > 0:
                 f.write(b'\x00' * padding_size)
             f.write(pkg_data)
-            
+
         assert update.get_hub_version(tmpdir) == "2.1.4"
 
 

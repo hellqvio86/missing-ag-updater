@@ -2,7 +2,7 @@
 
 .venv: pyproject.toml
 	uv venv
-	uv pip install pytest ruff
+	uv pip install -e . --group dev
 
 venv: .venv
 
