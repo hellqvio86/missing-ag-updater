@@ -23,7 +23,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["missing_ag_updater.py"]
+packages = ["src/missing_ag_updater"]
 
 [dependency-groups]
 dev = [
