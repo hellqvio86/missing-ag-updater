@@ -25,6 +25,8 @@ import urllib.request
 import zipfile
 from typing import Any, Optional
 
+from pydantic import BaseModel
+
 # Color output helpers for premium terminal feedback
 COLOR_HEADER = "\033[95m"
 COLOR_BLUE = "\033[94m"
@@ -42,23 +44,23 @@ if sys.platform == "win32":
         COLOR_HEADER = COLOR_BLUE = COLOR_GREEN = COLOR_WARNING = COLOR_FAIL = COLOR_ENDC = COLOR_BOLD = ""
 
 
-def print_status(msg: str):
+def print_status(msg: str) -> None:
     print(f"{COLOR_BLUE}⠋{COLOR_ENDC} {msg}")
 
 
-def print_success(msg: str):
+def print_success(msg: str) -> None:
     print(f"{COLOR_GREEN}✓{COLOR_ENDC} {msg}")
 
 
-def print_warning(msg: str):
+def print_warning(msg: str) -> None:
     print(f"{COLOR_WARNING}⚠{COLOR_ENDC} {COLOR_WARNING}{msg}{COLOR_ENDC}")
 
 
-def print_error(msg: str):
+def print_error(msg: str) -> None:
     print(f"{COLOR_FAIL}✗{COLOR_ENDC} {COLOR_FAIL}{msg}{COLOR_ENDC}")
 
 
-def print_info(msg: str):
+def print_info(msg: str) -> None:
     print(f"  {msg}")
 
 
@@ -87,6 +89,9 @@ else:
 # Default Paths based on OS
 HOME = os.path.expanduser("~")
 
+DEFAULT_IDE_LAUNCHER: Optional[str] = None
+DEFAULT_HUB_LAUNCHER: Optional[str] = None
+
 if OS_NAME == "linux":
     OPT_DIR = os.path.join(HOME, "opt")
     BIN_DIR = os.path.join(HOME, ".local", "bin")
@@ -101,23 +106,17 @@ elif OS_NAME == "darwin":
     DEFAULT_IDE_DIR = "/Applications/Antigravity IDE.app"
     DEFAULT_HUB_DIR = "/Applications/Antigravity.app"
     DEFAULT_CLI_BINARY = os.path.join(HOME, ".local", "bin", "agy")
-    DEFAULT_IDE_LAUNCHER = None
-    DEFAULT_HUB_LAUNCHER = None
 
 elif OS_NAME == "windows":
     LOCALAPPDATA = os.environ.get("LOCALAPPDATA", os.path.join(HOME, "AppData", "Local"))
     DEFAULT_IDE_DIR = os.path.join(LOCALAPPDATA, "Programs", "antigravity-ide")
     DEFAULT_HUB_DIR = os.path.join(LOCALAPPDATA, "Programs", "antigravity")
     DEFAULT_CLI_BINARY = os.path.join(LOCALAPPDATA, "Microsoft", "WindowsApps", "agy.exe")
-    DEFAULT_IDE_LAUNCHER = None
-    DEFAULT_HUB_LAUNCHER = None
 
 else:
     DEFAULT_IDE_DIR = ""
     DEFAULT_HUB_DIR = ""
     DEFAULT_CLI_BINARY = ""
-    DEFAULT_IDE_LAUNCHER = None
-    DEFAULT_HUB_LAUNCHER = None
 
 # API URLs
 IDE_RELEASES_URL = "https://antigravity-ide-auto-updater-974169037036.us-central1.run.app/releases"
@@ -125,6 +124,17 @@ HUB_RELEASES_URL = "https://antigravity-hub-auto-updater-974169037036.us-central
 CLI_MANIFEST_URL = (
     f"https://antigravity-cli-auto-updater-974169037036.us-central1.run.app/manifests/{OS_NAME}_{CLI_ARCH}.json"
 )
+
+
+class Release(BaseModel):
+    version: str
+    execution_id: str
+
+
+class CliManifest(BaseModel):
+    version: str
+    url: str
+    sha512: Optional[str] = None
 
 
 def get_running_pids(keyword: str) -> list[str]:
@@ -226,7 +236,7 @@ def fetch_json(url: str) -> Any:
         raise RuntimeError(f"Failed to query {url}: {e}")
 
 
-def download_file(url: str, dest_path: str, label: str = "Downloading"):
+def download_file(url: str, dest_path: str, *, label: str = "Downloading") -> None:
     """Download a file with a visually appealing text progress bar."""
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (AntigravityUpdater)"})
     try:
@@ -272,7 +282,7 @@ def compute_sha512(file_path: str) -> str:
     return h.hexdigest()
 
 
-def update_symlink(target: str, link_name: str):
+def update_symlink(target: str, link_name: str) -> None:
     """Safely create or update a symbolic link (Linux/macOS only)."""
     if OS_NAME == "windows":
         return
@@ -356,20 +366,21 @@ def get_download_url(app_type: str, version: str, exec_id: str) -> str:
     return ""
 
 
-def update_ide(ide_dir: str, launcher_path: Optional[str], dry_run: bool = False, force: bool = False) -> bool:
+def update_ide(ide_dir: str, launcher_path: Optional[str], *, dry_run: bool = False, force: bool = False) -> bool:
     """Check and execute updates for Antigravity IDE."""
     print_status("Checking for Antigravity IDE updates...")
     current_ver = get_ide_version(ide_dir)
 
     try:
-        releases = fetch_json(IDE_RELEASES_URL)
-        if not releases:
+        releases_json = fetch_json(IDE_RELEASES_URL)
+        if not releases_json:
             print_error("No IDE releases found from update server.")
             return False
 
+        releases = [Release.model_validate(r) for r in releases_json]
         latest = releases[0]
-        latest_ver = latest["version"]
-        exec_id = latest["execution_id"]
+        latest_ver = latest.version
+        exec_id = latest.execution_id
     except Exception as e:
         print_error(f"Failed to check IDE updates: {e}")
         return False
@@ -447,20 +458,21 @@ def update_ide(ide_dir: str, launcher_path: Optional[str], dry_run: bool = False
             return False
 
 
-def update_hub(hub_dir: str, launcher_path: Optional[str], dry_run: bool = False, force: bool = False) -> bool:
+def update_hub(hub_dir: str, launcher_path: Optional[str], *, dry_run: bool = False, force: bool = False) -> bool:
     """Check and execute updates for Antigravity Hub."""
     print_status("Checking for Antigravity Hub updates...")
     current_ver = get_hub_version(hub_dir)
 
     try:
-        releases = fetch_json(HUB_RELEASES_URL)
-        if not releases:
+        releases_json = fetch_json(HUB_RELEASES_URL)
+        if not releases_json:
             print_error("No Hub releases found from update server.")
             return False
 
+        releases = [Release.model_validate(r) for r in releases_json]
         latest = releases[0]
-        latest_ver = latest["version"]
-        exec_id = latest["execution_id"]
+        latest_ver = latest.version
+        exec_id = latest.execution_id
     except Exception as e:
         print_error(f"Failed to check Hub updates: {e}")
         return False
@@ -538,16 +550,17 @@ def update_hub(hub_dir: str, launcher_path: Optional[str], dry_run: bool = False
             return False
 
 
-def update_cli(cli_binary: str, dry_run: bool = False, force: bool = False) -> bool:
+def update_cli(cli_binary: str, *, dry_run: bool = False, force: bool = False) -> bool:
     """Check and execute updates for Antigravity CLI."""
     print_status("Checking for Antigravity CLI updates...")
     current_ver = get_cli_version(cli_binary)
 
     try:
-        manifest = fetch_json(CLI_MANIFEST_URL)
-        latest_ver = manifest["version"]
-        download_url = manifest["url"]
-        expected_sha512 = manifest.get("sha512")
+        manifest_json = fetch_json(CLI_MANIFEST_URL)
+        manifest = CliManifest.model_validate(manifest_json)
+        latest_ver = manifest.version
+        download_url = manifest.url
+        expected_sha512 = manifest.sha512
     except Exception as e:
         print_error(f"Failed to check CLI updates: {e}")
         return False
@@ -622,7 +635,7 @@ def update_cli(cli_binary: str, dry_run: bool = False, force: bool = False) -> b
             return False
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
         description="Auto-updater utility for Google Antigravity developer tools (Cross-Platform).",
         formatter_class=argparse.RawTextHelpFormatter,

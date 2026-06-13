@@ -14,7 +14,9 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
-dependencies = []
+dependencies = [
+    "pydantic>=2.0.0",
+]
 
 [project.scripts]
 antigravity-updater = "missing_ag_updater:main"
@@ -31,6 +33,7 @@ dev = [
     "pytest>=8.0.0",
     "ruff>=0.3.0",
     "pytest-cov>=4.0.0",
+    "mypy>=1.0.0",
 ]
 
 [tool.ruff]
