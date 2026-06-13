@@ -171,6 +171,18 @@ jobs:
           git tag -a "v${{ steps.check_version.outputs.version }}" -m "Release v${{ steps.check_version.outputs.version }}"
           git push origin "v${{ steps.check_version.outputs.version }}"
 
+      - name: Install uv
+        if: steps.check_version.outputs.changed == 'true'
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        if: steps.check_version.outputs.changed == 'true'
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
       - name: Build package
         if: steps.check_version.outputs.changed == 'true'
         run: |
