@@ -215,6 +215,8 @@ The project includes a `Makefile` to simplify development tasks:
   ```bash
   make clean
   ```
+## Other update antigravity projects
+[https://github.com/opensnap/antigravity| Opensnap Antigravity updater]
 
 ## License
 
