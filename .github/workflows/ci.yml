@@ -147,7 +147,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
         with:
-          fetch-depth: 2
+          fetch-depth: 0
 
       - name: Check version change
         id: check_version
@@ -196,6 +196,23 @@ jobs:
           format: spdx-json
           output-file: sbom.spdx.json
 
+      - name: Generate Changelog
+        if: steps.check_version.outputs.changed == 'true'
+        shell: bash
+        run: |
+          git fetch --tags --force
+          TAGS=$(git tag --sort=-v:refname | grep -E '^v[0-9]')
+          TAG_COUNT=$(echo "$TAGS" | grep -c -E '^v[0-9]' || echo 0)
+          echo "## Changelog" > changelog.md
+          echo "" >> changelog.md
+          if [ "$TAG_COUNT" -le 1 ]; then
+            git log --pretty=format:"* %s (%h)" --no-merges >> changelog.md
+          else
+            PREV_TAG=$(echo "$TAGS" | sed -n '2p')
+            git log ${PREV_TAG}..HEAD --pretty=format:"* %s (%h)" --no-merges >> changelog.md
+          fi
+          echo "" >> changelog.md
+
       - name: Create Release Draft
         if: steps.check_version.outputs.changed == 'true'
         uses: softprops/action-gh-release@v3
@@ -203,7 +220,7 @@ jobs:
           tag_name: v${{ steps.check_version.outputs.version }}
           name: v${{ steps.check_version.outputs.version }}
           draft: true
-          generate_release_notes: true
+          body_path: changelog.md
           files: |
             dist/*.whl
             dist/*.tar.gz
