@@ -123,6 +123,40 @@ options:
   python -m missing_ag_updater --cli
   ```
 
+## Default Installation Paths
+
+By default, the updater installs each component to the standard paths recommended for each operating system:
+
+| Platform | Antigravity IDE Path | Antigravity Hub Path | Antigravity CLI Path | Launcher/Symlink Path |
+| :--- | :--- | :--- | :--- | :--- |
+| **Linux** | `~/opt/Antigravity IDE` | `~/opt/Antigravity-x64` | `~/.local/bin/agy` | `~/.local/bin/antigravity-ide`<br>`~/.local/bin/antigravity` |
+| **macOS** | `/Applications/Antigravity IDE.app` | `/Applications/Antigravity.app` | `~/.local/bin/agy` | *N/A (installed in Applications)* |
+| **Windows** | `%LOCALAPPDATA%\Programs\antigravity-ide` | `%LOCALAPPDATA%\Programs\antigravity` | `%LOCALAPPDATA%\Microsoft\WindowsApps\agy.exe` | *N/A (added to PATH)* |
+
+You can override these default paths at execution time using the `--dir-ide`, `--dir-hub`, and `--path-cli` flags.
+
+---
+
+## How It Works
+
+The auto-updater acts as a secure, cross-platform layer to keep your local developer environment up to date:
+
+1. **Update Resolution**:
+   Queries the unofficial update API endpoints to parse the latest version info. For the IDE and Hub, this resolves to Google release manifests. For the CLI, it parses the architecture-specific manifest.
+
+2. **Process Integrity Check**:
+   Before writing any files, the utility checks if the IDE or Hub is currently running. If active PIDs are detected, the update will abort (unless bypassed with `--force`) to prevent file lockups and corruption.
+
+3. **Secure CLI Checksum Verification**:
+   When updating the CLI, the manifest provides a SHA-512 checksum. The tool computes the hash of the downloaded zip or tarball locally and compares them to ensure integrity before extraction.
+
+4. **Platform-Specific Installation**:
+   - **Linux**: Extracts the tarball to a temporary directory, replaces the target directory under `~/opt`, and creates/updates symbolic links under `~/.local/bin`.
+   - **macOS**: Mounts the downloaded `.dmg` file securely via `hdiutil attach`, replaces the `.app` bundle under `/Applications`, and unmounts the volume.
+   - **Windows**: Executes the installer binary with the silent installation flag (`/S`) to perform a background upgrade.
+
+---
+
 ## Launching the Applications
 
 Once updated, you can launch the Antigravity tools using their standard terminal commands:
