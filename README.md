@@ -29,13 +29,13 @@ make venv
 
 Run the script directly to check and update all components:
 ```bash
-./update.py
+./missing_ag_updater.py
 ```
 
 ### Options
 
 ```text
-usage: update.py [-h] [--check] [--ide] [--hub] [--cli] [--force]
+usage: missing_ag_updater.py [-h] [--check] [--ide] [--hub] [--cli] [--force]
                  [--dir-ide DIR_IDE] [--dir-hub DIR_HUB] [--path-cli PATH_CLI]
 
 Auto-updater utility for Google Antigravity developer tools (Cross-Platform).
@@ -56,17 +56,17 @@ options:
 
 - **Dry run check for all tools:**
   ```bash
-  ./update.py --check
+  ./missing_ag_updater.py --check
   ```
 
 - **Force update the Hub application only:**
   ```bash
-  ./update.py --hub --force
+  ./missing_ag_updater.py --hub --force
   ```
 
 - **Update only the CLI tool:**
   ```bash
-  ./update.py --cli
+  ./missing_ag_updater.py --cli
   ```
 
 ## Launching the Applications

@@ -5,13 +5,13 @@ import struct
 import tempfile
 from unittest.mock import patch
 
-import update
+import missing_ag_updater
 
 
 def test_get_ide_version():
     with tempfile.TemporaryDirectory() as tmpdir:
         # Test non-existent product.json
-        assert update.get_ide_version(tmpdir) == "0.0.0"
+        assert missing_ag_updater.get_ide_version(tmpdir) == "0.0.0"
 
         # Test valid product.json
         app_dir = os.path.join(tmpdir, "resources", "app")
@@ -19,7 +19,7 @@ def test_get_ide_version():
         with open(os.path.join(app_dir, "product.json"), "w") as f:
             json.dump({"ideVersion": "2.0.4"}, f)
 
-        assert update.get_ide_version(tmpdir) == "2.0.4"
+        assert missing_ag_updater.get_ide_version(tmpdir) == "2.0.4"
 
 
 def test_get_hub_version():
@@ -50,19 +50,19 @@ def test_get_hub_version():
                 f.write(b"\x00" * padding_size)
             f.write(pkg_data)
 
-        assert update.get_hub_version(tmpdir) == "2.1.4"
+        assert missing_ag_updater.get_hub_version(tmpdir) == "2.1.4"
 
 
 def test_get_download_url():
     # Test IDE Linux
-    with patch("update.OS_NAME", "linux"):
-        url = update.get_download_url("ide", "2.0.4", "12345")
+    with patch("missing_ag_updater.OS_NAME", "linux"):
+        url = missing_ag_updater.get_download_url("ide", "2.0.4", "12345")
         assert "linux-x64/Antigravity%20IDE.tar.gz" in url
 
     # Test Hub macOS
-    with patch("update.OS_NAME", "darwin"):
-        with patch("update.ARCH_NAME", "arm64"):
-            url = update.get_download_url("hub", "2.1.4", "67890")
+    with patch("missing_ag_updater.OS_NAME", "darwin"):
+        with patch("missing_ag_updater.ARCH_NAME", "arm64"):
+            url = missing_ag_updater.get_download_url("hub", "2.1.4", "67890")
             assert "darwin-arm/Antigravity.dmg" in url
 
 
@@ -72,6 +72,6 @@ def test_compute_sha512():
         tmp_name = tmp.name
     try:
         expected = hashlib.sha512(b"hello world").hexdigest()
-        assert update.compute_sha512(tmp_name) == expected
+        assert missing_ag_updater.compute_sha512(tmp_name) == expected
     finally:
         os.remove(tmp_name)
