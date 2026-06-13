@@ -3,6 +3,9 @@
 > [!IMPORTANT]
 > **Disclaimer:** This project is an unofficial, community-maintained utility. It is **NOT** affiliated with, sponsored by, or supported by Google LLC.
 
+> [!WARNING]
+> **Alpha Software:** This utility is currently in an early **alpha** stage of development. Features may change without notice, and bugs may occur. Use with caution.
+
 This repository contains a Python utility to check for and apply updates to the Google Antigravity developer suite on Linux, macOS, and Windows.
 
 ## Features
