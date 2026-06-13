@@ -5,12 +5,15 @@
 [![Python Versions](https://img.shields.io/pypi/pyversions/missing-ag-updater.svg)](https://pypi.org/project/missing-ag-updater/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+```
  __  __ _         _                     _    ____       _   _           _       _            
 |  \/  (_)___ ___(_)_ __   __ _        / \  / ___|     | | | |_ __   __| | __ _| |_ ___ _ __ 
 | |\/| | / __/ __| | '_ \ / _` |_____ / _ \| |  _ _____| | | | '_ \ / _` |/ _` | __/ _ \ '__|
 | |  | | \__ \__ \ | | | | (_| |_____/ ___ \ |_| |_____| |_| | |_) | (_| | (_| | ||  __/ |   
 |_|  |_|_|___/___/_|_| |_|\__, |    /_/   \_\____|      \___/| .__/ \__,_|\__,_|\__\___|_|   
                           |___/                              |_| 
+
+```
 
 > [!IMPORTANT]
 > **Disclaimer:** This project is an unofficial, community-maintained utility. It is **NOT** affiliated with, sponsored by, or supported by Google LLC.
