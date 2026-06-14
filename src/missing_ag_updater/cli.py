@@ -2,6 +2,7 @@ import argparse
 import os
 import sys
 
+from .config import get_default_config_path, load_toml_config
 from .const import (
     ARCH_NAME,
     COLOR_BOLD,
@@ -67,6 +68,12 @@ def main() -> None:
         default=None,
         help="Skip installing Nautilus context-menu integration on Linux",
     )
+    parser.add_argument(
+        "--config",
+        type=str,
+        default=None,
+        help="Path to TOML configuration file override",
+    )
 
     args = parser.parse_args()
 
@@ -74,32 +81,126 @@ def main() -> None:
         print_error("Unsupported operating system.")
         sys.exit(1)
 
-    # Resolve settings from CLI arguments or environment variables
-    check = args.check if args.check is not None else get_env_bool(["ANTIGRAVITY_CHECK", "AG_CHECK"], False)
-    ide = args.ide if args.ide is not None else get_env_bool(["ANTIGRAVITY_IDE", "AG_IDE"], False)
-    hub = args.hub if args.hub is not None else get_env_bool(["ANTIGRAVITY_HUB", "AG_HUB"], False)
-    cli = args.cli if args.cli is not None else get_env_bool(["ANTIGRAVITY_CLI", "AG_CLI"], False)
-    force = args.force if args.force is not None else get_env_bool(["ANTIGRAVITY_FORCE", "AG_FORCE"], False)
+    # 1. Resolve configuration path: CLI arg > Env Variable > Default Path
+    config_path = args.config
+    explicit_config = True
+    if not config_path:
+        config_path = os.environ.get("ANTIGRAVITY_CONFIG") or os.environ.get("AG_CONFIG")
+        if config_path:
+            explicit_config = True
+        else:
+            config_path = get_default_config_path()
+            explicit_config = False
 
-    dir_ide = args.dir_ide or get_env_str(["ANTIGRAVITY_DIR_IDE", "AG_DIR_IDE"], DEFAULT_IDE_DIR)
-    dir_hub = args.dir_hub or get_env_str(["ANTIGRAVITY_DIR_HUB", "AG_DIR_HUB"], DEFAULT_HUB_DIR)
-    path_cli = args.path_cli or get_env_str(["ANTIGRAVITY_PATH_CLI", "AG_PATH_CLI"], DEFAULT_CLI_BINARY)
+    # 2. Load TOML configuration if exists
+    try:
+        config_dict = load_toml_config(config_path, explicit=explicit_config)
+    except Exception as e:
+        print_error(str(e))
+        sys.exit(1)
 
+    # 3. Settings Resolution Helpers
+    def resolve_bool(cli_val: bool | None, env_names: list[str], toml_key: str, default_val: bool) -> bool:
+        if cli_val is not None:
+            return cli_val
+        for name in env_names:
+            val = os.environ.get(name)
+            if val is not None:
+                return val.lower() in ("1", "true", "yes", "on")
+        toml_val = config_dict.get(toml_key)
+        if toml_val is not None:
+            if isinstance(toml_val, bool):
+                return toml_val
+            if isinstance(toml_val, str):
+                return toml_val.lower() in ("1", "true", "yes", "on")
+        return default_val
+
+    def resolve_str(cli_val: str | None, env_names: list[str], toml_key: str, default_val: str) -> str:
+        if cli_val is not None:
+            return cli_val
+        for name in env_names:
+            val = os.environ.get(name)
+            if val is not None:
+                return val
+        toml_val = config_dict.get(toml_key)
+        if toml_val is not None:
+            return str(toml_val)
+        return default_val
+
+    # Resolve settings (CLI > Env > TOML > Default)
+    check = resolve_bool(args.check, ["ANTIGRAVITY_CHECK", "AG_CHECK"], "check", False)
+    ide = resolve_bool(args.ide, ["ANTIGRAVITY_IDE", "AG_IDE"], "ide", False)
+    hub = resolve_bool(args.hub, ["ANTIGRAVITY_HUB", "AG_HUB"], "hub", False)
+    cli = resolve_bool(args.cli, ["ANTIGRAVITY_CLI", "AG_CLI"], "cli", False)
+    force = resolve_bool(args.force, ["ANTIGRAVITY_FORCE", "AG_FORCE"], "force", False)
+
+    dir_ide = resolve_str(args.dir_ide, ["ANTIGRAVITY_DIR_IDE", "AG_DIR_IDE"], "dir_ide", DEFAULT_IDE_DIR)
+    dir_hub = resolve_str(args.dir_hub, ["ANTIGRAVITY_DIR_HUB", "AG_DIR_HUB"], "dir_hub", DEFAULT_HUB_DIR)
+    path_cli = resolve_str(args.path_cli, ["ANTIGRAVITY_PATH_CLI", "AG_PATH_CLI"], "path_cli", DEFAULT_CLI_BINARY)
+
+    # Resolve install_desktop (with NO_DESKTOP checks)
     if args.install_desktop is not None:
         install_desktop = args.install_desktop
     else:
         if get_env_bool(["ANTIGRAVITY_NO_DESKTOP", "AG_NO_DESKTOP"], False):
             install_desktop = False
         else:
-            install_desktop = get_env_bool(["ANTIGRAVITY_DESKTOP", "AG_DESKTOP"], True)
+            desktop_env = None
+            for name in ["ANTIGRAVITY_DESKTOP", "AG_DESKTOP"]:
+                val = os.environ.get(name)
+                if val is not None:
+                    desktop_env = val.lower() in ("1", "true", "yes", "on")
+                    break
 
+            if desktop_env is not None:
+                install_desktop = desktop_env
+            else:
+                toml_desktop = config_dict.get("desktop")
+                toml_no_desktop = config_dict.get("no_desktop")
+                if toml_desktop is not None:
+                    if isinstance(toml_desktop, bool):
+                        install_desktop = toml_desktop
+                    else:
+                        install_desktop = str(toml_desktop).lower() in ("1", "true", "yes", "on")
+                elif toml_no_desktop is not None:
+                    if isinstance(toml_no_desktop, bool):
+                        install_desktop = not toml_no_desktop
+                    else:
+                        install_desktop = str(toml_no_desktop).lower() not in ("1", "true", "yes", "on")
+                else:
+                    install_desktop = True
+
+    # Resolve install_nautilus (with NO_NAUTILUS checks)
     if args.install_nautilus is not None:
         install_nautilus = args.install_nautilus
     else:
         if get_env_bool(["ANTIGRAVITY_NO_NAUTILUS", "AG_NO_NAUTILUS"], False):
             install_nautilus = False
         else:
-            install_nautilus = get_env_bool(["ANTIGRAVITY_NAUTILUS", "AG_NAUTILUS"], True)
+            nautilus_env = None
+            for name in ["ANTIGRAVITY_NAUTILUS", "AG_NAUTILUS"]:
+                val = os.environ.get(name)
+                if val is not None:
+                    nautilus_env = val.lower() in ("1", "true", "yes", "on")
+                    break
+
+            if nautilus_env is not None:
+                install_nautilus = nautilus_env
+            else:
+                toml_nautilus = config_dict.get("nautilus")
+                toml_no_nautilus = config_dict.get("no_nautilus")
+                if toml_nautilus is not None:
+                    if isinstance(toml_nautilus, bool):
+                        install_nautilus = toml_nautilus
+                    else:
+                        install_nautilus = str(toml_nautilus).lower() in ("1", "true", "yes", "on")
+                elif toml_no_nautilus is not None:
+                    if isinstance(toml_no_nautilus, bool):
+                        install_nautilus = not toml_no_nautilus
+                    else:
+                        install_nautilus = str(toml_no_nautilus).lower() not in ("1", "true", "yes", "on")
+                else:
+                    install_nautilus = True
 
     # If no specific component is selected, default to all components
     update_all = not (ide or hub or cli)

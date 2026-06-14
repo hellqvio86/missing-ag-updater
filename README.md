@@ -160,6 +160,36 @@ You can configure the behavior of the auto-updater using environment variables. 
 > [!NOTE]
 > Boolean environment variables accept `1`, `true`, `yes`, or `on` as `True`, and any other value (or unset) as `False`.
 
+### Configuration File (TOML)
+
+You can also use a TOML configuration file to save your settings persistently. By default, the updater looks for a configuration file in the following standard user directories:
+
+- **Linux**: `~/.config/missing-ag-updater/config.toml` (honors `XDG_CONFIG_HOME`)
+- **macOS**: `~/Library/Application Support/missing-ag-updater/config.toml`
+- **Windows**: `%APPDATA%\missing-ag-updater\config.toml`
+
+You can override the config file location using the `--config PATH` option or the `ANTIGRAVITY_CONFIG` / `AG_CONFIG` environment variables.
+
+#### Settings Resolution Hierarchy
+
+Values are resolved in the following priority order (highest to lowest):
+1. **CLI Arguments** (explicitly passed)
+2. **Environment Variables**
+3. **TOML Configuration File**
+4. **Default Values**
+
+#### Example TOML Configuration
+
+```toml
+check = false
+ide = true
+hub = true
+cli = true
+force = false
+dir_ide = "/home/user/opt/Antigravity IDE"
+desktop = true
+nautilus = true
+```
 
 ### Examples
 
