@@ -128,47 +128,92 @@ def get_cli_version(cli_binary: str) -> str:
 
 
 def fetch_json(url: str) -> Any:
-    """Fetch JSON from a URL with custom user agent headers."""
+    """Fetch JSON from a URL with custom user agent headers, retrying on transient failures."""
+    import time
+
     headers = {"User-Agent": "Mozilla/5.0 (AntigravityUpdater)"}
-    try:
-        response = requests.get(url, headers=headers, timeout=10)
-        response.raise_for_status()
-        return response.json()
-    except Exception as e:
-        raise RuntimeError(f"Failed to query {url}: {e}")
+    max_retries = 3
+    backoff_factor = 0.5
+    last_err: Exception | None = None
+
+    for attempt in range(max_retries + 1):
+        try:
+            response = requests.get(url, headers=headers, timeout=10)
+            response.raise_for_status()
+            return response.json()
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
+            last_err = e
+            if attempt < max_retries:
+                time.sleep(backoff_factor * (2**attempt))
+            continue
+        except requests.exceptions.HTTPError as e:
+            last_err = e
+            if e.response is not None and e.response.status_code in [500, 502, 503, 504]:
+                if attempt < max_retries:
+                    time.sleep(backoff_factor * (2**attempt))
+                    continue
+            raise RuntimeError(f"Failed to query {url}: {e}")
+        except Exception as e:
+            raise RuntimeError(f"Failed to query {url}: {e}")
+
+    raise RuntimeError(f"Failed to query {url}: {last_err}")
 
 
 def download_file(url: str, dest_path: str, *, label: str = "Downloading") -> None:
-    """Download a file with a visually appealing text progress bar."""
-    headers = {"User-Agent": "Mozilla/5.0 (AntigravityUpdater)"}
-    try:
-        with requests.get(url, headers=headers, stream=True, timeout=60) as response:
-            response.raise_for_status()
-            total_size = int(response.headers.get("content-length", 0))
-            block_size = 1024 * 64
-            downloaded = 0
+    """Download a file with a visually appealing text progress bar, retrying on transient failures."""
+    import time
 
-            with open(dest_path, "wb") as f:
-                for chunk in response.iter_content(chunk_size=block_size):
-                    if chunk:
-                        f.write(chunk)
-                        downloaded += len(chunk)
-                        if total_size:
-                            percent = int(downloaded * 100 / total_size)
-                            bar_len = 40
-                            filled_len = int(bar_len * downloaded // total_size)
-                            bar = "█" * filled_len + "-" * (bar_len - filled_len)
-                            current_mb = downloaded / 1024 / 1024
-                            total_mb = total_size / 1024 / 1024
-                            sys.stdout.write(
-                                f"\r{COLOR_BLUE}⠋{COLOR_ENDC} {label}: [{bar}] {percent}% "
-                                f"({current_mb:.1f}/{total_mb:.1f} MB)"
-                            )
-                            sys.stdout.flush()
-                sys.stdout.write("\n")
-    except Exception as e:
-        sys.stdout.write("\n")
-        raise RuntimeError(f"Download error from {url}: {e}")
+    headers = {"User-Agent": "Mozilla/5.0 (AntigravityUpdater)"}
+    max_retries = 3
+    backoff_factor = 0.5
+    last_err: Exception | None = None
+
+    for attempt in range(max_retries + 1):
+        try:
+            with requests.get(url, headers=headers, stream=True, timeout=60) as response:
+                response.raise_for_status()
+                total_size = int(response.headers.get("content-length", 0))
+                block_size = 1024 * 64
+                downloaded = 0
+
+                with open(dest_path, "wb") as f:
+                    for chunk in response.iter_content(chunk_size=block_size):
+                        if chunk:
+                            f.write(chunk)
+                            downloaded += len(chunk)
+                            if total_size:
+                                percent = int(downloaded * 100 / total_size)
+                                bar_len = 40
+                                filled_len = int(bar_len * downloaded // total_size)
+                                bar = "█" * filled_len + "-" * (bar_len - filled_len)
+                                current_mb = downloaded / 1024 / 1024
+                                total_mb = total_size / 1024 / 1024
+                                sys.stdout.write(
+                                    f"\r{COLOR_BLUE}⠋{COLOR_ENDC} {label}: [{bar}] {percent}% "
+                                    f"({current_mb:.1f}/{total_mb:.1f} MB)"
+                                )
+                                sys.stdout.flush()
+                    sys.stdout.write("\n")
+                return
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
+            last_err = e
+            if attempt < max_retries:
+                time.sleep(backoff_factor * (2**attempt))
+            continue
+        except requests.exceptions.HTTPError as e:
+            last_err = e
+            if e.response is not None and e.response.status_code in [500, 502, 503, 504]:
+                if attempt < max_retries:
+                    time.sleep(backoff_factor * (2**attempt))
+                    continue
+            sys.stdout.write("\n")
+            raise RuntimeError(f"Download error from {url}: {e}")
+        except Exception as e:
+            sys.stdout.write("\n")
+            raise RuntimeError(f"Download error from {url}: {e}")
+
+    sys.stdout.write("\n")
+    raise RuntimeError(f"Download error from {url}: {last_err}")
 
 
 def compute_sha512(file_path: str) -> str:

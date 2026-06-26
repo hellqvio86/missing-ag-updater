@@ -309,6 +309,12 @@ nautilus -q
 
 The project includes a `Makefile` to simplify development tasks:
 
+- **Run the updater (via module):**
+  ```bash
+  make run
+  # Pass options via the ARGS variable
+  make run ARGS="--check"
+  ```
 - **Lint check (Ruff):**
   ```bash
   make lint

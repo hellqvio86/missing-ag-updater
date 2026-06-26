@@ -154,7 +154,8 @@ def test_get_running_pids() -> None:
 
 
 @responses.activate
-def test_fetch_json() -> None:
+@patch("time.sleep")
+def test_fetch_json(mock_sleep) -> None:
     responses.add(
         responses.GET,
         "http://example.com/api",
@@ -172,6 +173,19 @@ def test_fetch_json() -> None:
     with pytest.raises(RuntimeError) as exc_info:
         fetch_json("http://example.com/api-error")
     assert "Failed to query http://example.com/api-error" in str(exc_info.value)
+    assert mock_sleep.call_count == 3
+
+
+@responses.activate
+@patch("time.sleep")
+def test_fetch_json_retry_success(mock_sleep) -> None:
+    responses.add(responses.GET, "http://example.com/api-retry", status=500)
+    responses.add(responses.GET, "http://example.com/api-retry", status=502)
+    responses.add(responses.GET, "http://example.com/api-retry", json={"ok": True}, status=200)
+
+    data = fetch_json("http://example.com/api-retry")
+    assert data == {"ok": True}
+    assert mock_sleep.call_count == 2
 
 
 def test_update_symlink() -> None:
@@ -220,7 +234,8 @@ def test_download_file_success() -> None:
 
 
 @responses.activate
-def test_download_file_error() -> None:
+@patch("time.sleep")
+def test_download_file_error(mock_sleep) -> None:
     responses.add(
         responses.GET,
         "http://example.com/file",
@@ -233,6 +248,28 @@ def test_download_file_error() -> None:
         with pytest.raises(RuntimeError) as exc_info:
             download_file("http://example.com/file", dest)
         assert "Download error from http://example.com/file" in str(exc_info.value)
+        assert mock_sleep.call_count == 0
+
+
+@responses.activate
+@patch("time.sleep")
+def test_download_file_retry_success(mock_sleep) -> None:
+    responses.add(responses.GET, "http://example.com/file-retry", status=503)
+    responses.add(
+        responses.GET,
+        "http://example.com/file-retry",
+        body=b"retry-success",
+        headers={"content-length": "13"},
+        status=200,
+    )
+    with tempfile.TemporaryDirectory() as tmpdir:
+        dest = os.path.join(tmpdir, "downloaded-retry.txt")
+        from missing_ag_updater.utils import download_file
+
+        download_file("http://example.com/file-retry", dest)
+        with open(dest, "rb") as f:
+            assert f.read() == b"retry-success"
+        assert mock_sleep.call_count == 1
 
 
 def test_get_hub_version_exceptions() -> None:
