@@ -347,9 +347,9 @@ def test_update_symlink_exception() -> None:
 
 
 def _build_asar(asar_path: str, files: dict[str, bytes]) -> int:
-    # Write a minimal Electron-format app.asar archive whose JSON header is
-    # padded to a 4-byte boundary, mirroring archives produced by Electron.
-    # Returns the number of padding bytes applied.
+    # Build a minimal Electron app.asar archive using Chromium Pickle format,
+    # including 4-byte alignment padding for the JSON header.
+    # Returns the number of null padding bytes added.
     header: dict[str, Any] = {"files": {}}
     payload = bytearray()
     offset = 0
@@ -361,14 +361,14 @@ def _build_asar(asar_path: str, files: dict[str, bytes]) -> int:
     json_len = len(header_data)
     padding = (4 - json_len % 4) % 4
     header_size = 8 + json_len + padding
-    with open(asar_path, "wb") as f:
-        f.write(struct.pack("<I", 4))
-        f.write(struct.pack("<I", header_size))
-        f.write(struct.pack("<I", 4 + json_len + padding))
-        f.write(struct.pack("<I", json_len))
-        f.write(header_data)
-        f.write(b"\x00" * padding)
-        f.write(bytes(payload))
+    with open(asar_path, "wb") as fdesc:
+        fdesc.write(struct.pack("<I", 4))
+        fdesc.write(struct.pack("<I", header_size))
+        fdesc.write(struct.pack("<I", 4 + json_len + padding))
+        fdesc.write(struct.pack("<I", json_len))
+        fdesc.write(header_data)
+        fdesc.write(b"\x00" * padding)
+        fdesc.write(bytes(payload))
     return padding
 
 
@@ -401,8 +401,8 @@ def test_extract_asar_icon_padded_header() -> None:
 
         dest_icon = os.path.join(tmpdir, "out", "icon.png")
         assert extract_asar_icon(asar_path, dest_icon) is True
-        with open(dest_icon, "rb") as f:
-            assert f.read() == icon_bytes
+        with open(dest_icon, "rb") as fdesc:
+            assert fdesc.read() == icon_bytes
 
 
 def test_extract_asar_icon_failure_cases() -> None:
