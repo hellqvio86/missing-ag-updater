@@ -37,18 +37,11 @@ from missing_ag_updater.const import DEFAULT_IDE_DIR, DEFAULT_HUB_DIR, DEFAULT_C
 
 # 1. Update the IDE
 ide_success = update_ide(
-    ide_dir=DEFAULT_IDE_DIR,
-    launcher_path="/home/user/.local/bin/antigravity-ide",
-    dry_run=False,
-    force=True
+    ide_dir=DEFAULT_IDE_DIR, launcher_path="/home/user/.local/bin/antigravity-ide", dry_run=False, force=True
 )
 
 # 2. Update the CLI
-cli_success = update_cli(
-    cli_binary=DEFAULT_CLI_BINARY,
-    dry_run=False,
-    force=True
-)
+cli_success = update_cli(cli_binary=DEFAULT_CLI_BINARY, dry_run=False, force=True)
 ```
 
 ---
