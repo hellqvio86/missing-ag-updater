@@ -81,6 +81,26 @@ def get_ide_version(ide_dir: str) -> str:
         return "0.0.0"
 
 
+def _read_asar_header(asar_path: str) -> tuple[dict[str, Any], int] | None:
+    """Parse an Electron app.asar header, returning (header_json, data_start_offset)."""
+    if not os.path.exists(asar_path):
+        return None
+    try:
+        with open(asar_path, "rb") as f:
+            prefix = f.read(16)
+            if len(prefix) < 16:
+                return None
+            header_size = struct.unpack("<I", prefix[4:8])[0]
+            json_size = struct.unpack("<I", prefix[12:16])[0]
+            if json_size <= 0 or json_size > header_size:
+                json_size = header_size - 8
+            f.seek(16)
+            header_json = json.loads(f.read(json_size).decode("utf-8"))
+            return header_json, 8 + header_size
+    except Exception:
+        return None
+
+
 def get_hub_version(hub_dir: str) -> str:
     """Read the current local Hub version by parsing app.asar package.json."""
     if OS_NAME == "darwin":
@@ -88,27 +108,21 @@ def get_hub_version(hub_dir: str) -> str:
     else:
         asar_path = os.path.join(hub_dir, "resources", "app.asar")
 
-    if not os.path.exists(asar_path):
+    parsed = _read_asar_header(asar_path)
+    if parsed is None:
         return "0.0.0"
+    header_json, data_start_offset = parsed
     try:
+        files = header_json.get("files", {})
+        package_json_info = files.get("package.json", {})
+        if not package_json_info:
+            return "0.0.0"
+        offset = int(package_json_info.get("offset"))
+        size = int(package_json_info.get("size"))
         with open(asar_path, "rb") as f:
-            header_size_data = f.read(8)
-            if len(header_size_data) < 8:
-                return "0.0.0"
-            header_size = struct.unpack("<I", header_size_data[4:8])[0]
-            f.seek(16)
-            header_json_data = f.read(header_size - 8)
-            header_json = json.loads(header_json_data.decode("utf-8"))
-            files = header_json.get("files", {})
-            package_json_info = files.get("package.json", {})
-            if not package_json_info:
-                return "0.0.0"
-            offset = int(package_json_info.get("offset"))
-            size = int(package_json_info.get("size"))
-            data_start_offset = 8 + header_size
             f.seek(data_start_offset + offset)
             pkg_json = json.loads(f.read(size).decode("utf-8"))
-            return pkg_json.get("version", "0.0.0")
+        return pkg_json.get("version", "0.0.0")
     except Exception:
         return "0.0.0"
 
@@ -244,30 +258,24 @@ def update_symlink(target: str, link_name: str) -> None:
 
 def extract_asar_icon(asar_path: str, dest_icon_path: str) -> bool:
     """Extract icon.png from app.asar package and write to dest_icon_path."""
-    if not os.path.exists(asar_path):
+    parsed = _read_asar_header(asar_path)
+    if parsed is None:
         return False
+    header_json, data_start_offset = parsed
     try:
+        files = header_json.get("files", {})
+        icon_info = files.get("icon.png")
+        if not icon_info:
+            return False
+        offset = int(icon_info.get("offset"))
+        size = int(icon_info.get("size"))
         with open(asar_path, "rb") as f:
-            header_size_data = f.read(8)
-            if len(header_size_data) < 8:
-                return False
-            header_size = struct.unpack("<I", header_size_data[4:8])[0]
-            f.seek(16)
-            header_json_data = f.read(header_size - 8)
-            header_json = json.loads(header_json_data.decode("utf-8"))
-            files = header_json.get("files", {})
-            icon_info = files.get("icon.png")
-            if not icon_info:
-                return False
-            offset = int(icon_info.get("offset"))
-            size = int(icon_info.get("size"))
-            data_start_offset = 8 + header_size
             f.seek(data_start_offset + offset)
             icon_data = f.read(size)
-            os.makedirs(os.path.dirname(dest_icon_path), exist_ok=True)
-            with open(dest_icon_path, "wb") as icon_file:
-                icon_file.write(icon_data)
-            return True
+        os.makedirs(os.path.dirname(dest_icon_path), exist_ok=True)
+        with open(dest_icon_path, "wb") as icon_file:
+            icon_file.write(icon_data)
+        return True
     except Exception:
         return False
 

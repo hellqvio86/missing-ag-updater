@@ -5,6 +5,7 @@ import struct
 import subprocess
 import tempfile
 from io import StringIO
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -12,6 +13,7 @@ import responses
 
 from missing_ag_updater.utils import (
     compute_sha512,
+    extract_asar_icon,
     fetch_json,
     get_cli_version,
     get_hub_version,
@@ -342,3 +344,73 @@ def test_update_symlink_exception() -> None:
             with patch("os.remove", side_effect=Exception("permission denied")):
                 # Should print a warning but not raise exception
                 update_symlink("target", "link")
+
+
+def _build_asar(asar_path: str, files: dict[str, bytes]) -> int:
+    # Write a minimal Electron-format app.asar archive whose JSON header is
+    # padded to a 4-byte boundary, mirroring archives produced by Electron.
+    # Returns the number of padding bytes applied.
+    header: dict[str, Any] = {"files": {}}
+    payload = bytearray()
+    offset = 0
+    for name, data in files.items():
+        header["files"][name] = {"size": len(data), "offset": str(offset)}
+        payload += data
+        offset += len(data)
+    header_data = json.dumps(header).encode("utf-8")
+    json_len = len(header_data)
+    padding = (4 - json_len % 4) % 4
+    header_size = 8 + json_len + padding
+    with open(asar_path, "wb") as f:
+        f.write(struct.pack("<I", 4))
+        f.write(struct.pack("<I", header_size))
+        f.write(struct.pack("<I", 4 + json_len + padding))
+        f.write(struct.pack("<I", json_len))
+        f.write(header_data)
+        f.write(b"\x00" * padding)
+        f.write(bytes(payload))
+    return padding
+
+
+def test_get_hub_version_padded_header() -> None:
+    # Regression test: a real asar header whose length is not a multiple of four
+    # is null-padded. The parser must read only the JSON bytes and ignore padding.
+    with tempfile.TemporaryDirectory() as tmpdir:
+        asar_dir = os.path.join(tmpdir, "resources")
+        os.makedirs(asar_dir)
+        asar_path = os.path.join(asar_dir, "app.asar")
+        files = {
+            "package.json": json.dumps({"version": "2.4.2"}).encode("utf-8"),
+            "icon.png": b"\x89PNG\r\n\x1a\nICON",
+        }
+        padding = _build_asar(asar_path, files)
+        assert padding != 0
+        assert get_hub_version(tmpdir) == "2.4.2"
+
+
+def test_extract_asar_icon_padded_header() -> None:
+    with tempfile.TemporaryDirectory() as tmpdir:
+        asar_path = os.path.join(tmpdir, "app.asar")
+        icon_bytes = b"\x89PNG\r\n\x1a\nICON"
+        files = {
+            "package.json": json.dumps({"version": "2.4.2"}).encode("utf-8"),
+            "icon.png": icon_bytes,
+        }
+        padding = _build_asar(asar_path, files)
+        assert padding != 0
+
+        dest_icon = os.path.join(tmpdir, "out", "icon.png")
+        assert extract_asar_icon(asar_path, dest_icon) is True
+        with open(dest_icon, "rb") as f:
+            assert f.read() == icon_bytes
+
+
+def test_extract_asar_icon_failure_cases() -> None:
+    with tempfile.TemporaryDirectory() as tmpdir:
+        # Missing archive
+        assert extract_asar_icon(os.path.join(tmpdir, "missing.asar"), os.path.join(tmpdir, "i.png")) is False
+
+        # Archive without an icon.png entry
+        asar_path = os.path.join(tmpdir, "app.asar")
+        _build_asar(asar_path, {"package.json": json.dumps({"version": "1.0.0"}).encode("utf-8")})
+        assert extract_asar_icon(asar_path, os.path.join(tmpdir, "i.png")) is False
