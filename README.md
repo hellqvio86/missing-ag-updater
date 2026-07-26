@@ -173,7 +173,7 @@ You can also use a TOML configuration file to save your settings persistently. B
 - **macOS**: `~/Library/Application Support/missing-ag-updater/config.toml`
 - **Windows**: `%APPDATA%\missing-ag-updater\config.toml`
 
-You can override the config file location using the `--config PATH` option or the `ANTIGRAVITY_CONFIG` / `AG_CONFIG` environment variables.
+You can override the config file location using the `--config PATH` option or the `ANTIGRAVITY_CONFIG` / `AG_CONFIG` environment variables. A template is provided in [`config.example.toml`](file:///home/hellqvio/git/missing-ag-updater/config.example.toml).
 
 #### Settings Resolution Hierarchy
 
@@ -191,7 +191,7 @@ ide = true
 hub = true
 cli = true
 force = false
-suid_sandbox = true
+suid_sandbox = false
 dir_ide = "/home/user/opt/Antigravity IDE"
 desktop = true
 nautilus = true
