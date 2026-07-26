@@ -312,8 +312,45 @@ def refresh_linux_desktop_caches() -> None:
         pass
 
 
+def is_apparmor_enabled() -> bool:
+    """Check if AppArmor is enabled and active on Linux."""
+    if OS_NAME != "linux":
+        return False
+
+    param_path = "/sys/module/apparmor/parameters/enabled"
+    if os.path.exists(param_path):
+        try:
+            with open(param_path, "r", encoding="utf-8") as f:
+                if f.read().strip().upper() == "Y":
+                    return True
+        except Exception:
+            pass
+
+    userns_path = "/proc/sys/kernel/apparmor_restrict_unprivileged_userns"
+    if os.path.exists(userns_path):
+        try:
+            with open(userns_path, "r", encoding="utf-8") as f:
+                if f.read().strip() == "1":
+                    return True
+        except Exception:
+            pass
+
+    try:
+        res = subprocess.run(["aa-enabled"], capture_output=True, text=True)
+        if res.returncode == 0:
+            return True
+    except Exception:
+        pass
+
+    return False
+
+
 def configure_suid_sandbox(ide_dir: str) -> bool:
-    """Configure root:root 4755 permissions on chrome-sandbox binary."""
+    """Configure root:root 4755 permissions on chrome-sandbox binary if AppArmor is active."""
+    if not is_apparmor_enabled():
+        print_info("AppArmor is not active on this system; SUID sandbox configuration skipped.")
+        return True
+
     sandbox_path = os.path.join(ide_dir, "chrome-sandbox")
     if not os.path.exists(sandbox_path):
         print_warning(f"chrome-sandbox binary not found at {sandbox_path}")

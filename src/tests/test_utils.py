@@ -6,7 +6,7 @@ import subprocess
 import tempfile
 from io import StringIO
 from typing import Any
-from unittest.mock import patch
+from unittest.mock import mock_open, patch
 
 import pytest
 import responses
@@ -20,6 +20,7 @@ from missing_ag_updater.utils import (
     get_hub_version,
     get_ide_version,
     get_running_pids,
+    is_apparmor_enabled,
     print_error,
     print_info,
     print_status,
@@ -417,37 +418,62 @@ def test_extract_asar_icon_failure_cases() -> None:
         assert extract_asar_icon(asar_path, os.path.join(tmpdir, "i.png")) is False
 
 
+def test_is_apparmor_enabled() -> None:
+    with patch("missing_ag_updater.utils.OS_NAME", "windows"):
+        assert is_apparmor_enabled() is False
+
+    with patch("missing_ag_updater.utils.OS_NAME", "linux"):
+        with patch("os.path.exists", side_effect=lambda p: p == "/sys/module/apparmor/parameters/enabled"):
+            with patch("builtins.open", mock_open(read_data="Y\n")):
+                assert is_apparmor_enabled() is True
+
+        with patch(
+            "os.path.exists", side_effect=lambda p: p == "/proc/sys/kernel/apparmor_restrict_unprivileged_userns"
+        ):
+            with patch("builtins.open", mock_open(read_data="1\n")):
+                assert is_apparmor_enabled() is True
+
+
+def test_configure_suid_sandbox_apparmor_disabled() -> None:
+    with patch("missing_ag_updater.utils.is_apparmor_enabled", return_value=False):
+        assert configure_suid_sandbox("/tmp/fake_ide") is True
+
+
 def test_configure_suid_sandbox_missing() -> None:
-    with tempfile.TemporaryDirectory() as tmpdir:
-        assert configure_suid_sandbox(tmpdir) is False
+    with patch("missing_ag_updater.utils.is_apparmor_enabled", return_value=True):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            assert configure_suid_sandbox(tmpdir) is False
 
 
 def test_configure_suid_sandbox_as_root() -> None:
-    with tempfile.TemporaryDirectory() as tmpdir:
-        sandbox_file = os.path.join(tmpdir, "chrome-sandbox")
-        open(sandbox_file, "w").close()
-        with patch("os.geteuid", return_value=0, create=True):
-            with patch("os.chown") as mock_chown:
-                with patch("os.chmod") as mock_chmod:
-                    assert configure_suid_sandbox(tmpdir) is True
-                    mock_chown.assert_called_once_with(sandbox_file, 0, 0)
-                    mock_chmod.assert_called_once_with(sandbox_file, 0o4755)
+    with patch("missing_ag_updater.utils.is_apparmor_enabled", return_value=True):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sandbox_file = os.path.join(tmpdir, "chrome-sandbox")
+            open(sandbox_file, "w").close()
+            with patch("os.geteuid", return_value=0, create=True):
+                with patch("os.chown") as mock_chown:
+                    with patch("os.chmod") as mock_chmod:
+                        assert configure_suid_sandbox(tmpdir) is True
+                        mock_chown.assert_called_once_with(sandbox_file, 0, 0)
+                        mock_chmod.assert_called_once_with(sandbox_file, 0o4755)
 
 
 def test_configure_suid_sandbox_via_sudo() -> None:
-    with tempfile.TemporaryDirectory() as tmpdir:
-        sandbox_file = os.path.join(tmpdir, "chrome-sandbox")
-        open(sandbox_file, "w").close()
-        with patch("os.geteuid", return_value=1000, create=True):
-            with patch("subprocess.run") as mock_run:
-                assert configure_suid_sandbox(tmpdir) is True
-                assert mock_run.call_count == 2
+    with patch("missing_ag_updater.utils.is_apparmor_enabled", return_value=True):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sandbox_file = os.path.join(tmpdir, "chrome-sandbox")
+            open(sandbox_file, "w").close()
+            with patch("os.geteuid", return_value=1000, create=True):
+                with patch("subprocess.run") as mock_run:
+                    assert configure_suid_sandbox(tmpdir) is True
+                    assert mock_run.call_count == 2
 
 
 def test_configure_suid_sandbox_failure() -> None:
-    with tempfile.TemporaryDirectory() as tmpdir:
-        sandbox_file = os.path.join(tmpdir, "chrome-sandbox")
-        open(sandbox_file, "w").close()
-        with patch("os.geteuid", return_value=1000, create=True):
-            with patch("subprocess.run", side_effect=subprocess.CalledProcessError(1, "sudo")):
-                assert configure_suid_sandbox(tmpdir) is False
+    with patch("missing_ag_updater.utils.is_apparmor_enabled", return_value=True):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sandbox_file = os.path.join(tmpdir, "chrome-sandbox")
+            open(sandbox_file, "w").close()
+            with patch("os.geteuid", return_value=1000, create=True):
+                with patch("subprocess.run", side_effect=subprocess.CalledProcessError(1, "sudo")):
+                    assert configure_suid_sandbox(tmpdir) is False
