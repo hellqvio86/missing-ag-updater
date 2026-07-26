@@ -154,7 +154,7 @@ def test_update_ide_success_linux() -> None:
                                     assert res is True
                                     assert os.path.exists(os.path.join(target_ide_dir, "bin", "antigravity-ide"))
                                     mock_desktop.assert_called_once_with(
-                                        ide_dir=target_ide_dir, launcher_path=launcher, ubuntu=False
+                                        ide_dir=target_ide_dir, launcher_path=launcher
                                     )
                                     mock_nautilus.assert_called_once_with(
                                         ide_dir=target_ide_dir, launcher_path=launcher

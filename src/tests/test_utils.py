@@ -216,15 +216,6 @@ def test_update_symlink() -> None:
             assert os.path.islink(link_name)
             assert os.readlink(link_name) == new_target
 
-            # Test ubuntu_fix creates wrapper script instead of symlink
-            wrapper_name = os.path.join(tmpdir, "wrapper_file")
-            update_symlink(target, wrapper_name, ubuntu_fix=True)
-            assert not os.path.islink(wrapper_name)
-            assert os.path.exists(wrapper_name)
-            with open(wrapper_name, "r", encoding="utf-8") as wf:
-                content = wf.read()
-                assert f'exec "{target}" --no-sandbox "$@"' in content
-
 
 @responses.activate
 def test_download_file_success() -> None:

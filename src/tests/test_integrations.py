@@ -115,7 +115,6 @@ def test_cli_no_desktop_no_nautilus() -> None:
                         force=False,
                         install_desktop=False,
                         install_nautilus=False,
-                        ubuntu=False,
                         suid_sandbox=False,
                     )
                     mock_exit.assert_called_once_with(0)
@@ -171,7 +170,6 @@ def test_cli_env_variables() -> None:
                             force=True,
                             install_desktop=False,
                             install_nautilus=False,
-                            ubuntu=False,
                             suid_sandbox=False,
                         )
                         mock_exit.assert_called_once_with(0)
@@ -226,7 +224,6 @@ def test_cli_override_env_variables() -> None:
                             force=False,
                             install_desktop=False,
                             install_nautilus=False,
-                            ubuntu=False,
                             suid_sandbox=False,
                         )
                         mock_exit.assert_called_once_with(0)

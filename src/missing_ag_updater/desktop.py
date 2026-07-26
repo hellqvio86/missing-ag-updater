@@ -6,13 +6,11 @@ from .const import USER_APPLICATIONS_DIR, USER_ICONS_DIR
 from .utils import extract_asar_icon, print_success, print_warning, refresh_linux_desktop_caches
 
 
-def install_ide_desktop(ide_dir: str, launcher_path: Optional[str], *, ubuntu: bool = False) -> None:
+def install_ide_desktop(ide_dir: str, launcher_path: Optional[str]) -> None:
     """Create local Linux desktop entry and install icon for Antigravity IDE."""
     os.makedirs(USER_APPLICATIONS_DIR, exist_ok=True)
     desktop_file = os.path.join(USER_APPLICATIONS_DIR, "antigravity-ide.desktop")
     exec_path = launcher_path or os.path.join(ide_dir, "bin", "antigravity-ide")
-    if ubuntu and not launcher_path:
-        exec_path = f'"{exec_path}" --no-sandbox'
 
     desktop_content = f"""[Desktop Entry]
 Name=Antigravity IDE
