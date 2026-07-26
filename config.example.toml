@@ -16,6 +16,6 @@ desktop = true
 nautilus = true
 
 # Path Overrides (Optional)
-# dir_ide = "/home/user/opt/Antigravity IDE"
+# dir_ide = "/home/user/opt/Antigravity-IDE"
 # dir_hub = "/home/user/opt/Antigravity Hub"
 # path_cli = "/home/user/.local/bin/antigravity"

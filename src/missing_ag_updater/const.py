@@ -54,7 +54,7 @@ if OS_NAME == "linux":
     OPT_DIR = os.path.join(HOME, "opt")
     BIN_DIR = os.path.join(HOME, ".local", "bin")
 
-    DEFAULT_IDE_DIR = os.path.join(OPT_DIR, "Antigravity IDE")
+    DEFAULT_IDE_DIR = os.path.join(OPT_DIR, "Antigravity-IDE")
     DEFAULT_HUB_DIR = os.path.join(OPT_DIR, "Antigravity-x64")
     DEFAULT_CLI_BINARY = os.path.join(BIN_DIR, "agy")
     DEFAULT_IDE_LAUNCHER = os.path.join(BIN_DIR, "antigravity-ide")

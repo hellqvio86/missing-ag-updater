@@ -192,7 +192,7 @@ hub = true
 cli = true
 force = false
 suid_sandbox = false
-dir_ide = "/home/user/opt/Antigravity IDE"
+dir_ide = "/home/user/opt/Antigravity-IDE"
 desktop = true
 nautilus = true
 ```
@@ -204,14 +204,14 @@ nautilus = true
   python -m missing_ag_updater --check
   ```
 
-- **Force update the Hub application only:**
+- **Update only Antigravity IDE and create desktop / Nautilus integration:**
   ```bash
-  python -m missing_ag_updater --hub --force
+  python -m missing_ag_updater --ide
   ```
 
-- **Update only the CLI tool:**
+- **Force update all components regardless of version:**
   ```bash
-  python -m missing_ag_updater --cli
+  python -m missing_ag_updater --force
   ```
 
 ## Default Installation Paths
@@ -222,7 +222,7 @@ After the update finishes, the permanent application files are stored in the fol
 
 | Platform | Antigravity IDE Path | Antigravity Hub Path | Antigravity CLI Path | Launcher/Symlink Path |
 | :--- | :--- | :--- | :--- | :--- |
-| **Linux** | `~/opt/Antigravity IDE` | `~/opt/Antigravity-x64` | `~/.local/bin/agy` | `~/.local/bin/antigravity-ide`<br>`~/.local/bin/antigravity` |
+| **Linux** | `~/opt/Antigravity-IDE` | `~/opt/Antigravity-x64` | `~/.local/bin/agy` | `~/.local/bin/antigravity-ide`<br>`~/.local/bin/antigravity` |
 | **macOS** | `/Applications/Antigravity IDE.app` | `/Applications/Antigravity.app` | `~/.local/bin/agy` | *N/A (installed in Applications)* |
 | **Windows** | `%LOCALAPPDATA%\Programs\antigravity-ide` | `%LOCALAPPDATA%\Programs\antigravity` | `%LOCALAPPDATA%\Microsoft\WindowsApps\agy.exe` | *N/A (added to PATH)* |
 

@@ -185,8 +185,14 @@ def update_ide(
 
                 extracted_folder = os.path.join(tmpdir, "Antigravity IDE")
                 if not os.path.exists(extracted_folder):
-                    print_error("Failed to find 'Antigravity IDE' directory inside the archive.")
-                    return False
+                    extracted_folder = os.path.join(tmpdir, "Antigravity-IDE")
+                if not os.path.exists(extracted_folder):
+                    subdirs = [d for d in os.listdir(tmpdir) if os.path.isdir(os.path.join(tmpdir, d))]
+                    if len(subdirs) == 1:
+                        extracted_folder = os.path.join(tmpdir, subdirs[0])
+                    else:
+                        print_error("Failed to find IDE directory inside the archive.")
+                        return False
 
                 print_status("Installing IDE...")
                 os.makedirs(os.path.dirname(ide_dir), exist_ok=True)
