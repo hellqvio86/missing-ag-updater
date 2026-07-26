@@ -69,6 +69,12 @@ def main() -> None:
         help="Skip installing Nautilus context-menu integration on Linux",
     )
     parser.add_argument(
+        "--ubuntu",
+        action="store_true",
+        default=None,
+        help="Enable Ubuntu compatibility mode (creates launcher wrapper script with --no-sandbox)",
+    )
+    parser.add_argument(
         "--config",
         type=str,
         default=None,
@@ -133,6 +139,7 @@ def main() -> None:
     hub = resolve_bool(args.hub, ["ANTIGRAVITY_HUB", "AG_HUB"], "hub", False)
     cli = resolve_bool(args.cli, ["ANTIGRAVITY_CLI", "AG_CLI"], "cli", False)
     force = resolve_bool(args.force, ["ANTIGRAVITY_FORCE", "AG_FORCE"], "force", False)
+    ubuntu = resolve_bool(args.ubuntu, ["ANTIGRAVITY_UBUNTU", "AG_UBUNTU"], "ubuntu", False)
 
     dir_ide = resolve_str(args.dir_ide, ["ANTIGRAVITY_DIR_IDE", "AG_DIR_IDE"], "dir_ide", DEFAULT_IDE_DIR)
     dir_hub = resolve_str(args.dir_hub, ["ANTIGRAVITY_DIR_HUB", "AG_DIR_HUB"], "dir_hub", DEFAULT_HUB_DIR)
@@ -223,6 +230,7 @@ def main() -> None:
             force=force,
             install_desktop=install_desktop,
             install_nautilus=install_nautilus,
+            ubuntu=ubuntu,
         )
         success = success and res
         print()

@@ -160,6 +160,7 @@ You can configure the behavior of the auto-updater using environment variables. 
 | `--path-cli` | `ANTIGRAVITY_PATH_CLI` or `AG_PATH_CLI` | String | Override path to Antigravity CLI binary |
 | `--no-desktop` | `ANTIGRAVITY_DESKTOP` / `AG_DESKTOP` (Boolean, default `true`) or `ANTIGRAVITY_NO_DESKTOP` / `AG_NO_DESKTOP` (Boolean, default `false`) | Boolean | Set to `false` or `1` (for `NO_DESKTOP`) to skip installing local `.desktop` launcher and application icons on Linux |
 | `--no-nautilus` | `ANTIGRAVITY_NAUTILUS` / `AG_NAUTILUS` (Boolean, default `true`) or `ANTIGRAVITY_NO_NAUTILUS` / `AG_NO_NAUTILUS` (Boolean, default `false`) | Boolean | Set to `false` or `1` (for `NO_NAUTILUS`) to skip installing the Nautilus context-menu extension |
+| `--ubuntu` | `ANTIGRAVITY_UBUNTU` or `AG_UBUNTU` | Boolean | Enable Ubuntu compatibility mode (creates launcher wrapper script passing `--no-sandbox` to bypass AppArmor unprivileged userns restrictions) |
 
 > [!NOTE]
 > Boolean environment variables accept `1`, `true`, `yes`, or `on` as `True`, and any other value (or unset) as `False`.
@@ -190,6 +191,7 @@ ide = true
 hub = true
 cli = true
 force = false
+ubuntu = true
 dir_ide = "/home/user/opt/Antigravity IDE"
 desktop = true
 nautilus = true

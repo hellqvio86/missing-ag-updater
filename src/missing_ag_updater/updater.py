@@ -113,6 +113,7 @@ def update_ide(
     force: bool = False,
     install_desktop: bool = True,
     install_nautilus: bool = True,
+    ubuntu: bool = False,
 ) -> bool:
     """Check and execute updates for Antigravity IDE."""
     print_status("Checking for Antigravity IDE updates...")
@@ -196,10 +197,10 @@ def update_ide(
                 if launcher_path:
                     target_launcher = os.path.join(ide_dir, "bin", "antigravity-ide")
                     if os.path.exists(target_launcher):
-                        update_symlink(target_launcher, launcher_path)
+                        update_symlink(target_launcher, launcher_path, ubuntu_fix=ubuntu)
 
                 if install_desktop and OS_NAME == "linux":
-                    install_ide_desktop(ide_dir=ide_dir, launcher_path=launcher_path)
+                    install_ide_desktop(ide_dir=ide_dir, launcher_path=launcher_path, ubuntu=ubuntu)
 
                 if install_nautilus and OS_NAME == "linux":
                     install_ide_nautilus(ide_dir=ide_dir, launcher_path=launcher_path)

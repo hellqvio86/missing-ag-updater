@@ -73,5 +73,27 @@ def test_main_force_and_check() -> None:
                         force=True,
                         install_desktop=True,
                         install_nautilus=True,
+                        ubuntu=False,
                     )
                     mock_exit.assert_called_once_with(0)
+
+
+def test_main_ubuntu_flag() -> None:
+    # Test --ubuntu flag passes ubuntu=True to update_ide
+    with patch("sys.argv", ["antigravity-updater", "--ide", "--ubuntu"]):
+        with patch("missing_ag_updater.cli.OS_NAME", "linux"):
+            with patch("missing_ag_updater.cli.update_ide", return_value=True) as mock_ide:
+                with patch("sys.exit", side_effect=SystemExit) as mock_exit:
+                    with pytest.raises(SystemExit):
+                        main()
+                    mock_ide.assert_called_once_with(
+                        "/home/hellqvio/opt/Antigravity IDE",
+                        DEFAULT_IDE_LAUNCHER,
+                        dry_run=False,
+                        force=False,
+                        install_desktop=True,
+                        install_nautilus=True,
+                        ubuntu=True,
+                    )
+                    mock_exit.assert_called_once_with(0)
+

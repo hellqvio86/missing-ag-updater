@@ -255,16 +255,23 @@ def compute_sha512(file_path: str) -> str:
     return h.hexdigest()
 
 
-def update_symlink(target: str, link_name: str) -> None:
-    """Safely create or update a symbolic link (Linux/macOS only)."""
+def update_symlink(target: str, link_name: str, *, ubuntu_fix: bool = False) -> None:
+    """Safely create or update a symbolic link or launcher wrapper script (Linux/macOS only)."""
     if OS_NAME == "windows":
         return
     try:
         if os.path.exists(link_name) or os.path.islink(link_name):
             os.remove(link_name)
         os.makedirs(os.path.dirname(link_name), exist_ok=True)
-        os.symlink(target, link_name)
-        print_success(f"Linked command: {link_name} -> {target}")
+        if ubuntu_fix:
+            wrapper_content = f'#!/usr/bin/env sh\nexec "{target}" --no-sandbox "$@"\n'
+            with open(link_name, "w", encoding="utf-8") as f:
+                f.write(wrapper_content)
+            os.chmod(link_name, 0o755)
+            print_success(f"Created launcher wrapper (--no-sandbox): {link_name} -> {target}")
+        else:
+            os.symlink(target, link_name)
+            print_success(f"Linked command: {link_name} -> {target}")
     except Exception as e:
         print_warning(f"Could not update symbolic link {link_name}: {e}")
 
