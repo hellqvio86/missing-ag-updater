@@ -103,6 +103,7 @@ def test_cli_config_integration(tmp_path) -> None:
                         install_desktop=False,  # loaded from TOML
                         install_nautilus=False,  # loaded from TOML
                         ubuntu=False,
+                        suid_sandbox=False,
                     )
                     mock_exit.assert_called_once_with(0)
 

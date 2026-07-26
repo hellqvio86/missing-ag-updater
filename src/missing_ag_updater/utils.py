@@ -317,3 +317,19 @@ def refresh_linux_desktop_caches() -> None:
             subprocess.run(["gtk-update-icon-cache", "-q", icon_parent], capture_output=True, check=False)
     except Exception:
         pass
+
+
+def configure_suid_sandbox(ide_dir: str) -> bool:
+    """Configure root:root 4755 permissions on chrome-sandbox binary."""
+    sandbox_path = os.path.join(ide_dir, "chrome-sandbox")
+    if not os.path.exists(sandbox_path):
+        print_warning(f"chrome-sandbox binary not found at {sandbox_path}")
+        return False
+    try:
+        subprocess.run(["sudo", "chown", "root", sandbox_path], check=True)
+        subprocess.run(["sudo", "chmod", "4755", sandbox_path], check=True)
+        print_success(f"Configured root:root 4755 permissions on {sandbox_path}")
+        return True
+    except Exception as e:
+        print_warning(f"Could not configure SUID sandbox permissions: {e}")
+        return False

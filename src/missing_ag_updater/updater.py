@@ -20,6 +20,7 @@ from .models import CliManifest, Release
 from .nautilus import install_ide_nautilus
 from .utils import (
     compute_sha512,
+    configure_suid_sandbox,
     download_file,
     fetch_json,
     get_cli_version,
@@ -114,6 +115,7 @@ def update_ide(
     install_desktop: bool = True,
     install_nautilus: bool = True,
     ubuntu: bool = False,
+    suid_sandbox: bool = False,
 ) -> bool:
     """Check and execute updates for Antigravity IDE."""
     print_status("Checking for Antigravity IDE updates...")
@@ -204,6 +206,9 @@ def update_ide(
 
                 if install_nautilus and OS_NAME == "linux":
                     install_ide_nautilus(ide_dir=ide_dir, launcher_path=launcher_path)
+
+                if suid_sandbox and OS_NAME == "linux":
+                    configure_suid_sandbox(ide_dir)
 
             print_success(f"Antigravity IDE successfully upgraded to version {latest_ver}!")
             return True
