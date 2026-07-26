@@ -96,4 +96,3 @@ def test_main_suid_sandbox_flag() -> None:
                         suid_sandbox=True,
                     )
                     mock_exit.assert_called_once_with(0)
-
