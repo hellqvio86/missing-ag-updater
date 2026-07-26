@@ -82,20 +82,33 @@ def get_ide_version(ide_dir: str) -> str:
 
 
 def _read_asar_header(asar_path: str) -> tuple[dict[str, Any], int] | None:
-    """Parse an Electron app.asar header, returning (header_json, data_start_offset)."""
+    """Parse an Electron app.asar header, returning (header_json, data_start_offset).
+
+    Electron ASAR archives use a 16-byte Chromium Pickle header structure:
+      - Bytes 0..3:   uint32 size prefix (always 4)
+      - Bytes 4..7:   uint32 total header section size (includes JSON + padding)
+      - Bytes 8..11:  uint32 pickle string length (4 + json_size + padding)
+      - Bytes 12..15: uint32 exact JSON string size (json_size)
+
+    Reads exact `json_size` (bytes 12..15) to prevent 0-3 alignment null bytes
+    (\\x00) from breaking json.loads. Falls back to `header_size - 8` if `json_size`
+    is invalid.
+    """
     if not os.path.exists(asar_path):
         return None
     try:
-        with open(asar_path, "rb") as f:
-            prefix = f.read(16)
+        with open(asar_path, "rb") as fdesc:
+            prefix = fdesc.read(16)
             if len(prefix) < 16:
                 return None
             header_size = struct.unpack("<I", prefix[4:8])[0]
+            # Read exact json_size from Chromium Pickle payload length (bytes 12..15)
             json_size = struct.unpack("<I", prefix[12:16])[0]
+            # Fall back to header_size - 8 if json_size is non-standard or corrupt
             if json_size <= 0 or json_size > header_size:
                 json_size = header_size - 8
-            f.seek(16)
-            header_json = json.loads(f.read(json_size).decode("utf-8"))
+            fdesc.seek(16)
+            header_json = json.loads(fdesc.read(json_size).decode("utf-8"))
             return header_json, 8 + header_size
     except Exception:
         return None
@@ -119,9 +132,9 @@ def get_hub_version(hub_dir: str) -> str:
             return "0.0.0"
         offset = int(package_json_info.get("offset"))
         size = int(package_json_info.get("size"))
-        with open(asar_path, "rb") as f:
-            f.seek(data_start_offset + offset)
-            pkg_json = json.loads(f.read(size).decode("utf-8"))
+        with open(asar_path, "rb") as fdesc:
+            fdesc.seek(data_start_offset + offset)
+            pkg_json = json.loads(fdesc.read(size).decode("utf-8"))
         return pkg_json.get("version", "0.0.0")
     except Exception:
         return "0.0.0"
@@ -269,9 +282,9 @@ def extract_asar_icon(asar_path: str, dest_icon_path: str) -> bool:
             return False
         offset = int(icon_info.get("offset"))
         size = int(icon_info.get("size"))
-        with open(asar_path, "rb") as f:
-            f.seek(data_start_offset + offset)
-            icon_data = f.read(size)
+        with open(asar_path, "rb") as fdesc:
+            fdesc.seek(data_start_offset + offset)
+            icon_data = fdesc.read(size)
         os.makedirs(os.path.dirname(dest_icon_path), exist_ok=True)
         with open(dest_icon_path, "wb") as icon_file:
             icon_file.write(icon_data)
