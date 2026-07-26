@@ -70,8 +70,8 @@ def test_get_ide_version() -> None:
         # Test valid product.json
         app_dir = os.path.join(tmpdir, "resources", "app")
         os.makedirs(app_dir)
-        with open(os.path.join(app_dir, "product.json"), "w", encoding="utf-8") as f:
-            json.dump({"ideVersion": "2.0.4"}, f)
+        with open(os.path.join(app_dir, "product.json"), "w", encoding="utf-8") as fdesc:
+            json.dump({"ideVersion": "2.0.4"}, fdesc)
 
         assert get_ide_version(tmpdir) == "2.0.4"
 
@@ -91,15 +91,15 @@ def test_get_hub_version() -> None:
         header_size = len(header_data) + 8
         padding_size = (8 + header_size) - (16 + len(header_data))
 
-        with open(asar_path, "wb") as f:
-            f.write(struct.pack("<I", 4))
-            f.write(struct.pack("<I", header_size))
-            f.write(struct.pack("<I", header_size - 4))
-            f.write(struct.pack("<I", len(header_data)))
-            f.write(header_data)
+        with open(asar_path, "wb") as fdesc:
+            fdesc.write(struct.pack("<I", 4))
+            fdesc.write(struct.pack("<I", header_size))
+            fdesc.write(struct.pack("<I", header_size - 4))
+            fdesc.write(struct.pack("<I", len(header_data)))
+            fdesc.write(header_data)
             if padding_size > 0:
-                f.write(b"\x00" * padding_size)
-            f.write(pkg_data)
+                fdesc.write(b"\x00" * padding_size)
+            fdesc.write(pkg_data)
 
         assert get_hub_version(tmpdir) == "2.1.4"
 
@@ -111,8 +111,8 @@ def test_get_cli_version() -> None:
         assert get_cli_version(cli_binary) == "0.0.0"
 
         # Create dummy file
-        with open(cli_binary, "w") as f:
-            f.write("#!/bin/sh\necho 1.0.8")
+        with open(cli_binary, "w") as fdesc:
+            fdesc.write("#!/bin/sh\necho 1.0.8")
         os.chmod(cli_binary, 0o755)
 
         # Mock subprocess.run
@@ -201,8 +201,8 @@ def test_update_symlink() -> None:
     with patch("missing_ag_updater.utils.OS_NAME", "linux"):
         with tempfile.TemporaryDirectory() as tmpdir:
             target = os.path.join(tmpdir, "target_file")
-            with open(target, "w") as f:
-                f.write("target contents")
+            with open(target, "w") as fdesc:
+                fdesc.write("target contents")
 
             link_name = os.path.join(tmpdir, "symlink_file")
             update_symlink(target, link_name)
@@ -211,8 +211,8 @@ def test_update_symlink() -> None:
 
             # Update link again to see if it replaces correctly
             new_target = os.path.join(tmpdir, "new_target_file")
-            with open(new_target, "w") as f:
-                f.write("new target contents")
+            with open(new_target, "w") as fdesc:
+                fdesc.write("new target contents")
 
             update_symlink(new_target, link_name)
             assert os.path.islink(link_name)
@@ -233,8 +233,8 @@ def test_download_file_success() -> None:
         from missing_ag_updater.utils import download_file
 
         download_file("http://example.com/file", dest)
-        with open(dest, "rb") as f:
-            assert f.read() == b"0123456789"
+        with open(dest, "rb") as fdesc:
+            assert fdesc.read() == b"0123456789"
 
 
 @responses.activate
@@ -271,8 +271,8 @@ def test_download_file_retry_success(mock_sleep) -> None:
         from missing_ag_updater.utils import download_file
 
         download_file("http://example.com/file-retry", dest)
-        with open(dest, "rb") as f:
-            assert f.read() == b"retry-success"
+        with open(dest, "rb") as fdesc:
+            assert fdesc.read() == b"retry-success"
         assert mock_sleep.call_count == 1
 
 
@@ -285,17 +285,17 @@ def test_get_hub_version_exceptions() -> None:
         asar_dir = os.path.join(tmpdir, "resources")
         os.makedirs(asar_dir, exist_ok=True)
         asar_path = os.path.join(asar_dir, "app.asar")
-        with open(asar_path, "wb") as f:
-            f.write(b"short")
+        with open(asar_path, "wb") as fdesc:
+            fdesc.write(b"short")
         assert get_hub_version(tmpdir) == "0.0.0"
 
         # 3. Valid length but invalid JSON or error reading
-        with open(asar_path, "wb") as f:
-            f.write(struct.pack("<I", 4))
-            f.write(struct.pack("<I", 100))
-            f.write(struct.pack("<I", 96))
-            f.write(struct.pack("<I", 10))
-            f.write(b"invalidjson")
+        with open(asar_path, "wb") as fdesc:
+            fdesc.write(struct.pack("<I", 4))
+            fdesc.write(struct.pack("<I", 100))
+            fdesc.write(struct.pack("<I", 96))
+            fdesc.write(struct.pack("<I", 10))
+            fdesc.write(b"invalidjson")
         assert get_hub_version(tmpdir) == "0.0.0"
 
 
@@ -309,13 +309,13 @@ def test_get_ide_version_darwin_and_exception() -> None:
             # Valid
             app_dir = os.path.join(tmpdir, "Contents", "Resources", "app")
             os.makedirs(app_dir)
-            with open(os.path.join(app_dir, "product.json"), "w", encoding="utf-8") as f:
-                json.dump({"ideVersion": "2.0.4"}, f)
+            with open(os.path.join(app_dir, "product.json"), "w", encoding="utf-8") as fdesc:
+                json.dump({"ideVersion": "2.0.4"}, fdesc)
             assert get_ide_version(tmpdir) == "2.0.4"
 
             # Invalid json format raises exception and returns "0.0.0"
-            with open(os.path.join(app_dir, "product.json"), "w", encoding="utf-8") as f:
-                f.write("invalid json")
+            with open(os.path.join(app_dir, "product.json"), "w", encoding="utf-8") as fdesc:
+                fdesc.write("invalid json")
             assert get_ide_version(tmpdir) == "0.0.0"
 
 

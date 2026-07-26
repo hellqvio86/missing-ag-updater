@@ -59,8 +59,8 @@ def install_macos_dmg(dmg_path: str, dest_app_path: str) -> bool:
 
         shutil.copytree(source_app, dest_app_path, symlinks=True)
         return True
-    except Exception as e:
-        print_error(f"macOS DMG installation failed: {e}")
+    except Exception as err:
+        print_error(f"macOS DMG installation failed: {err}")
         return False
     finally:
         # Detach DMG
@@ -78,8 +78,8 @@ def install_windows_exe(exe_path: str) -> bool:
         print_status("Running silent installer (/S)...")
         subprocess.run([exe_path, "/S"], check=True)
         return True
-    except Exception as e:
-        print_error(f"Windows EXE installation failed: {e}")
+    except Exception as err:
+        print_error(f"Windows EXE installation failed: {err}")
         return False
 
 
@@ -130,8 +130,8 @@ def update_ide(
         latest = releases[0]
         latest_ver = latest.version
         exec_id = latest.execution_id
-    except Exception as e:
-        print_error(f"Failed to check IDE updates: {e}")
+    except Exception as err:
+        print_error(f"Failed to check IDE updates: {err}")
         return False
 
     print_info(f"Local IDE Version:  {COLOR_BOLD}{current_ver}{COLOR_ENDC}")
@@ -211,8 +211,8 @@ def update_ide(
 
             print_success(f"Antigravity IDE successfully upgraded to version {latest_ver}!")
             return True
-        except Exception as e:
-            print_error(f"Failed to upgrade IDE: {e}")
+        except Exception as err:
+            print_error(f"Failed to upgrade IDE: {err}")
             return False
 
 
@@ -238,8 +238,8 @@ def update_hub(
         latest = releases[0]
         latest_ver = latest.version
         exec_id = latest.execution_id
-    except Exception as e:
-        print_error(f"Failed to check Hub updates: {e}")
+    except Exception as err:
+        print_error(f"Failed to check Hub updates: {err}")
         return False
 
     print_info(f"Local Hub Version:  {COLOR_BOLD}{current_ver}{COLOR_ENDC}")
@@ -313,8 +313,8 @@ def update_hub(
 
             print_success(f"Antigravity Hub successfully upgraded to version {latest_ver}!")
             return True
-        except Exception as e:
-            print_error(f"Failed to upgrade Hub: {e}")
+        except Exception as err:
+            print_error(f"Failed to upgrade Hub: {err}")
             return False
 
 
@@ -329,8 +329,8 @@ def update_cli(cli_binary: str, *, dry_run: bool = False, force: bool = False) -
         latest_ver = manifest.version
         download_url = manifest.url
         expected_sha512 = manifest.sha512
-    except Exception as e:
-        print_error(f"Failed to check CLI updates: {e}")
+    except Exception as err:
+        print_error(f"Failed to check CLI updates: {err}")
         return False
 
     print_info(f"Local CLI Version:  {COLOR_BOLD}{current_ver}{COLOR_ENDC}")
@@ -398,6 +398,6 @@ def update_cli(cli_binary: str, *, dry_run: bool = False, force: bool = False) -
 
             print_success(f"Antigravity CLI successfully upgraded to version {latest_ver}!")
             return True
-        except Exception as e:
-            print_error(f"Failed to upgrade CLI: {e}")
+        except Exception as err:
+            print_error(f"Failed to upgrade CLI: {err}")
             return False

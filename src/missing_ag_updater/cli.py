@@ -101,8 +101,8 @@ def main() -> None:
     # 2. Load TOML configuration if exists
     try:
         config_dict = load_toml_config(config_path, explicit=explicit_config)
-    except Exception as e:
-        print_error(str(e))
+    except Exception as err:
+        print_error(str(err))
         sys.exit(1)
 
     # 3. Settings Resolution Helpers

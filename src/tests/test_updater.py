@@ -130,8 +130,8 @@ def test_update_ide_success_linux() -> None:
         with tempfile.TemporaryDirectory() as td:
             d = os.path.join(td, "Antigravity IDE", "bin")
             os.makedirs(d)
-            with open(os.path.join(d, "antigravity-ide"), "w") as f:
-                f.write("launcher content")
+            with open(os.path.join(d, "antigravity-ide"), "w") as fdesc:
+                fdesc.write("launcher content")
             with tarfile.open(dest_path, "w:gz") as tar:
                 tar.add(os.path.join(td, "Antigravity IDE"), arcname="Antigravity IDE")
 
@@ -224,8 +224,8 @@ def test_update_hub_success_linux() -> None:
         with tempfile.TemporaryDirectory() as td:
             d = os.path.join(td, "Antigravity-x64")
             os.makedirs(d)
-            with open(os.path.join(d, "antigravity"), "w") as f:
-                f.write("launcher content")
+            with open(os.path.join(d, "antigravity"), "w") as fdesc:
+                fdesc.write("hub launcher content")
             with tarfile.open(dest_path, "w:gz") as tar:
                 tar.add(d, arcname="Antigravity-x64")
 
@@ -277,8 +277,8 @@ def test_update_cli_success_linux() -> None:
     def mock_download_write_tar_cli(url: str, dest_path: str, **kwargs: Any) -> None:
         with tempfile.TemporaryDirectory() as td:
             p = os.path.join(td, "antigravity")
-            with open(p, "w") as f:
-                f.write("cli binary content")
+            with open(p, "w") as fdesc:
+                fdesc.write("cli binary content")
             with tarfile.open(dest_path, "w:gz") as tar:
                 tar.add(p, arcname="antigravity")
 
@@ -323,8 +323,8 @@ def test_update_cli_zip_success_windows() -> None:
     def mock_download_write_zip_cli(url: str, dest_path: str, **kwargs: Any) -> None:
         with tempfile.TemporaryDirectory() as td:
             p = os.path.join(td, "agy.exe")
-            with open(p, "w") as f:
-                f.write("cli binary exe content")
+            with open(p, "w") as fdesc:
+                fdesc.write("cli binary exe content")
             with zipfile.ZipFile(dest_path, "w") as z:
                 z.write(p, arcname="agy.exe")
 

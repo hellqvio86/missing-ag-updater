@@ -74,8 +74,8 @@ def get_ide_version(ide_dir: str) -> str:
     if not os.path.exists(product_json_path):
         return "0.0.0"
     try:
-        with open(product_json_path, "r", encoding="utf-8") as f:
-            product_json = json.load(f)
+        with open(product_json_path, "r", encoding="utf-8") as fdesc:
+            product_json = json.load(fdesc)
             return product_json.get("ideVersion", "0.0.0")
     except Exception:
         return "0.0.0"
@@ -168,20 +168,20 @@ def fetch_json(url: str) -> Any:
             response = requests.get(url, headers=headers, timeout=10)
             response.raise_for_status()
             return response.json()
-        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
-            last_err = e
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as err:
+            last_err = err
             if attempt < max_retries:
                 time.sleep(backoff_factor * (2**attempt))
             continue
-        except requests.exceptions.HTTPError as e:
-            last_err = e
-            if e.response is not None and e.response.status_code in [500, 502, 503, 504]:
+        except requests.exceptions.HTTPError as err:
+            last_err = err
+            if err.response is not None and err.response.status_code in [500, 502, 503, 504]:
                 if attempt < max_retries:
                     time.sleep(backoff_factor * (2**attempt))
                     continue
-            raise RuntimeError(f"Failed to query {url}: {e}")
-        except Exception as e:
-            raise RuntimeError(f"Failed to query {url}: {e}")
+            raise RuntimeError(f"Failed to query {url}: {err}")
+        except Exception as err:
+            raise RuntimeError(f"Failed to query {url}: {err}")
 
     raise RuntimeError(f"Failed to query {url}: {last_err}")
 
@@ -203,10 +203,10 @@ def download_file(url: str, dest_path: str, *, label: str = "Downloading") -> No
                 block_size = 1024 * 64
                 downloaded = 0
 
-                with open(dest_path, "wb") as f:
+                with open(dest_path, "wb") as fdesc:
                     for chunk in response.iter_content(chunk_size=block_size):
                         if chunk:
-                            f.write(chunk)
+                            fdesc.write(chunk)
                             downloaded += len(chunk)
                             if total_size:
                                 percent = int(downloaded * 100 / total_size)
@@ -222,22 +222,22 @@ def download_file(url: str, dest_path: str, *, label: str = "Downloading") -> No
                                 sys.stdout.flush()
                     sys.stdout.write("\n")
                 return
-        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
-            last_err = e
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as err:
+            last_err = err
             if attempt < max_retries:
                 time.sleep(backoff_factor * (2**attempt))
             continue
-        except requests.exceptions.HTTPError as e:
-            last_err = e
-            if e.response is not None and e.response.status_code in [500, 502, 503, 504]:
+        except requests.exceptions.HTTPError as err:
+            last_err = err
+            if err.response is not None and err.response.status_code in [500, 502, 503, 504]:
                 if attempt < max_retries:
                     time.sleep(backoff_factor * (2**attempt))
                     continue
             sys.stdout.write("\n")
-            raise RuntimeError(f"Download error from {url}: {e}")
-        except Exception as e:
+            raise RuntimeError(f"Download error from {url}: {err}")
+        except Exception as err:
             sys.stdout.write("\n")
-            raise RuntimeError(f"Download error from {url}: {e}")
+            raise RuntimeError(f"Download error from {url}: {err}")
 
     sys.stdout.write("\n")
     raise RuntimeError(f"Download error from {url}: {last_err}")
@@ -246,9 +246,9 @@ def download_file(url: str, dest_path: str, *, label: str = "Downloading") -> No
 def compute_sha512(file_path: str) -> str:
     """Compute the SHA512 hash of a file."""
     h = hashlib.sha512()
-    with open(file_path, "rb") as f:
+    with open(file_path, "rb") as fdesc:
         while True:
-            chunk = f.read(8192)
+            chunk = fdesc.read(8192)
             if not chunk:
                 break
             h.update(chunk)
@@ -265,8 +265,8 @@ def update_symlink(target: str, link_name: str) -> None:
         os.makedirs(os.path.dirname(link_name), exist_ok=True)
         os.symlink(target, link_name)
         print_success(f"Linked command: {link_name} -> {target}")
-    except Exception as e:
-        print_warning(f"Could not update symbolic link {link_name}: {e}")
+    except Exception as err:
+        print_warning(f"Could not update symbolic link {link_name}: {err}")
 
 
 def extract_asar_icon(asar_path: str, dest_icon_path: str) -> bool:
@@ -320,8 +320,8 @@ def is_apparmor_enabled() -> bool:
     param_path = "/sys/module/apparmor/parameters/enabled"
     if os.path.exists(param_path):
         try:
-            with open(param_path, "r", encoding="utf-8") as f:
-                if f.read().strip().upper() == "Y":
+            with open(param_path, "r", encoding="utf-8") as fdesc:
+                if fdesc.read().strip().upper() == "Y":
                     return True
         except Exception:
             pass
@@ -329,8 +329,8 @@ def is_apparmor_enabled() -> bool:
     userns_path = "/proc/sys/kernel/apparmor_restrict_unprivileged_userns"
     if os.path.exists(userns_path):
         try:
-            with open(userns_path, "r", encoding="utf-8") as f:
-                if f.read().strip() == "1":
+            with open(userns_path, "r", encoding="utf-8") as fdesc:
+                if fdesc.read().strip() == "1":
                     return True
         except Exception:
             pass
@@ -372,9 +372,9 @@ def configure_suid_sandbox(ide_dir: str) -> bool:
         subprocess.run(["sudo", "chmod", "4755", sandbox_path], check=True)
         print_success(f"Configured root:root 4755 permissions on {sandbox_path}")
         return True
-    except Exception as e:
+    except Exception as err:
         print_error(
-            f"Failed to configure SUID sandbox permissions on {sandbox_path}: {e}\n"
+            f"Failed to configure SUID sandbox permissions on {sandbox_path}: {err}\n"
             f"  Root privileges (euid 0) or sudo access are required.\n"
             f'  Manual command: sudo chown root "{sandbox_path}" && sudo chmod 4755 "{sandbox_path}"'
         )
