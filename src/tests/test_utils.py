@@ -13,6 +13,7 @@ import responses
 
 from missing_ag_updater.utils import (
     compute_sha512,
+    configure_suid_sandbox,
     extract_asar_icon,
     fetch_json,
     get_cli_version,
@@ -414,3 +415,39 @@ def test_extract_asar_icon_failure_cases() -> None:
         asar_path = os.path.join(tmpdir, "app.asar")
         _build_asar(asar_path, {"package.json": json.dumps({"version": "1.0.0"}).encode("utf-8")})
         assert extract_asar_icon(asar_path, os.path.join(tmpdir, "i.png")) is False
+
+
+def test_configure_suid_sandbox_missing() -> None:
+    with tempfile.TemporaryDirectory() as tmpdir:
+        assert configure_suid_sandbox(tmpdir) is False
+
+
+def test_configure_suid_sandbox_as_root() -> None:
+    with tempfile.TemporaryDirectory() as tmpdir:
+        sandbox_file = os.path.join(tmpdir, "chrome-sandbox")
+        open(sandbox_file, "w").close()
+        with patch("os.geteuid", return_value=0, create=True):
+            with patch("os.chown") as mock_chown:
+                with patch("os.chmod") as mock_chmod:
+                    assert configure_suid_sandbox(tmpdir) is True
+                    mock_chown.assert_called_once_with(sandbox_file, 0, 0)
+                    mock_chmod.assert_called_once_with(sandbox_file, 0o4755)
+
+
+def test_configure_suid_sandbox_via_sudo() -> None:
+    with tempfile.TemporaryDirectory() as tmpdir:
+        sandbox_file = os.path.join(tmpdir, "chrome-sandbox")
+        open(sandbox_file, "w").close()
+        with patch("os.geteuid", return_value=1000, create=True):
+            with patch("subprocess.run") as mock_run:
+                assert configure_suid_sandbox(tmpdir) is True
+                assert mock_run.call_count == 2
+
+
+def test_configure_suid_sandbox_failure() -> None:
+    with tempfile.TemporaryDirectory() as tmpdir:
+        sandbox_file = os.path.join(tmpdir, "chrome-sandbox")
+        open(sandbox_file, "w").close()
+        with patch("os.geteuid", return_value=1000, create=True):
+            with patch("subprocess.run", side_effect=subprocess.CalledProcessError(1, "sudo")):
+                assert configure_suid_sandbox(tmpdir) is False

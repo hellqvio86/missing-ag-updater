@@ -318,11 +318,27 @@ def configure_suid_sandbox(ide_dir: str) -> bool:
     if not os.path.exists(sandbox_path):
         print_warning(f"chrome-sandbox binary not found at {sandbox_path}")
         return False
+
+    is_root = False
+    if hasattr(os, "geteuid"):
+        is_root = os.geteuid() == 0
+
     try:
+        if is_root:
+            os.chown(sandbox_path, 0, 0)
+            os.chmod(sandbox_path, 0o4755)
+            print_success(f"Configured root:root 4755 permissions on {sandbox_path}")
+            return True
+
+        print_info(f"Root privileges (euid 0) required. Requesting sudo for {sandbox_path}...")
         subprocess.run(["sudo", "chown", "root", sandbox_path], check=True)
         subprocess.run(["sudo", "chmod", "4755", sandbox_path], check=True)
         print_success(f"Configured root:root 4755 permissions on {sandbox_path}")
         return True
     except Exception as e:
-        print_warning(f"Could not configure SUID sandbox permissions: {e}")
+        print_error(
+            f"Failed to configure SUID sandbox permissions on {sandbox_path}: {e}\n"
+            f"  Root privileges (euid 0) or sudo access are required.\n"
+            f'  Manual command: sudo chown root "{sandbox_path}" && sudo chmod 4755 "{sandbox_path}"'
+        )
         return False
