@@ -1,4 +1,4 @@
-.PHONY: venv lint test clean format build publish run
+.PHONY: venv lint test clean format build publish run install
 
 .venv: pyproject.toml
 	if [ ! -d .venv ]; then uv venv; fi
@@ -21,6 +21,9 @@ test: .venv
 run: .venv
 	.venv/bin/python3 -m missing_ag_updater $(ARGS)
 
+install:
+	uv tool install --force .
+
 build: .venv
 	uv build
 
@@ -29,3 +32,4 @@ publish: build
 
 clean:
 	rm -rf .venv __pycache__ .pytest_cache .ruff_cache dist
+
