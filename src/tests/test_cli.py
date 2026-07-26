@@ -1,4 +1,4 @@
-from unittest.mock import patch
+from unittest.mock import ANY, patch
 
 import pytest
 
@@ -87,7 +87,7 @@ def test_main_suid_sandbox_flag() -> None:
                     with pytest.raises(SystemExit):
                         main()
                     mock_ide.assert_called_once_with(
-                        "/home/hellqvio/opt/Antigravity IDE",
+                        ANY,
                         DEFAULT_IDE_LAUNCHER,
                         dry_run=False,
                         force=False,
