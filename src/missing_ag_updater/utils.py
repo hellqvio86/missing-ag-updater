@@ -90,9 +90,9 @@ def _read_asar_header(asar_path: str) -> tuple[dict[str, Any], int] | None:
       - Bytes 8..11:  uint32 pickle string length (4 + json_size + padding)
       - Bytes 12..15: uint32 exact JSON string size (json_size)
 
-    Our fix reads exact `json_size` (bytes 12..15), taking precedence over the
-    contributor's `header_size - 8` calculation to prevent 0-3 alignment null bytes
-    (\\x00) from causing JSONDecodeError in json.loads.
+    Reads exact `json_size` (bytes 12..15) to prevent 0-3 alignment null bytes
+    (\\x00) from breaking json.loads. Falls back to `header_size - 8` if `json_size`
+    is invalid.
     """
     if not os.path.exists(asar_path):
         return None
@@ -102,9 +102,9 @@ def _read_asar_header(asar_path: str) -> tuple[dict[str, Any], int] | None:
             if len(prefix) < 16:
                 return None
             header_size = struct.unpack("<I", prefix[4:8])[0]
-            # Our fix: read exact json_size from bytes 12..15 (Chromium Pickle format).
+            # Read exact json_size from Chromium Pickle payload length (bytes 12..15)
             json_size = struct.unpack("<I", prefix[12:16])[0]
-            # Fall back to contributor's header_size - 8 only if json_size is missing/corrupt
+            # Fall back to header_size - 8 if json_size is non-standard or corrupt
             if json_size <= 0 or json_size > header_size:
                 json_size = header_size - 8
             fdesc.seek(16)
