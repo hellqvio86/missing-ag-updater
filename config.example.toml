@@ -9,7 +9,7 @@ ide = true
 hub = true
 cli = true
 force = false
-suid_sandbox = false
+apparmor_sandbox = false  # Ubuntu only: set chrome-sandbox to root:root 4755
 
 # Desktop and Nautilus context menu integrations (Linux)
 desktop = true

@@ -12,6 +12,7 @@ import pytest
 import responses
 
 from missing_ag_updater.utils import (
+    _get_linux_distro_id_like,
     can_fix_suid_sandbox,
     compute_sha512,
     configure_suid_sandbox,
@@ -20,8 +21,10 @@ from missing_ag_updater.utils import (
     get_cli_version,
     get_hub_version,
     get_ide_version,
+    get_linux_distro_id,
     get_running_pids,
     is_apparmor_enabled,
+    is_sandbox_distro,
     is_suid_sandbox_configured,
     print_error,
     print_info,
@@ -445,87 +448,202 @@ def test_extract_asar_icon_failure_cases() -> None:
         assert extract_asar_icon(asar_path, os.path.join(tmpdir, "i.png")) is False
 
 
+# ── Distro detection tests ──
+
+
+def test_get_linux_distro_id_ubuntu() -> None:
+    """Parses ID=ubuntu from /etc/os-release."""
+    content = 'NAME="Ubuntu"\nID=ubuntu\nVERSION_ID="24.04"\n'
+    with patch("missing_ag_updater.utils.OS_NAME", "linux"):
+        with patch("builtins.open", mock_open(read_data=content)):
+            assert get_linux_distro_id() == "ubuntu"
+
+
+def test_get_linux_distro_id_fedora() -> None:
+    """Parses ID=fedora from /etc/os-release."""
+    content = 'NAME="Fedora Linux"\nID=fedora\nVERSION_ID="40"\n'
+    with patch("missing_ag_updater.utils.OS_NAME", "linux"):
+        with patch("builtins.open", mock_open(read_data=content)):
+            assert get_linux_distro_id() == "fedora"
+
+
+def test_get_linux_distro_id_quoted() -> None:
+    """Handles quoted ID values like ID=\"ubuntu\"."""
+    content = 'ID="ubuntu"\n'
+    with patch("missing_ag_updater.utils.OS_NAME", "linux"):
+        with patch("builtins.open", mock_open(read_data=content)):
+            assert get_linux_distro_id() == "ubuntu"
+
+
+def test_get_linux_distro_id_non_linux() -> None:
+    """Returns empty string on non-Linux platforms."""
+    with patch("missing_ag_updater.utils.OS_NAME", "darwin"):
+        assert get_linux_distro_id() == ""
+
+
+def test_get_linux_distro_id_file_missing() -> None:
+    """Returns empty string when /etc/os-release cannot be read."""
+    with patch("missing_ag_updater.utils.OS_NAME", "linux"):
+        with patch("builtins.open", side_effect=FileNotFoundError):
+            assert get_linux_distro_id() == ""
+
+
+def test_get_linux_distro_id_like_ubuntu_derivative() -> None:
+    """Linux Mint returns ID_LIKE with ubuntu."""
+    content = 'ID=linuxmint\nID_LIKE="ubuntu debian"\n'
+    with patch("missing_ag_updater.utils.OS_NAME", "linux"):
+        with patch("builtins.open", mock_open(read_data=content)):
+            result = _get_linux_distro_id_like()
+            assert "ubuntu" in result
+            assert "debian" in result
+
+
+def test_get_linux_distro_id_like_non_linux() -> None:
+    """Returns empty list on non-Linux."""
+    with patch("missing_ag_updater.utils.OS_NAME", "windows"):
+        assert _get_linux_distro_id_like() == []
+
+
+def test_get_linux_distro_id_like_no_field() -> None:
+    """Returns empty list when ID_LIKE is absent."""
+    content = 'ID=arch\nNAME="Arch Linux"\n'
+    with patch("missing_ag_updater.utils.OS_NAME", "linux"):
+        with patch("builtins.open", mock_open(read_data=content)):
+            assert _get_linux_distro_id_like() == []
+
+
+def test_is_sandbox_distro_ubuntu() -> None:
+    """Ubuntu is in the sandbox allowlist."""
+    with patch("missing_ag_updater.utils.get_linux_distro_id", return_value="ubuntu"):
+        assert is_sandbox_distro() is True
+
+
+def test_is_sandbox_distro_fedora() -> None:
+    """Fedora is NOT in the sandbox allowlist."""
+    with patch("missing_ag_updater.utils.get_linux_distro_id", return_value="fedora"):
+        with patch("missing_ag_updater.utils._get_linux_distro_id_like", return_value=[]):
+            assert is_sandbox_distro() is False
+
+
+def test_is_sandbox_distro_mint_derivative() -> None:
+    """Linux Mint (ID_LIKE=ubuntu) is covered by the allowlist."""
+    with patch("missing_ag_updater.utils.get_linux_distro_id", return_value="linuxmint"):
+        with patch("missing_ag_updater.utils._get_linux_distro_id_like", return_value=["ubuntu", "debian"]):
+            assert is_sandbox_distro() is True
+
+
+def test_is_sandbox_distro_non_linux() -> None:
+    """Non-Linux always returns False."""
+    with patch("missing_ag_updater.utils.get_linux_distro_id", return_value=""):
+        with patch("missing_ag_updater.utils._get_linux_distro_id_like", return_value=[]):
+            assert is_sandbox_distro() is False
+
+
+# ── AppArmor / sandbox tests ──
+
+
 def test_is_apparmor_enabled() -> None:
     with patch("missing_ag_updater.utils.OS_NAME", "windows"):
         assert is_apparmor_enabled() is False
 
     with patch("missing_ag_updater.utils.OS_NAME", "linux"):
-        with patch("os.path.exists", side_effect=lambda p: p == "/sys/module/apparmor/parameters/enabled"):
-            with patch("builtins.open", mock_open(read_data="Y\n")):
-                assert is_apparmor_enabled() is True
+        with patch("missing_ag_updater.utils.is_sandbox_distro", return_value=True):
+            with patch("os.path.exists", side_effect=lambda p: p == "/sys/module/apparmor/parameters/enabled"):
+                with patch("builtins.open", mock_open(read_data="Y\n")):
+                    assert is_apparmor_enabled() is True
 
-        with patch(
-            "os.path.exists", side_effect=lambda p: p == "/proc/sys/kernel/apparmor_restrict_unprivileged_userns"
-        ):
-            with patch("builtins.open", mock_open(read_data="1\n")):
-                assert is_apparmor_enabled() is True
+            with patch(
+                "os.path.exists",
+                side_effect=lambda p: p == "/proc/sys/kernel/apparmor_restrict_unprivileged_userns",
+            ):
+                with patch("builtins.open", mock_open(read_data="1\n")):
+                    assert is_apparmor_enabled() is True
 
 
-def test_configure_suid_sandbox_apparmor_disabled() -> None:
-    with patch("missing_ag_updater.utils.is_apparmor_enabled", return_value=False):
+def test_is_apparmor_enabled_non_sandbox_distro() -> None:
+    """is_apparmor_enabled returns False on non-allowlisted distros even if AppArmor files exist."""
+    with patch("missing_ag_updater.utils.OS_NAME", "linux"):
+        with patch("missing_ag_updater.utils.is_sandbox_distro", return_value=False):
+            assert is_apparmor_enabled() is False
+
+
+def test_configure_suid_sandbox_non_sandbox_distro() -> None:
+    """configure_suid_sandbox skips entirely on non-allowlisted distros."""
+    with patch("missing_ag_updater.utils.is_sandbox_distro", return_value=False):
         assert configure_suid_sandbox("/tmp/fake_ide") is True
 
 
+def test_configure_suid_sandbox_apparmor_disabled() -> None:
+    with patch("missing_ag_updater.utils.is_sandbox_distro", return_value=True):
+        with patch("missing_ag_updater.utils.is_apparmor_enabled", return_value=False):
+            assert configure_suid_sandbox("/tmp/fake_ide") is True
+
+
 def test_configure_suid_sandbox_missing() -> None:
-    with patch("missing_ag_updater.utils.is_apparmor_enabled", return_value=True):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            assert configure_suid_sandbox(tmpdir) is False
+    with patch("missing_ag_updater.utils.is_sandbox_distro", return_value=True):
+        with patch("missing_ag_updater.utils.is_apparmor_enabled", return_value=True):
+            with tempfile.TemporaryDirectory() as tmpdir:
+                assert configure_suid_sandbox(tmpdir) is False
 
 
 def test_configure_suid_sandbox_as_root() -> None:
-    with patch("missing_ag_updater.utils.is_apparmor_enabled", return_value=True):
-        with patch("missing_ag_updater.utils.is_suid_sandbox_configured", return_value=False):
-            with tempfile.TemporaryDirectory() as tmpdir:
-                sandbox_file = os.path.join(tmpdir, "chrome-sandbox")
-                open(sandbox_file, "w").close()
-                with patch("os.geteuid", return_value=0, create=True):
-                    with patch("os.chown") as mock_chown:
-                        with patch("os.chmod") as mock_chmod:
-                            assert configure_suid_sandbox(tmpdir) is True
-                            mock_chown.assert_called_once_with(sandbox_file, 0, 0)
-                            mock_chmod.assert_called_once_with(sandbox_file, 0o4755)
+    with patch("missing_ag_updater.utils.is_sandbox_distro", return_value=True):
+        with patch("missing_ag_updater.utils.is_apparmor_enabled", return_value=True):
+            with patch("missing_ag_updater.utils.is_suid_sandbox_configured", return_value=False):
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    sandbox_file = os.path.join(tmpdir, "chrome-sandbox")
+                    open(sandbox_file, "w").close()
+                    with patch("os.geteuid", return_value=0, create=True):
+                        with patch("os.chown") as mock_chown:
+                            with patch("os.chmod") as mock_chmod:
+                                assert configure_suid_sandbox(tmpdir) is True
+                                mock_chown.assert_called_once_with(sandbox_file, 0, 0)
+                                mock_chmod.assert_called_once_with(sandbox_file, 0o4755)
 
 
 def test_configure_suid_sandbox_via_sudo() -> None:
-    with patch("missing_ag_updater.utils.is_apparmor_enabled", return_value=True):
-        with patch("missing_ag_updater.utils.is_suid_sandbox_configured", return_value=False):
-            with tempfile.TemporaryDirectory() as tmpdir:
-                sandbox_file = os.path.join(tmpdir, "chrome-sandbox")
-                open(sandbox_file, "w").close()
-                with patch("os.geteuid", return_value=1000, create=True):
-                    with patch("subprocess.run") as mock_run:
-                        assert configure_suid_sandbox(tmpdir) is True
-                        assert mock_run.call_count == 2
+    with patch("missing_ag_updater.utils.is_sandbox_distro", return_value=True):
+        with patch("missing_ag_updater.utils.is_apparmor_enabled", return_value=True):
+            with patch("missing_ag_updater.utils.is_suid_sandbox_configured", return_value=False):
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    sandbox_file = os.path.join(tmpdir, "chrome-sandbox")
+                    open(sandbox_file, "w").close()
+                    with patch("os.geteuid", return_value=1000, create=True):
+                        with patch("subprocess.run") as mock_run:
+                            assert configure_suid_sandbox(tmpdir) is True
+                            assert mock_run.call_count == 2
                         # Must use root:root (not just root) so group is also fixed
                         assert mock_run.call_args_list[0][0][0] == ["sudo", "chown", "root:root", sandbox_file]
 
 
 def test_configure_suid_sandbox_failure() -> None:
-    with patch("missing_ag_updater.utils.is_apparmor_enabled", return_value=True):
-        with patch("missing_ag_updater.utils.is_suid_sandbox_configured", return_value=False):
-            with tempfile.TemporaryDirectory() as tmpdir:
-                sandbox_file = os.path.join(tmpdir, "chrome-sandbox")
-                open(sandbox_file, "w").close()
-                with patch("os.geteuid", return_value=1000, create=True):
-                    with patch("subprocess.run", side_effect=subprocess.CalledProcessError(1, "sudo")):
-                        assert configure_suid_sandbox(tmpdir) is False
+    with patch("missing_ag_updater.utils.is_sandbox_distro", return_value=True):
+        with patch("missing_ag_updater.utils.is_apparmor_enabled", return_value=True):
+            with patch("missing_ag_updater.utils.is_suid_sandbox_configured", return_value=False):
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    sandbox_file = os.path.join(tmpdir, "chrome-sandbox")
+                    open(sandbox_file, "w").close()
+                    with patch("os.geteuid", return_value=1000, create=True):
+                        with patch("subprocess.run", side_effect=subprocess.CalledProcessError(1, "sudo")):
+                            assert configure_suid_sandbox(tmpdir) is False
 
 
 def test_configure_suid_sandbox_already_ok() -> None:
     """If sandbox is already root:root 4755, no chown/chmod should be called."""
-    with patch("missing_ag_updater.utils.is_apparmor_enabled", return_value=True):
-        with patch("missing_ag_updater.utils.is_suid_sandbox_configured", return_value=True):
-            with tempfile.TemporaryDirectory() as tmpdir:
-                sandbox_file = os.path.join(tmpdir, "chrome-sandbox")
-                open(sandbox_file, "w").close()
-                with patch("os.chown") as mock_chown:
-                    with patch("os.chmod") as mock_chmod:
-                        with patch("subprocess.run") as mock_run:
-                            assert configure_suid_sandbox(tmpdir) is True
-                            # Nothing should have been called — already configured
-                            mock_chown.assert_not_called()
-                            mock_chmod.assert_not_called()
-                            mock_run.assert_not_called()
+    with patch("missing_ag_updater.utils.is_sandbox_distro", return_value=True):
+        with patch("missing_ag_updater.utils.is_apparmor_enabled", return_value=True):
+            with patch("missing_ag_updater.utils.is_suid_sandbox_configured", return_value=True):
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    sandbox_file = os.path.join(tmpdir, "chrome-sandbox")
+                    open(sandbox_file, "w").close()
+                    with patch("os.chown") as mock_chown:
+                        with patch("os.chmod") as mock_chmod:
+                            with patch("subprocess.run") as mock_run:
+                                assert configure_suid_sandbox(tmpdir) is True
+                                # Nothing should have been called — already configured
+                                mock_chown.assert_not_called()
+                                mock_chmod.assert_not_called()
+                                mock_run.assert_not_called()
 
 
 def test_is_suid_sandbox_configured_correct() -> None:
@@ -561,55 +679,68 @@ def test_is_suid_sandbox_configured_exception() -> None:
         assert is_suid_sandbox_configured("/fake/chrome-sandbox") is False
 
 
-def test_can_fix_suid_sandbox_no_apparmor() -> None:
-    """If AppArmor is not active, sandbox fix is never needed — always OK."""
-    with patch("missing_ag_updater.utils.is_apparmor_enabled", return_value=False):
+def test_can_fix_suid_sandbox_non_sandbox_distro() -> None:
+    """can_fix_suid_sandbox returns OK on non-allowlisted distros."""
+    with patch("missing_ag_updater.utils.is_sandbox_distro", return_value=False):
         ok, reason = can_fix_suid_sandbox()
         assert ok is True
         assert reason == ""
 
 
-def test_can_fix_suid_sandbox_as_root() -> None:
-    """If we are root, we can always fix sandbox permissions directly."""
-    with patch("missing_ag_updater.utils.is_apparmor_enabled", return_value=True):
-        with patch("os.geteuid", return_value=0, create=True):
+def test_can_fix_suid_sandbox_no_apparmor() -> None:
+    """If AppArmor is not active, sandbox fix is never needed — always OK."""
+    with patch("missing_ag_updater.utils.is_sandbox_distro", return_value=True):
+        with patch("missing_ag_updater.utils.is_apparmor_enabled", return_value=False):
             ok, reason = can_fix_suid_sandbox()
             assert ok is True
             assert reason == ""
 
 
-def test_can_fix_suid_sandbox_sudo_available() -> None:
-    """Non-root but sudo -n true succeeds — fix is possible."""
-    with patch("missing_ag_updater.utils.is_apparmor_enabled", return_value=True):
-        with patch("os.geteuid", return_value=1000, create=True):
-            mock_result: subprocess.CompletedProcess[bytes] = subprocess.CompletedProcess(
-                args=["sudo", "-n", "true"], returncode=0
-            )
-            with patch("subprocess.run", return_value=mock_result):
+def test_can_fix_suid_sandbox_as_root() -> None:
+    """If we are root, we can always fix sandbox permissions directly."""
+    with patch("missing_ag_updater.utils.is_sandbox_distro", return_value=True):
+        with patch("missing_ag_updater.utils.is_apparmor_enabled", return_value=True):
+            with patch("os.geteuid", return_value=0, create=True):
                 ok, reason = can_fix_suid_sandbox()
                 assert ok is True
                 assert reason == ""
 
 
+def test_can_fix_suid_sandbox_sudo_available() -> None:
+    """Non-root but sudo -n true succeeds — fix is possible."""
+    with patch("missing_ag_updater.utils.is_sandbox_distro", return_value=True):
+        with patch("missing_ag_updater.utils.is_apparmor_enabled", return_value=True):
+            with patch("os.geteuid", return_value=1000, create=True):
+                mock_result: subprocess.CompletedProcess[bytes] = subprocess.CompletedProcess(
+                    args=["sudo", "-n", "true"], returncode=0
+                )
+                with patch("subprocess.run", return_value=mock_result):
+                    ok, reason = can_fix_suid_sandbox()
+                    assert ok is True
+                    assert reason == ""
+
+
 def test_can_fix_suid_sandbox_sudo_unavailable() -> None:
     """Non-root and sudo -n true fails — bail out early with a clear reason."""
-    with patch("missing_ag_updater.utils.is_apparmor_enabled", return_value=True):
-        with patch("os.geteuid", return_value=1000, create=True):
-            mock_result: subprocess.CompletedProcess[bytes] = subprocess.CompletedProcess(
-                args=["sudo", "-n", "true"], returncode=1
-            )
-            with patch("subprocess.run", return_value=mock_result):
-                ok, reason = can_fix_suid_sandbox()
-                assert ok is False
-                assert "AppArmor" in reason
-                assert "sudo" in reason
+    with patch("missing_ag_updater.utils.is_sandbox_distro", return_value=True):
+        with patch("missing_ag_updater.utils.is_apparmor_enabled", return_value=True):
+            with patch("os.geteuid", return_value=1000, create=True):
+                mock_result: subprocess.CompletedProcess[bytes] = subprocess.CompletedProcess(
+                    args=["sudo", "-n", "true"], returncode=1
+                )
+                with patch("subprocess.run", return_value=mock_result):
+                    ok, reason = can_fix_suid_sandbox()
+                    assert ok is False
+                    assert "AppArmor" in reason
+                    assert "sudo" in reason
 
 
 def test_can_fix_suid_sandbox_sudo_exception() -> None:
     """sudo not found or times out — bail out early with a clear reason."""
-    with patch("missing_ag_updater.utils.is_apparmor_enabled", return_value=True):
-        with patch("os.geteuid", return_value=1000, create=True):
-            with patch("subprocess.run", side_effect=FileNotFoundError("sudo not found")):
-                ok, reason = can_fix_suid_sandbox()
-                assert ok is False
-                assert "AppArmor" in reason
+    with patch("missing_ag_updater.utils.is_sandbox_distro", return_value=True):
+        with patch("missing_ag_updater.utils.is_apparmor_enabled", return_value=True):
+            with patch("os.geteuid", return_value=1000, create=True):
+                with patch("subprocess.run", side_effect=FileNotFoundError("sudo not found")):
+                    ok, reason = can_fix_suid_sandbox()
+                    assert ok is False
+                    assert "AppArmor" in reason

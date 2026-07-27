@@ -38,6 +38,62 @@ def print_info(msg: str) -> None:
     print(f"  {msg}")
 
 
+# Distro allowlist for sandbox features (opt-in per distro)
+_SANDBOX_DISTROS = frozenset({"ubuntu"})
+
+
+def get_linux_distro_id() -> str:
+    """Return the lowercase distro ID from /etc/os-release (e.g. 'ubuntu', 'fedora').
+
+    Returns an empty string on non-Linux platforms or if the file cannot be read.
+    """
+    if OS_NAME != "linux":
+        return ""
+    try:
+        with open("/etc/os-release", "r", encoding="utf-8") as fdesc:
+            for line in fdesc:
+                if line.startswith("ID="):
+                    return line.strip().split("=", 1)[1].strip('"').lower()
+    except Exception:
+        pass
+    return ""
+
+
+def _get_linux_distro_id_like() -> list[str]:
+    """Return the lowercase ID_LIKE values from /etc/os-release as a list.
+
+    For example, Linux Mint returns ['ubuntu', 'debian'].
+    Returns an empty list on non-Linux or if the field is absent.
+    """
+    if OS_NAME != "linux":
+        return []
+    try:
+        with open("/etc/os-release", "r", encoding="utf-8") as fdesc:
+            for line in fdesc:
+                if line.startswith("ID_LIKE="):
+                    raw = line.strip().split("=", 1)[1].strip('"').lower()
+                    return raw.split()
+    except Exception:
+        pass
+    return []
+
+
+def is_sandbox_distro() -> bool:
+    """Return True if the current Linux distro requires sandbox fixes.
+
+    Checks both the ID and ID_LIKE fields from /etc/os-release against a
+    curated allowlist.  This covers the primary distro (e.g. 'ubuntu') as
+    well as derivatives (e.g. Linux Mint with ID_LIKE='ubuntu debian').
+    """
+    distro_id = get_linux_distro_id()
+    if distro_id in _SANDBOX_DISTROS:
+        return True
+    for like_id in _get_linux_distro_id_like():
+        if like_id in _SANDBOX_DISTROS:
+            return True
+    return False
+
+
 def get_running_pids(keyword: str) -> list[str]:
     """Get list of running PIDs matching the specified keyword (excluding current process)."""
     pids = []
@@ -345,8 +401,14 @@ def refresh_linux_desktop_caches() -> None:
 
 
 def is_apparmor_enabled() -> bool:
-    """Check if AppArmor is enabled and active on Linux."""
+    """Check if AppArmor is enabled and active on Linux.
+
+    Only checks on distros in the sandbox allowlist (e.g. Ubuntu).
+    Returns False immediately on non-allowlisted distros.
+    """
     if OS_NAME != "linux":
+        return False
+    if not is_sandbox_distro():
         return False
 
     param_path = "/sys/module/apparmor/parameters/enabled"
@@ -397,7 +459,13 @@ def can_fix_suid_sandbox() -> tuple[bool, str]:
     Returns (True, "") if we can, or (False, reason) if we cannot.
     Used to bail out early — before downloading anything — when --suid-sandbox
     is requested but we have no way to set root:root 4755.
+
+    Skips entirely on distros not in the sandbox allowlist.
     """
+    if not is_sandbox_distro():
+        # Not a distro that needs sandbox fixes — always OK.
+        return True, ""
+
     if not is_apparmor_enabled():
         # No AppArmor means no sandbox fix needed at all — always OK.
         return True, ""
@@ -438,7 +506,13 @@ def configure_suid_sandbox(ide_dir: str) -> bool:
     - If misconfigured, attempts to fix via sudo.
     - If fixing fails (no sudo / wrong permissions), prints a loud error with the manual
       fix command and returns False so callers can signal overall failure.
+
+    Only runs on distros in the sandbox allowlist (e.g. Ubuntu).
     """
+    if not is_sandbox_distro():
+        print_info("Distro does not require SUID sandbox configuration; skipped.")
+        return True
+
     if not is_apparmor_enabled():
         print_info("AppArmor is not active on this system; SUID sandbox configuration skipped.")
         return True

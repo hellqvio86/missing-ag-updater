@@ -1,4 +1,5 @@
 import os
+import shutil
 import subprocess
 import tempfile
 from typing import Any
@@ -157,6 +158,43 @@ def test_update_ide_success_linux() -> None:
                                     mock_nautilus.assert_called_once_with(
                                         ide_dir=target_ide_dir, launcher_path=launcher
                                     )
+
+
+def test_update_ide_skips_legacy_cleanup_on_non_sandbox_distro() -> None:
+    import tarfile
+
+    def mock_download_write_tar(url: str, dest_path: str, **kwargs: Any) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            d = os.path.join(td, "Antigravity IDE", "bin")
+            os.makedirs(d)
+            with open(os.path.join(d, "antigravity-ide"), "w") as fdesc:
+                fdesc.write("launcher content")
+            with tarfile.open(dest_path, "w:gz") as tar:
+                tar.add(os.path.join(td, "Antigravity IDE"), arcname="Antigravity IDE")
+
+    with patch("missing_ag_updater.updater.OS_NAME", "linux"):
+        with patch("missing_ag_updater.updater.get_ide_version", return_value="2.0.3"):
+            with patch(
+                "missing_ag_updater.updater.fetch_json",
+                return_value=[{"version": "2.0.4", "execution_id": "1234"}],
+            ):
+                with patch("missing_ag_updater.updater.get_running_pids", return_value=[]):
+                    with patch("missing_ag_updater.updater.download_file", side_effect=mock_download_write_tar):
+                        with patch("missing_ag_updater.updater.is_sandbox_distro", return_value=False):
+                            original_rmtree = shutil.rmtree
+
+                            def record_rmtree(path: str, *args: Any, **kwargs: Any) -> None:
+                                if path.endswith("Antigravity IDE"):
+                                    raise AssertionError("legacy directory should not be removed")
+                                return original_rmtree(path, *args, **kwargs)
+
+                            with patch("missing_ag_updater.updater.shutil.rmtree", side_effect=record_rmtree):
+                                with tempfile.TemporaryDirectory() as root:
+                                    target_ide_dir = os.path.join(root, "target-ide")
+                                    legacy_ide_dir = os.path.join(root, "Antigravity IDE")
+                                    os.makedirs(legacy_ide_dir)
+                                    res = update_ide(target_ide_dir, None, force=True)
+                                    assert res is True
 
 
 def test_update_ide_empty_releases() -> None:

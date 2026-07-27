@@ -126,7 +126,7 @@ $ antigravity-updater
 ```text
 usage: python -m missing_ag_updater [-h] [--check] [--ide] [--hub] [--cli] [--force]
                  [--dir-ide DIR_IDE] [--dir-hub DIR_HUB] [--path-cli PATH_CLI]
-                 [--no-desktop] [--no-nautilus]
+                 [--no-desktop] [--no-nautilus] [--apparmor-sandbox]
 
 Auto-updater utility for Google Antigravity developer tools (Cross-Platform).
 
@@ -160,7 +160,7 @@ You can configure the behavior of the auto-updater using environment variables. 
 | `--path-cli` | `ANTIGRAVITY_PATH_CLI` or `AG_PATH_CLI` | String | Override path to Antigravity CLI binary |
 | `--no-desktop` | `ANTIGRAVITY_DESKTOP` / `AG_DESKTOP` (Boolean, default `true`) or `ANTIGRAVITY_NO_DESKTOP` / `AG_NO_DESKTOP` (Boolean, default `false`) | Boolean | Set to `false` or `1` (for `NO_DESKTOP`) to skip installing local `.desktop` launcher and application icons on Linux |
 | `--no-nautilus` | `ANTIGRAVITY_NAUTILUS` / `AG_NAUTILUS` (Boolean, default `true`) or `ANTIGRAVITY_NO_NAUTILUS` / `AG_NO_NAUTILUS` (Boolean, default `false`) | Boolean | Set to `false` or `1` (for `NO_NAUTILUS`) to skip installing the Nautilus context-menu extension |
-| `--suid-sandbox` | `ANTIGRAVITY_SUID_SANDBOX` or `AG_SUID_SANDBOX` | Boolean | Configure `root:root 4755` permissions on `chrome-sandbox` to run with full Chromium sandbox enabled |
+| `--apparmor-sandbox` | `ANTIGRAVITY_APPARMOR_SANDBOX` or `AG_APPARMOR_SANDBOX` | Boolean | **(Ubuntu only)** Configure `root:root 4755` permissions on `chrome-sandbox` for AppArmor compatibility |
 
 > [!NOTE]
 > Boolean environment variables accept `1`, `true`, `yes`, or `on` as `True`, and any other value (or unset) as `False`.
@@ -191,7 +191,7 @@ ide = true
 hub = true
 cli = true
 force = false
-suid_sandbox = false
+apparmor_sandbox = false  # Ubuntu only
 dir_ide = "/home/user/opt/Antigravity-IDE"
 desktop = true
 nautilus = true
@@ -311,6 +311,49 @@ Install the `nautilus-python` bindings using your distribution's package manager
 After installing the package, restart Nautilus to reload all python extensions:
 ```bash
 nautilus -q
+```
+
+## Linux Sandbox (Ubuntu)
+
+On **Ubuntu 24.04+**, the kernel restricts unprivileged user namespaces via AppArmor (`apparmor_restrict_unprivileged_userns`). This breaks the Chromium namespace sandbox used by Electron applications such as the Antigravity IDE and Hub.
+
+Without a fix, the IDE will crash on launch with:
+```text
+FATAL: Check failed: . : Invalid argument (22)
+```
+
+### Why This Only Affects Ubuntu
+
+| Distro | Sandbox Status | Reason |
+| :--- | :--- | :--- |
+| **Ubuntu 24.04+** | ❌ Broken without fix | AppArmor blocks unprivileged user namespaces |
+| **Fedora** | ✅ Works out of the box | SELinux does not restrict user namespaces |
+| **Arch Linux** | ✅ Works out of the box | No namespace restrictions by default |
+| **Debian 12+** | ⚠ May need fix | AppArmor enabled by default (not yet in allowlist) |
+
+The updater **auto-detects your distro** via `/etc/os-release` and only applies sandbox fixes on Ubuntu (and Ubuntu-based derivatives like Linux Mint and Pop!_OS via `ID_LIKE`). On all other distros, `--apparmor-sandbox` is silently skipped.
+
+### The Fix: `--apparmor-sandbox`
+
+Pass the `--apparmor-sandbox` flag to configure the `chrome-sandbox` binary with SUID root permissions (`root:root 4755`), which allows Chromium to use the legacy setuid sandbox instead:
+
+```bash
+# During update:
+antigravity-updater --apparmor-sandbox
+
+# Or set it permanently in your config:
+# ~/.config/missing-ag-updater/config.toml
+apparmor_sandbox = true
+```
+
+This requires `sudo` access (or running as root). The updater will prompt for `sudo` if needed, or fail early with a clear error message if `sudo` is unavailable.
+
+### Manual Fix
+
+If you prefer to fix the sandbox manually without using the flag:
+```bash
+sudo chown root:root "$HOME/opt/Antigravity-IDE/chrome-sandbox" && \
+sudo chmod 4755 "$HOME/opt/Antigravity-IDE/chrome-sandbox"
 ```
 
 ## Development

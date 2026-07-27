@@ -69,10 +69,10 @@ def main() -> None:
         help="Skip installing Nautilus context-menu integration on Linux",
     )
     parser.add_argument(
-        "--suid-sandbox",
+        "--apparmor-sandbox",
         action="store_true",
         default=None,
-        help="Configure root:root 4755 permissions on chrome-sandbox to run with full Chromium sandbox enabled",
+        help="Configure root:root 4755 permissions on chrome-sandbox for Ubuntu AppArmor compatibility",
     )
     parser.add_argument(
         "--config",
@@ -139,8 +139,8 @@ def main() -> None:
     hub = resolve_bool(args.hub, ["ANTIGRAVITY_HUB", "AG_HUB"], "hub", False)
     cli = resolve_bool(args.cli, ["ANTIGRAVITY_CLI", "AG_CLI"], "cli", False)
     force = resolve_bool(args.force, ["ANTIGRAVITY_FORCE", "AG_FORCE"], "force", False)
-    suid_sandbox = resolve_bool(
-        args.suid_sandbox, ["ANTIGRAVITY_SUID_SANDBOX", "AG_SUID_SANDBOX"], "suid_sandbox", False
+    apparmor_sandbox = resolve_bool(
+        args.apparmor_sandbox, ["ANTIGRAVITY_APPARMOR_SANDBOX", "AG_APPARMOR_SANDBOX"], "apparmor_sandbox", False
     )
 
     dir_ide = resolve_str(args.dir_ide, ["ANTIGRAVITY_DIR_IDE", "AG_DIR_IDE"], "dir_ide", DEFAULT_IDE_DIR)
@@ -232,7 +232,7 @@ def main() -> None:
             force=force,
             install_desktop=install_desktop,
             install_nautilus=install_nautilus,
-            suid_sandbox=suid_sandbox,
+            suid_sandbox=apparmor_sandbox,
         )
         success = success and res
         print()

@@ -81,9 +81,9 @@ def test_main_force_and_check() -> None:
                         mock_exit.assert_called_once_with(0)
 
 
-def test_main_suid_sandbox_flag() -> None:
-    # Test --suid-sandbox flag passes suid_sandbox=True to update_ide
-    with patch("sys.argv", ["antigravity-updater", "--ide", "--suid-sandbox"]):
+def test_main_apparmor_sandbox_flag() -> None:
+    # Test --apparmor-sandbox flag passes suid_sandbox=True to update_ide
+    with patch("sys.argv", ["antigravity-updater", "--ide", "--apparmor-sandbox"]):
         with patch("missing_ag_updater.cli.OS_NAME", "linux"):
             with patch("missing_ag_updater.cli.load_toml_config", return_value={}):
                 with patch("missing_ag_updater.cli.update_ide", return_value=True) as mock_ide:
