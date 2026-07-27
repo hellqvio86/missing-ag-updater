@@ -377,8 +377,29 @@ def is_apparmor_enabled() -> bool:
     return False
 
 
+def is_suid_sandbox_configured(sandbox_path: str) -> bool:
+    """Return True if chrome-sandbox is owned by root:root with mode 4755."""
+    try:
+        st = os.stat(sandbox_path)
+        import stat as stat_mod
+
+        uid_ok = st.st_uid == 0
+        gid_ok = st.st_gid == 0
+        mode_ok = bool(st.st_mode & stat_mod.S_ISUID) and (st.st_mode & 0o777) == 0o755
+        return uid_ok and gid_ok and mode_ok
+    except Exception:
+        return False
+
+
 def configure_suid_sandbox(ide_dir: str) -> bool:
-    """Configure root:root 4755 permissions on chrome-sandbox binary if AppArmor is active."""
+    """Configure root:root 4755 permissions on chrome-sandbox binary if AppArmor is active.
+
+    Checks the current state first:
+    - If already correctly configured (root:root 4755), skips with a success message.
+    - If misconfigured, attempts to fix via sudo.
+    - If fixing fails (no sudo / wrong permissions), prints a loud error with the manual
+      fix command and returns False so callers can signal overall failure.
+    """
     if not is_apparmor_enabled():
         print_info("AppArmor is not active on this system; SUID sandbox configuration skipped.")
         return True
@@ -396,9 +417,14 @@ def configure_suid_sandbox(ide_dir: str) -> bool:
             continue
 
         found_any = True
-        is_root = False
-        if hasattr(os, "geteuid"):
-            is_root = os.geteuid() == 0
+
+        # Check current state — skip if already correctly configured
+        if is_suid_sandbox_configured(sandbox_path):
+            print_success(f"SUID sandbox already correctly configured: {sandbox_path}")
+            continue
+
+        # Misconfigured — try to fix
+        is_root = hasattr(os, "geteuid") and os.geteuid() == 0
 
         try:
             if is_root:
@@ -406,15 +432,16 @@ def configure_suid_sandbox(ide_dir: str) -> bool:
                 os.chmod(sandbox_path, 0o4755)
                 print_success(f"Configured root:root 4755 permissions on {sandbox_path}")
             else:
-                print_info(f"Root privileges (euid 0) required. Requesting sudo for {sandbox_path}...")
-                subprocess.run(["sudo", "chown", "root", sandbox_path], check=True)
+                print_info(f"Root privileges required. Requesting sudo for {sandbox_path}...")
+                subprocess.run(["sudo", "chown", "root:root", sandbox_path], check=True)
                 subprocess.run(["sudo", "chmod", "4755", sandbox_path], check=True)
                 print_success(f"Configured root:root 4755 permissions on {sandbox_path}")
         except Exception as err:
             print_error(
-                f"Failed to configure SUID sandbox permissions on {sandbox_path}: {err}\n"
-                f"  Root privileges (euid 0) or sudo access are required.\n"
-                f'  Manual command: sudo chown root "{sandbox_path}" && sudo chmod 4755 "{sandbox_path}"'
+                f"Cannot fix SUID sandbox permissions on {sandbox_path}: {err}\n"
+                f"  The sandbox binary is misconfigured — Antigravity IDE will refuse to start.\n"
+                f"  Run the following command manually to fix it:\n"
+                f'    sudo chown root:root "{sandbox_path}" && sudo chmod 4755 "{sandbox_path}"'
             )
             success = False
 

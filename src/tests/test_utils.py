@@ -21,6 +21,7 @@ from missing_ag_updater.utils import (
     get_ide_version,
     get_running_pids,
     is_apparmor_enabled,
+    is_suid_sandbox_configured,
     print_error,
     print_info,
     print_status,
@@ -472,33 +473,88 @@ def test_configure_suid_sandbox_missing() -> None:
 
 def test_configure_suid_sandbox_as_root() -> None:
     with patch("missing_ag_updater.utils.is_apparmor_enabled", return_value=True):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            sandbox_file = os.path.join(tmpdir, "chrome-sandbox")
-            open(sandbox_file, "w").close()
-            with patch("os.geteuid", return_value=0, create=True):
-                with patch("os.chown") as mock_chown:
-                    with patch("os.chmod") as mock_chmod:
-                        assert configure_suid_sandbox(tmpdir) is True
-                        mock_chown.assert_called_once_with(sandbox_file, 0, 0)
-                        mock_chmod.assert_called_once_with(sandbox_file, 0o4755)
+        with patch("missing_ag_updater.utils.is_suid_sandbox_configured", return_value=False):
+            with tempfile.TemporaryDirectory() as tmpdir:
+                sandbox_file = os.path.join(tmpdir, "chrome-sandbox")
+                open(sandbox_file, "w").close()
+                with patch("os.geteuid", return_value=0, create=True):
+                    with patch("os.chown") as mock_chown:
+                        with patch("os.chmod") as mock_chmod:
+                            assert configure_suid_sandbox(tmpdir) is True
+                            mock_chown.assert_called_once_with(sandbox_file, 0, 0)
+                            mock_chmod.assert_called_once_with(sandbox_file, 0o4755)
 
 
 def test_configure_suid_sandbox_via_sudo() -> None:
     with patch("missing_ag_updater.utils.is_apparmor_enabled", return_value=True):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            sandbox_file = os.path.join(tmpdir, "chrome-sandbox")
-            open(sandbox_file, "w").close()
-            with patch("os.geteuid", return_value=1000, create=True):
-                with patch("subprocess.run") as mock_run:
-                    assert configure_suid_sandbox(tmpdir) is True
-                    assert mock_run.call_count == 2
+        with patch("missing_ag_updater.utils.is_suid_sandbox_configured", return_value=False):
+            with tempfile.TemporaryDirectory() as tmpdir:
+                sandbox_file = os.path.join(tmpdir, "chrome-sandbox")
+                open(sandbox_file, "w").close()
+                with patch("os.geteuid", return_value=1000, create=True):
+                    with patch("subprocess.run") as mock_run:
+                        assert configure_suid_sandbox(tmpdir) is True
+                        assert mock_run.call_count == 2
+                        # Must use root:root (not just root) so group is also fixed
+                        assert mock_run.call_args_list[0][0][0] == ["sudo", "chown", "root:root", sandbox_file]
 
 
 def test_configure_suid_sandbox_failure() -> None:
     with patch("missing_ag_updater.utils.is_apparmor_enabled", return_value=True):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            sandbox_file = os.path.join(tmpdir, "chrome-sandbox")
-            open(sandbox_file, "w").close()
-            with patch("os.geteuid", return_value=1000, create=True):
-                with patch("subprocess.run", side_effect=subprocess.CalledProcessError(1, "sudo")):
-                    assert configure_suid_sandbox(tmpdir) is False
+        with patch("missing_ag_updater.utils.is_suid_sandbox_configured", return_value=False):
+            with tempfile.TemporaryDirectory() as tmpdir:
+                sandbox_file = os.path.join(tmpdir, "chrome-sandbox")
+                open(sandbox_file, "w").close()
+                with patch("os.geteuid", return_value=1000, create=True):
+                    with patch("subprocess.run", side_effect=subprocess.CalledProcessError(1, "sudo")):
+                        assert configure_suid_sandbox(tmpdir) is False
+
+
+def test_configure_suid_sandbox_already_ok() -> None:
+    """If sandbox is already root:root 4755, no chown/chmod should be called."""
+    with patch("missing_ag_updater.utils.is_apparmor_enabled", return_value=True):
+        with patch("missing_ag_updater.utils.is_suid_sandbox_configured", return_value=True):
+            with tempfile.TemporaryDirectory() as tmpdir:
+                sandbox_file = os.path.join(tmpdir, "chrome-sandbox")
+                open(sandbox_file, "w").close()
+                with patch("os.chown") as mock_chown:
+                    with patch("os.chmod") as mock_chmod:
+                        with patch("subprocess.run") as mock_run:
+                            assert configure_suid_sandbox(tmpdir) is True
+                            # Nothing should have been called — already configured
+                            mock_chown.assert_not_called()
+                            mock_chmod.assert_not_called()
+                            mock_run.assert_not_called()
+
+
+def test_is_suid_sandbox_configured_correct() -> None:
+    """is_suid_sandbox_configured returns True for root:root 4755."""
+    import stat as stat_mod
+
+    mock_stat = os.stat_result((stat_mod.S_ISUID | 0o100755, 0, 0, 0, 0, 0, 0, 0, 0, 0))
+    with patch("os.stat", return_value=mock_stat):
+        assert is_suid_sandbox_configured("/fake/chrome-sandbox") is True
+
+
+def test_is_suid_sandbox_configured_wrong_group() -> None:
+    """is_suid_sandbox_configured returns False when group is not root."""
+    import stat as stat_mod
+
+    # uid=0, gid=1000 (non-root group) with 4755
+    mock_stat = os.stat_result((stat_mod.S_ISUID | 0o100755, 0, 0, 0, 0, 1000, 0, 0, 0, 0))
+    with patch("os.stat", return_value=mock_stat):
+        assert is_suid_sandbox_configured("/fake/chrome-sandbox") is False
+
+
+def test_is_suid_sandbox_configured_no_suid_bit() -> None:
+    """is_suid_sandbox_configured returns False when SUID bit is missing."""
+    # mode 0o755 without S_ISUID
+    mock_stat = os.stat_result((0o100755, 0, 0, 0, 0, 0, 0, 0, 0, 0))
+    with patch("os.stat", return_value=mock_stat):
+        assert is_suid_sandbox_configured("/fake/chrome-sandbox") is False
+
+
+def test_is_suid_sandbox_configured_exception() -> None:
+    """is_suid_sandbox_configured returns False on OS errors (file not found etc)."""
+    with patch("os.stat", side_effect=OSError("No such file")):
+        assert is_suid_sandbox_configured("/fake/chrome-sandbox") is False

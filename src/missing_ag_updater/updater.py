@@ -140,7 +140,8 @@ def update_ide(
     if current_ver == latest_ver and not force:
         print_success("Antigravity IDE is up to date.")
         if suid_sandbox and OS_NAME == "linux":
-            configure_suid_sandbox(ide_dir)
+            if not configure_suid_sandbox(ide_dir):
+                return False
         return True
 
     if dry_run:
@@ -215,7 +216,8 @@ def update_ide(
                     install_ide_nautilus(ide_dir=ide_dir, launcher_path=launcher_path)
 
                 if suid_sandbox and OS_NAME == "linux":
-                    configure_suid_sandbox(ide_dir)
+                    if not configure_suid_sandbox(ide_dir):
+                        return False
 
             print_success(f"Antigravity IDE successfully upgraded to version {latest_ver}!")
             return True
