@@ -226,6 +226,12 @@ After the update finishes, the permanent application files are stored in the fol
 | **macOS** | `/Applications/Antigravity IDE.app` | `/Applications/Antigravity.app` | `~/.local/bin/agy` | *N/A (installed in Applications)* |
 | **Windows** | `%LOCALAPPDATA%\Programs\antigravity-ide` | `%LOCALAPPDATA%\Programs\antigravity` | `%LOCALAPPDATA%\Microsoft\WindowsApps\agy.exe` | *N/A (added to PATH)* |
 
+> [!NOTE]
+> **Linux Path & Chromium SUID Sandbox Bug:**
+> On Linux, the IDE default directory is `~/opt/Antigravity-IDE` (hyphenated without spaces). This avoids an upstream Chromium bug in [`zygote_host_impl_linux.cc`](https://chromium.googlesource.com/chromium/src/+/refs/heads/main/content/browser/zygote_host/zygote_host_impl_linux.cc), where binary paths containing spaces (e.g., `~/opt/Antigravity IDE`) are truncated at space boundaries when executing `chrome-sandbox` via `execvp`, crashing with `FATAL: Check failed: . : Invalid argument (22)`.
+> 
+> The updater automatically checks both `~/opt/Antigravity-IDE` and legacy `~/opt/Antigravity IDE` paths to resolve versions for existing installations.
+
 You can override these default paths at execution time using the `--dir-ide`, `--dir-hub`, and `--path-cli` flags.
 
 ---
