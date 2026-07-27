@@ -139,6 +139,8 @@ def update_ide(
 
     if current_ver == latest_ver and not force:
         print_success("Antigravity IDE is up to date.")
+        if suid_sandbox and OS_NAME == "linux":
+            configure_suid_sandbox(ide_dir)
         return True
 
     if dry_run:
