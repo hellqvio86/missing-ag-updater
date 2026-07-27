@@ -26,6 +26,8 @@ from missing_ag_updater.utils import (
     print_status,
     print_success,
     print_warning,
+    resolve_existing_hub_dir,
+    resolve_existing_ide_dir,
     update_symlink,
 )
 
@@ -74,6 +76,29 @@ def test_get_ide_version() -> None:
             json.dump({"ideVersion": "2.0.4"}, fdesc)
 
         assert get_ide_version(tmpdir) == "2.0.4"
+
+
+def test_resolve_existing_dirs() -> None:
+    with tempfile.TemporaryDirectory() as tmpdir:
+        spaced_ide = os.path.join(tmpdir, "Antigravity IDE")
+        hyphen_ide = os.path.join(tmpdir, "Antigravity-IDE")
+
+        # Non-existent paths return original argument
+        assert resolve_existing_ide_dir(hyphen_ide) == hyphen_ide
+
+        # Creating spaced dir allows hyphen argument to resolve to spaced dir
+        os.makedirs(spaced_ide)
+        assert resolve_existing_ide_dir(hyphen_ide) == spaced_ide
+
+        # Creating hyphen dir takes precedence
+        os.makedirs(hyphen_ide)
+        assert resolve_existing_ide_dir(hyphen_ide) == hyphen_ide
+
+        spaced_hub = os.path.join(tmpdir, "Antigravity Hub")
+        hyphen_hub = os.path.join(tmpdir, "Antigravity-x64")
+        assert resolve_existing_hub_dir(hyphen_hub) == hyphen_hub
+        os.makedirs(spaced_hub)
+        assert resolve_existing_hub_dir(hyphen_hub) == spaced_hub
 
 
 def test_get_hub_version() -> None:

@@ -64,12 +64,43 @@ def get_running_pids(keyword: str) -> list[str]:
     return [pid for pid in pids if pid != my_pid]
 
 
+def resolve_existing_ide_dir(ide_dir: str) -> str:
+    """Resolve existing IDE directory path, checking both hyphenated and spaced directory names."""
+    if os.path.exists(ide_dir):
+        return ide_dir
+    if "Antigravity-IDE" in ide_dir:
+        alt = ide_dir.replace("Antigravity-IDE", "Antigravity IDE")
+        if os.path.exists(alt):
+            return alt
+    elif "Antigravity IDE" in ide_dir:
+        alt = ide_dir.replace("Antigravity IDE", "Antigravity-IDE")
+        if os.path.exists(alt):
+            return alt
+    return ide_dir
+
+
+def resolve_existing_hub_dir(hub_dir: str) -> str:
+    """Resolve existing Hub directory path, checking both hyphenated and spaced directory names."""
+    if os.path.exists(hub_dir):
+        return hub_dir
+    if "Antigravity-x64" in hub_dir:
+        alt = hub_dir.replace("Antigravity-x64", "Antigravity Hub")
+        if os.path.exists(alt):
+            return alt
+    elif "Antigravity Hub" in hub_dir:
+        alt = hub_dir.replace("Antigravity Hub", "Antigravity-x64")
+        if os.path.exists(alt):
+            return alt
+    return hub_dir
+
+
 def get_ide_version(ide_dir: str) -> str:
     """Read the current local IDE version from product.json."""
+    resolved_dir = resolve_existing_ide_dir(ide_dir)
     if OS_NAME == "darwin":
-        product_json_path = os.path.join(ide_dir, "Contents", "Resources", "app", "product.json")
+        product_json_path = os.path.join(resolved_dir, "Contents", "Resources", "app", "product.json")
     else:
-        product_json_path = os.path.join(ide_dir, "resources", "app", "product.json")
+        product_json_path = os.path.join(resolved_dir, "resources", "app", "product.json")
 
     if not os.path.exists(product_json_path):
         return "0.0.0"
@@ -116,10 +147,11 @@ def _read_asar_header(asar_path: str) -> tuple[dict[str, Any], int] | None:
 
 def get_hub_version(hub_dir: str) -> str:
     """Read the current local Hub version by parsing app.asar package.json."""
+    resolved_dir = resolve_existing_hub_dir(hub_dir)
     if OS_NAME == "darwin":
-        asar_path = os.path.join(hub_dir, "Contents", "Resources", "app.asar")
+        asar_path = os.path.join(resolved_dir, "Contents", "Resources", "app.asar")
     else:
-        asar_path = os.path.join(hub_dir, "resources", "app.asar")
+        asar_path = os.path.join(resolved_dir, "resources", "app.asar")
 
     parsed = _read_asar_header(asar_path)
     if parsed is None:
@@ -351,7 +383,8 @@ def configure_suid_sandbox(ide_dir: str) -> bool:
         print_info("AppArmor is not active on this system; SUID sandbox configuration skipped.")
         return True
 
-    sandbox_path = os.path.join(ide_dir, "chrome-sandbox")
+    resolved_dir = resolve_existing_ide_dir(ide_dir)
+    sandbox_path = os.path.join(resolved_dir, "chrome-sandbox")
     if not os.path.exists(sandbox_path):
         print_warning(f"chrome-sandbox binary not found at {sandbox_path}")
         return False
