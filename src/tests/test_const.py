@@ -1,5 +1,5 @@
 import importlib
-from unittest.mock import patch
+from unittest.mock import mock_open, patch
 
 import missing_ag_updater.const
 
@@ -29,6 +29,24 @@ def test_const_linux() -> None:
             importlib.reload(missing_ag_updater.const)
             assert missing_ag_updater.const.OS_NAME == "linux"
             assert missing_ag_updater.const.ARCH_NAME == "x64"
+
+
+def test_const_linux_ubuntu_uses_hyphenated_ide_dir() -> None:
+    with patch("sys.platform", "linux"):
+        with patch("platform.machine", return_value="x86_64"):
+            with patch("os.path.expanduser", return_value="/home/test"):
+                with patch("builtins.open", mock_open(read_data='NAME="Ubuntu"\nID=ubuntu\n')):
+                    importlib.reload(missing_ag_updater.const)
+                    assert missing_ag_updater.const.DEFAULT_IDE_DIR == "/home/test/opt/Antigravity-IDE"
+
+
+def test_const_linux_fedora_uses_spaced_ide_dir() -> None:
+    with patch("sys.platform", "linux"):
+        with patch("platform.machine", return_value="x86_64"):
+            with patch("os.path.expanduser", return_value="/home/test"):
+                with patch("builtins.open", mock_open(read_data='NAME="Fedora Linux"\nID=fedora\n')):
+                    importlib.reload(missing_ag_updater.const)
+                    assert missing_ag_updater.const.DEFAULT_IDE_DIR == "/home/test/opt/Antigravity IDE"
 
 
 def test_const_unknown() -> None:
