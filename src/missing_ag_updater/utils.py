@@ -391,6 +391,45 @@ def is_suid_sandbox_configured(sandbox_path: str) -> bool:
         return False
 
 
+def can_fix_suid_sandbox() -> tuple[bool, str]:
+    """Preflight check: can we actually fix chrome-sandbox permissions?
+
+    Returns (True, "") if we can, or (False, reason) if we cannot.
+    Used to bail out early — before downloading anything — when --suid-sandbox
+    is requested but we have no way to set root:root 4755.
+    """
+    if not is_apparmor_enabled():
+        # No AppArmor means no sandbox fix needed at all — always OK.
+        return True, ""
+
+    # Already root — can always chown/chmod directly.
+    if hasattr(os, "geteuid") and os.geteuid() == 0:
+        return True, ""
+
+    # Non-root: check if sudo is available and usable non-interactively.
+    try:
+        res = subprocess.run(
+            ["sudo", "-n", "true"],
+            capture_output=True,
+            timeout=5,
+        )
+        if res.returncode == 0:
+            return True, ""
+    except Exception:
+        pass
+
+    return (
+        False,
+        "AppArmor is active and chrome-sandbox requires root:root 4755 permissions, "
+        "but you are not root and sudo is not available non-interactively.\n"
+        "  Fix options:\n"
+        "    1. Run as root:  sudo antigravity-updater --suid-sandbox\n"
+        "    2. Or fix manually after install:\n"
+        '       sudo chown root:root "$HOME/opt/Antigravity-IDE/chrome-sandbox" && '
+        'sudo chmod 4755 "$HOME/opt/Antigravity-IDE/chrome-sandbox"',
+    )
+
+
 def configure_suid_sandbox(ide_dir: str) -> bool:
     """Configure root:root 4755 permissions on chrome-sandbox binary if AppArmor is active.
 

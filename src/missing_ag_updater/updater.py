@@ -19,6 +19,7 @@ from .desktop import install_hub_desktop, install_ide_desktop
 from .models import CliManifest, Release
 from .nautilus import install_ide_nautilus
 from .utils import (
+    can_fix_suid_sandbox,
     compute_sha512,
     configure_suid_sandbox,
     download_file,
@@ -157,6 +158,13 @@ def update_ide(
             print_error("Aborting IDE upgrade. Please close the IDE or run with --force.")
             return False
         print_warning("Proceeding anyway due to --force.")
+
+    # Sandbox preflight: fail early before downloading if we cannot fix permissions.
+    if suid_sandbox and OS_NAME == "linux":
+        ok, reason = can_fix_suid_sandbox()
+        if not ok:
+            print_error(f"Cannot proceed with --suid-sandbox: {reason}")
+            return False
 
     download_url = get_download_url("ide", latest_ver, exec_id)
     if not download_url:

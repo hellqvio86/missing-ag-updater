@@ -12,6 +12,7 @@ import pytest
 import responses
 
 from missing_ag_updater.utils import (
+    can_fix_suid_sandbox,
     compute_sha512,
     configure_suid_sandbox,
     extract_asar_icon,
@@ -558,3 +559,57 @@ def test_is_suid_sandbox_configured_exception() -> None:
     """is_suid_sandbox_configured returns False on OS errors (file not found etc)."""
     with patch("os.stat", side_effect=OSError("No such file")):
         assert is_suid_sandbox_configured("/fake/chrome-sandbox") is False
+
+
+def test_can_fix_suid_sandbox_no_apparmor() -> None:
+    """If AppArmor is not active, sandbox fix is never needed — always OK."""
+    with patch("missing_ag_updater.utils.is_apparmor_enabled", return_value=False):
+        ok, reason = can_fix_suid_sandbox()
+        assert ok is True
+        assert reason == ""
+
+
+def test_can_fix_suid_sandbox_as_root() -> None:
+    """If we are root, we can always fix sandbox permissions directly."""
+    with patch("missing_ag_updater.utils.is_apparmor_enabled", return_value=True):
+        with patch("os.geteuid", return_value=0, create=True):
+            ok, reason = can_fix_suid_sandbox()
+            assert ok is True
+            assert reason == ""
+
+
+def test_can_fix_suid_sandbox_sudo_available() -> None:
+    """Non-root but sudo -n true succeeds — fix is possible."""
+    with patch("missing_ag_updater.utils.is_apparmor_enabled", return_value=True):
+        with patch("os.geteuid", return_value=1000, create=True):
+            mock_result: subprocess.CompletedProcess[bytes] = subprocess.CompletedProcess(
+                args=["sudo", "-n", "true"], returncode=0
+            )
+            with patch("subprocess.run", return_value=mock_result):
+                ok, reason = can_fix_suid_sandbox()
+                assert ok is True
+                assert reason == ""
+
+
+def test_can_fix_suid_sandbox_sudo_unavailable() -> None:
+    """Non-root and sudo -n true fails — bail out early with a clear reason."""
+    with patch("missing_ag_updater.utils.is_apparmor_enabled", return_value=True):
+        with patch("os.geteuid", return_value=1000, create=True):
+            mock_result: subprocess.CompletedProcess[bytes] = subprocess.CompletedProcess(
+                args=["sudo", "-n", "true"], returncode=1
+            )
+            with patch("subprocess.run", return_value=mock_result):
+                ok, reason = can_fix_suid_sandbox()
+                assert ok is False
+                assert "AppArmor" in reason
+                assert "sudo" in reason
+
+
+def test_can_fix_suid_sandbox_sudo_exception() -> None:
+    """sudo not found or times out — bail out early with a clear reason."""
+    with patch("missing_ag_updater.utils.is_apparmor_enabled", return_value=True):
+        with patch("os.geteuid", return_value=1000, create=True):
+            with patch("subprocess.run", side_effect=FileNotFoundError("sudo not found")):
+                ok, reason = can_fix_suid_sandbox()
+                assert ok is False
+                assert "AppArmor" in reason
