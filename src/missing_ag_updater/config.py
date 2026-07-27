@@ -47,12 +47,12 @@ def load_toml_config(path: str | Path, *, explicit: bool = False) -> Dict[str, A
         return {}
 
     try:
-        with config_file.open("rb") as f:
-            return tomllib.load(f)
-    except Exception as e:
+        with config_file.open("rb") as fdesc:
+            return tomllib.load(fdesc)
+    except Exception as err:
         if explicit:
-            raise ValueError(f"Failed to parse TOML configuration file: {e}")
+            raise ValueError(f"Failed to parse TOML configuration file: {err}")
         from .utils import print_warning
 
-        print_warning(f"Could not load configuration file {config_file}: {e}")
+        print_warning(f"Could not load configuration file {config_file}: {err}")
         return {}

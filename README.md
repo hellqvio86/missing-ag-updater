@@ -126,7 +126,7 @@ $ antigravity-updater
 ```text
 usage: python -m missing_ag_updater [-h] [--check] [--ide] [--hub] [--cli] [--force]
                  [--dir-ide DIR_IDE] [--dir-hub DIR_HUB] [--path-cli PATH_CLI]
-                 [--no-desktop] [--no-nautilus]
+                 [--no-desktop] [--no-nautilus] [--apparmor-sandbox]
 
 Auto-updater utility for Google Antigravity developer tools (Cross-Platform).
 
@@ -160,6 +160,7 @@ You can configure the behavior of the auto-updater using environment variables. 
 | `--path-cli` | `ANTIGRAVITY_PATH_CLI` or `AG_PATH_CLI` | String | Override path to Antigravity CLI binary |
 | `--no-desktop` | `ANTIGRAVITY_DESKTOP` / `AG_DESKTOP` (Boolean, default `true`) or `ANTIGRAVITY_NO_DESKTOP` / `AG_NO_DESKTOP` (Boolean, default `false`) | Boolean | Set to `false` or `1` (for `NO_DESKTOP`) to skip installing local `.desktop` launcher and application icons on Linux |
 | `--no-nautilus` | `ANTIGRAVITY_NAUTILUS` / `AG_NAUTILUS` (Boolean, default `true`) or `ANTIGRAVITY_NO_NAUTILUS` / `AG_NO_NAUTILUS` (Boolean, default `false`) | Boolean | Set to `false` or `1` (for `NO_NAUTILUS`) to skip installing the Nautilus context-menu extension |
+| `--apparmor-sandbox` | `ANTIGRAVITY_APPARMOR_SANDBOX` or `AG_APPARMOR_SANDBOX` | Boolean | **(Ubuntu only)** Configure `root:root 4755` permissions on `chrome-sandbox` for AppArmor compatibility |
 
 > [!NOTE]
 > Boolean environment variables accept `1`, `true`, `yes`, or `on` as `True`, and any other value (or unset) as `False`.
@@ -172,7 +173,7 @@ You can also use a TOML configuration file to save your settings persistently. B
 - **macOS**: `~/Library/Application Support/missing-ag-updater/config.toml`
 - **Windows**: `%APPDATA%\missing-ag-updater\config.toml`
 
-You can override the config file location using the `--config PATH` option or the `ANTIGRAVITY_CONFIG` / `AG_CONFIG` environment variables.
+You can override the config file location using the `--config PATH` option or the `ANTIGRAVITY_CONFIG` / `AG_CONFIG` environment variables. A template is provided in [`config.example.toml`](file:///home/hellqvio/git/missing-ag-updater/config.example.toml).
 
 #### Settings Resolution Hierarchy
 
@@ -190,7 +191,8 @@ ide = true
 hub = true
 cli = true
 force = false
-dir_ide = "/home/user/opt/Antigravity IDE"
+apparmor_sandbox = false  # Ubuntu only
+dir_ide = "/home/user/opt/Antigravity-IDE"
 desktop = true
 nautilus = true
 ```
@@ -202,14 +204,14 @@ nautilus = true
   python -m missing_ag_updater --check
   ```
 
-- **Force update the Hub application only:**
+- **Update only Antigravity IDE and create desktop / Nautilus integration:**
   ```bash
-  python -m missing_ag_updater --hub --force
+  python -m missing_ag_updater --ide
   ```
 
-- **Update only the CLI tool:**
+- **Force update all components regardless of version:**
   ```bash
-  python -m missing_ag_updater --cli
+  python -m missing_ag_updater --force
   ```
 
 ## Default Installation Paths
@@ -220,9 +222,15 @@ After the update finishes, the permanent application files are stored in the fol
 
 | Platform | Antigravity IDE Path | Antigravity Hub Path | Antigravity CLI Path | Launcher/Symlink Path |
 | :--- | :--- | :--- | :--- | :--- |
-| **Linux** | `~/opt/Antigravity IDE` | `~/opt/Antigravity-x64` | `~/.local/bin/agy` | `~/.local/bin/antigravity-ide`<br>`~/.local/bin/antigravity` |
+| **Linux** | `~/opt/Antigravity-IDE` | `~/opt/Antigravity-x64` | `~/.local/bin/agy` | `~/.local/bin/antigravity-ide`<br>`~/.local/bin/antigravity` |
 | **macOS** | `/Applications/Antigravity IDE.app` | `/Applications/Antigravity.app` | `~/.local/bin/agy` | *N/A (installed in Applications)* |
 | **Windows** | `%LOCALAPPDATA%\Programs\antigravity-ide` | `%LOCALAPPDATA%\Programs\antigravity` | `%LOCALAPPDATA%\Microsoft\WindowsApps\agy.exe` | *N/A (added to PATH)* |
+
+> [!NOTE]
+> **Linux Path & Chromium SUID Sandbox Bug:**
+> On Linux, the IDE default directory is `~/opt/Antigravity-IDE` (hyphenated without spaces). This avoids an upstream Chromium bug in [`zygote_host_impl_linux.cc`](https://chromium.googlesource.com/chromium/src/+/refs/heads/main/content/browser/zygote_host/zygote_host_impl_linux.cc), where binary paths containing spaces (e.g., `~/opt/Antigravity IDE`) are truncated at space boundaries when executing `chrome-sandbox` via `execvp`, crashing with `FATAL: Check failed: . : Invalid argument (22)`.
+> 
+> The updater automatically checks both `~/opt/Antigravity-IDE` and legacy `~/opt/Antigravity IDE` paths to resolve versions for existing installations.
 
 You can override these default paths at execution time using the `--dir-ide`, `--dir-hub`, and `--path-cli` flags.
 
@@ -303,6 +311,49 @@ Install the `nautilus-python` bindings using your distribution's package manager
 After installing the package, restart Nautilus to reload all python extensions:
 ```bash
 nautilus -q
+```
+
+## Linux Sandbox (Ubuntu)
+
+On **Ubuntu 24.04+**, the kernel restricts unprivileged user namespaces via AppArmor (`apparmor_restrict_unprivileged_userns`). This breaks the Chromium namespace sandbox used by Electron applications such as the Antigravity IDE and Hub.
+
+Without a fix, the IDE will crash on launch with:
+```text
+FATAL: Check failed: . : Invalid argument (22)
+```
+
+### Why This Only Affects Ubuntu
+
+| Distro | Sandbox Status | Reason |
+| :--- | :--- | :--- |
+| **Ubuntu 24.04+** | ❌ Broken without fix | AppArmor blocks unprivileged user namespaces |
+| **Fedora** | ✅ Works out of the box | SELinux does not restrict user namespaces |
+| **Arch Linux** | ✅ Works out of the box | No namespace restrictions by default |
+| **Debian 12+** | ⚠ May need fix | AppArmor enabled by default (not yet in allowlist) |
+
+The updater **auto-detects your distro** via `/etc/os-release` and only applies sandbox fixes on Ubuntu (and Ubuntu-based derivatives like Linux Mint and Pop!_OS via `ID_LIKE`). On all other distros, `--apparmor-sandbox` is silently skipped.
+
+### The Fix: `--apparmor-sandbox`
+
+Pass the `--apparmor-sandbox` flag to configure the `chrome-sandbox` binary with SUID root permissions (`root:root 4755`), which allows Chromium to use the legacy setuid sandbox instead:
+
+```bash
+# During update:
+antigravity-updater --apparmor-sandbox
+
+# Or set it permanently in your config:
+# ~/.config/missing-ag-updater/config.toml
+apparmor_sandbox = true
+```
+
+This requires `sudo` access (or running as root). The updater will prompt for `sudo` if needed, or fail early with a clear error message if `sudo` is unavailable.
+
+### Manual Fix
+
+If you prefer to fix the sandbox manually without using the flag:
+```bash
+sudo chown root:root "$HOME/opt/Antigravity-IDE/chrome-sandbox" && \
+sudo chmod 4755 "$HOME/opt/Antigravity-IDE/chrome-sandbox"
 ```
 
 ## Development

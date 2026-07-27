@@ -1,4 +1,5 @@
 import os
+import shutil
 import subprocess
 import tempfile
 from typing import Any
@@ -130,8 +131,8 @@ def test_update_ide_success_linux() -> None:
         with tempfile.TemporaryDirectory() as td:
             d = os.path.join(td, "Antigravity IDE", "bin")
             os.makedirs(d)
-            with open(os.path.join(d, "antigravity-ide"), "w") as f:
-                f.write("launcher content")
+            with open(os.path.join(d, "antigravity-ide"), "w") as fdesc:
+                fdesc.write("launcher content")
             with tarfile.open(dest_path, "w:gz") as tar:
                 tar.add(os.path.join(td, "Antigravity IDE"), arcname="Antigravity IDE")
 
@@ -157,6 +158,43 @@ def test_update_ide_success_linux() -> None:
                                     mock_nautilus.assert_called_once_with(
                                         ide_dir=target_ide_dir, launcher_path=launcher
                                     )
+
+
+def test_update_ide_skips_legacy_cleanup_on_non_sandbox_distro() -> None:
+    import tarfile
+
+    def mock_download_write_tar(url: str, dest_path: str, **kwargs: Any) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            d = os.path.join(td, "Antigravity IDE", "bin")
+            os.makedirs(d)
+            with open(os.path.join(d, "antigravity-ide"), "w") as fdesc:
+                fdesc.write("launcher content")
+            with tarfile.open(dest_path, "w:gz") as tar:
+                tar.add(os.path.join(td, "Antigravity IDE"), arcname="Antigravity IDE")
+
+    with patch("missing_ag_updater.updater.OS_NAME", "linux"):
+        with patch("missing_ag_updater.updater.get_ide_version", return_value="2.0.3"):
+            with patch(
+                "missing_ag_updater.updater.fetch_json",
+                return_value=[{"version": "2.0.4", "execution_id": "1234"}],
+            ):
+                with patch("missing_ag_updater.updater.get_running_pids", return_value=[]):
+                    with patch("missing_ag_updater.updater.download_file", side_effect=mock_download_write_tar):
+                        with patch("missing_ag_updater.updater.is_ubuntu_sandbox_distro", return_value=False):
+                            original_rmtree = shutil.rmtree
+
+                            def record_rmtree(path: str, *args: Any, **kwargs: Any) -> None:
+                                if path.endswith("Antigravity IDE"):
+                                    raise AssertionError("legacy directory should not be removed")
+                                return original_rmtree(path, *args, **kwargs)
+
+                            with patch("missing_ag_updater.updater.shutil.rmtree", side_effect=record_rmtree):
+                                with tempfile.TemporaryDirectory() as root:
+                                    target_ide_dir = os.path.join(root, "target-ide")
+                                    legacy_ide_dir = os.path.join(root, "Antigravity IDE")
+                                    os.makedirs(legacy_ide_dir)
+                                    res = update_ide(target_ide_dir, None, force=True)
+                                    assert res is True
 
 
 def test_update_ide_empty_releases() -> None:
@@ -224,8 +262,8 @@ def test_update_hub_success_linux() -> None:
         with tempfile.TemporaryDirectory() as td:
             d = os.path.join(td, "Antigravity-x64")
             os.makedirs(d)
-            with open(os.path.join(d, "antigravity"), "w") as f:
-                f.write("launcher content")
+            with open(os.path.join(d, "antigravity"), "w") as fdesc:
+                fdesc.write("hub launcher content")
             with tarfile.open(dest_path, "w:gz") as tar:
                 tar.add(d, arcname="Antigravity-x64")
 
@@ -277,8 +315,8 @@ def test_update_cli_success_linux() -> None:
     def mock_download_write_tar_cli(url: str, dest_path: str, **kwargs: Any) -> None:
         with tempfile.TemporaryDirectory() as td:
             p = os.path.join(td, "antigravity")
-            with open(p, "w") as f:
-                f.write("cli binary content")
+            with open(p, "w") as fdesc:
+                fdesc.write("cli binary content")
             with tarfile.open(dest_path, "w:gz") as tar:
                 tar.add(p, arcname="antigravity")
 
@@ -323,8 +361,8 @@ def test_update_cli_zip_success_windows() -> None:
     def mock_download_write_zip_cli(url: str, dest_path: str, **kwargs: Any) -> None:
         with tempfile.TemporaryDirectory() as td:
             p = os.path.join(td, "agy.exe")
-            with open(p, "w") as f:
-                f.write("cli binary exe content")
+            with open(p, "w") as fdesc:
+                fdesc.write("cli binary exe content")
             with zipfile.ZipFile(dest_path, "w") as z:
                 z.write(p, arcname="agy.exe")
 

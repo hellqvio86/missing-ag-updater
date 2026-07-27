@@ -19,13 +19,16 @@ from .desktop import install_hub_desktop, install_ide_desktop
 from .models import CliManifest, Release
 from .nautilus import install_ide_nautilus
 from .utils import (
+    can_fix_suid_sandbox,
     compute_sha512,
+    configure_suid_sandbox,
     download_file,
     fetch_json,
     get_cli_version,
     get_hub_version,
     get_ide_version,
     get_running_pids,
+    is_ubuntu_sandbox_distro,
     print_error,
     print_info,
     print_status,
@@ -58,8 +61,8 @@ def install_macos_dmg(dmg_path: str, dest_app_path: str) -> bool:
 
         shutil.copytree(source_app, dest_app_path, symlinks=True)
         return True
-    except Exception as e:
-        print_error(f"macOS DMG installation failed: {e}")
+    except Exception as err:
+        print_error(f"macOS DMG installation failed: {err}")
         return False
     finally:
         # Detach DMG
@@ -77,8 +80,8 @@ def install_windows_exe(exe_path: str) -> bool:
         print_status("Running silent installer (/S)...")
         subprocess.run([exe_path, "/S"], check=True)
         return True
-    except Exception as e:
-        print_error(f"Windows EXE installation failed: {e}")
+    except Exception as err:
+        print_error(f"Windows EXE installation failed: {err}")
         return False
 
 
@@ -113,6 +116,7 @@ def update_ide(
     force: bool = False,
     install_desktop: bool = True,
     install_nautilus: bool = True,
+    suid_sandbox: bool = False,
 ) -> bool:
     """Check and execute updates for Antigravity IDE."""
     print_status("Checking for Antigravity IDE updates...")
@@ -128,8 +132,8 @@ def update_ide(
         latest = releases[0]
         latest_ver = latest.version
         exec_id = latest.execution_id
-    except Exception as e:
-        print_error(f"Failed to check IDE updates: {e}")
+    except Exception as err:
+        print_error(f"Failed to check IDE updates: {err}")
         return False
 
     print_info(f"Local IDE Version:  {COLOR_BOLD}{current_ver}{COLOR_ENDC}")
@@ -137,6 +141,9 @@ def update_ide(
 
     if current_ver == latest_ver and not force:
         print_success("Antigravity IDE is up to date.")
+        if suid_sandbox and OS_NAME == "linux":
+            if not configure_suid_sandbox(ide_dir):
+                return False
         return True
 
     if dry_run:
@@ -152,6 +159,13 @@ def update_ide(
             print_error("Aborting IDE upgrade. Please close the IDE or run with --force.")
             return False
         print_warning("Proceeding anyway due to --force.")
+
+    # Sandbox preflight: fail early before downloading if we cannot fix permissions.
+    if suid_sandbox and OS_NAME == "linux":
+        ok, reason = can_fix_suid_sandbox()
+        if not ok:
+            print_error(f"Cannot proceed with --suid-sandbox: {reason}")
+            return False
 
     download_url = get_download_url("ide", latest_ver, exec_id)
     if not download_url:
@@ -183,14 +197,30 @@ def update_ide(
 
                 extracted_folder = os.path.join(tmpdir, "Antigravity IDE")
                 if not os.path.exists(extracted_folder):
-                    print_error("Failed to find 'Antigravity IDE' directory inside the archive.")
-                    return False
+                    extracted_folder = os.path.join(tmpdir, "Antigravity-IDE")
+                if not os.path.exists(extracted_folder):
+                    subdirs = [d for d in os.listdir(tmpdir) if os.path.isdir(os.path.join(tmpdir, d))]
+                    if len(subdirs) == 1:
+                        extracted_folder = os.path.join(tmpdir, subdirs[0])
+                    else:
+                        print_error("Failed to find IDE directory inside the archive.")
+                        return False
 
                 print_status("Installing IDE...")
                 os.makedirs(os.path.dirname(ide_dir), exist_ok=True)
                 if os.path.exists(ide_dir):
                     shutil.rmtree(ide_dir)
                 shutil.move(extracted_folder, ide_dir)
+
+                # Migrate: remove legacy spaced directory only on Ubuntu-style
+                # distros, where the Chromium zygote / SUID sandbox can be
+                # affected by stale paths.
+                if OS_NAME == "linux" and is_ubuntu_sandbox_distro():
+                    legacy_ide_dir = os.path.join(os.path.dirname(ide_dir), "Antigravity IDE")
+                    if legacy_ide_dir != ide_dir and os.path.exists(legacy_ide_dir):
+                        print_status("Removing legacy 'Antigravity IDE' directory (migrating to hyphenated path)...")
+                        shutil.rmtree(legacy_ide_dir)
+                        print_success("Removed legacy directory: " + legacy_ide_dir)
 
                 # Update launchers
                 if launcher_path:
@@ -204,10 +234,14 @@ def update_ide(
                 if install_nautilus and OS_NAME == "linux":
                     install_ide_nautilus(ide_dir=ide_dir, launcher_path=launcher_path)
 
+                if suid_sandbox and OS_NAME == "linux":
+                    if not configure_suid_sandbox(ide_dir):
+                        return False
+
             print_success(f"Antigravity IDE successfully upgraded to version {latest_ver}!")
             return True
-        except Exception as e:
-            print_error(f"Failed to upgrade IDE: {e}")
+        except Exception as err:
+            print_error(f"Failed to upgrade IDE: {err}")
             return False
 
 
@@ -233,8 +267,8 @@ def update_hub(
         latest = releases[0]
         latest_ver = latest.version
         exec_id = latest.execution_id
-    except Exception as e:
-        print_error(f"Failed to check Hub updates: {e}")
+    except Exception as err:
+        print_error(f"Failed to check Hub updates: {err}")
         return False
 
     print_info(f"Local Hub Version:  {COLOR_BOLD}{current_ver}{COLOR_ENDC}")
@@ -308,8 +342,8 @@ def update_hub(
 
             print_success(f"Antigravity Hub successfully upgraded to version {latest_ver}!")
             return True
-        except Exception as e:
-            print_error(f"Failed to upgrade Hub: {e}")
+        except Exception as err:
+            print_error(f"Failed to upgrade Hub: {err}")
             return False
 
 
@@ -324,8 +358,8 @@ def update_cli(cli_binary: str, *, dry_run: bool = False, force: bool = False) -
         latest_ver = manifest.version
         download_url = manifest.url
         expected_sha512 = manifest.sha512
-    except Exception as e:
-        print_error(f"Failed to check CLI updates: {e}")
+    except Exception as err:
+        print_error(f"Failed to check CLI updates: {err}")
         return False
 
     print_info(f"Local CLI Version:  {COLOR_BOLD}{current_ver}{COLOR_ENDC}")
@@ -393,6 +427,6 @@ def update_cli(cli_binary: str, *, dry_run: bool = False, force: bool = False) -
 
             print_success(f"Antigravity CLI successfully upgraded to version {latest_ver}!")
             return True
-        except Exception as e:
-            print_error(f"Failed to upgrade CLI: {e}")
+        except Exception as err:
+            print_error(f"Failed to upgrade CLI: {err}")
             return False

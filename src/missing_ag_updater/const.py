@@ -3,6 +3,26 @@ import platform
 import sys
 from typing import Optional
 
+
+def _is_ubuntu_style_distro() -> bool:
+    if OS_NAME != "linux":
+        return False
+    try:
+        with open("/etc/os-release", "r", encoding="utf-8") as fdesc:
+            for line in fdesc:
+                if line.startswith("ID="):
+                    distro_id = line.strip().split("=", 1)[1].strip('"').lower()
+                    if distro_id == "ubuntu":
+                        return True
+                elif line.startswith("ID_LIKE="):
+                    distro_like = line.strip().split("=", 1)[1].strip('"').lower()
+                    if "ubuntu" in distro_like.split():
+                        return True
+    except Exception:
+        pass
+    return False
+
+
 # Color output helpers for premium terminal feedback
 COLOR_HEADER = "\033[95m"
 COLOR_BLUE = "\033[94m"
@@ -54,7 +74,8 @@ if OS_NAME == "linux":
     OPT_DIR = os.path.join(HOME, "opt")
     BIN_DIR = os.path.join(HOME, ".local", "bin")
 
-    DEFAULT_IDE_DIR = os.path.join(OPT_DIR, "Antigravity IDE")
+    ide_dir_name = "Antigravity-IDE" if _is_ubuntu_style_distro() else "Antigravity IDE"
+    DEFAULT_IDE_DIR = os.path.join(OPT_DIR, ide_dir_name)
     DEFAULT_HUB_DIR = os.path.join(OPT_DIR, "Antigravity-x64")
     DEFAULT_CLI_BINARY = os.path.join(BIN_DIR, "agy")
     DEFAULT_IDE_LAUNCHER = os.path.join(BIN_DIR, "antigravity-ide")

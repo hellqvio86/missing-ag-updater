@@ -60,8 +60,8 @@ def test_load_toml_config_missing(tmp_path) -> None:
 
 def test_load_toml_config_corrupt(tmp_path) -> None:
     corrupt_file = tmp_path / "corrupt.toml"
-    with open(corrupt_file, "w") as f:
-        f.write("this is not valid toml = {")
+    with open(corrupt_file, "w") as fdesc:
+        fdesc.write("this is not valid toml = {")
 
     # Non-explicit should return empty dict and print warning
     with patch("missing_ag_updater.utils.print_warning") as mock_warn:
@@ -75,8 +75,8 @@ def test_load_toml_config_corrupt(tmp_path) -> None:
 
 def test_load_toml_config_valid(tmp_path) -> None:
     valid_file = tmp_path / "valid.toml"
-    with open(valid_file, "w") as f:
-        f.write('force = true\ndir_ide = "/custom/ide"\n')
+    with open(valid_file, "w") as fdesc:
+        fdesc.write('force = true\ndir_ide = "/custom/ide"\n')
 
     data = load_toml_config(str(valid_file))
     assert data == {"force": True, "dir_ide": "/custom/ide"}
@@ -84,9 +84,9 @@ def test_load_toml_config_valid(tmp_path) -> None:
 
 def test_cli_config_integration(tmp_path) -> None:
     config_file = tmp_path / "cli_config.toml"
-    with open(config_file, "w") as f:
+    with open(config_file, "w") as fdesc:
         # We can configure force = true, desktop = false, nautilus = false
-        f.write("force = true\ndesktop = false\nnautilus = false\n")
+        fdesc.write("force = true\ndesktop = false\nnautilus = false\n")
 
     # Test that config file propagates to main updater logic
     with patch("sys.argv", ["antigravity-updater", "--ide", "--config", str(config_file)]):
@@ -102,6 +102,7 @@ def test_cli_config_integration(tmp_path) -> None:
                         force=True,  # loaded from TOML
                         install_desktop=False,  # loaded from TOML
                         install_nautilus=False,  # loaded from TOML
+                        suid_sandbox=False,
                     )
                     mock_exit.assert_called_once_with(0)
 

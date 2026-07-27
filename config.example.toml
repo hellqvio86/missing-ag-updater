@@ -1,0 +1,21 @@
+# Example Configuration File for missing-ag-updater
+# Place at:
+#   Linux:   ~/.config/missing-ag-updater/config.toml
+#   macOS:   ~/Library/Application Support/missing-ag-updater/config.toml
+#   Windows: %APPDATA%\missing-ag-updater\config.toml
+
+check = false
+ide = true
+hub = true
+cli = true
+force = false
+apparmor_sandbox = false  # Ubuntu only: set chrome-sandbox to root:root 4755
+
+# Desktop and Nautilus context menu integrations (Linux)
+desktop = true
+nautilus = true
+
+# Path Overrides (Optional)
+# dir_ide = "/home/user/opt/Antigravity-IDE"
+# dir_hub = "/home/user/opt/Antigravity Hub"
+# path_cli = "/home/user/.local/bin/antigravity"

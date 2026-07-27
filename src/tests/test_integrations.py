@@ -19,8 +19,8 @@ def test_install_ide_desktop(tmp_path) -> None:
     # Create dummy source icon file
     os.makedirs(os.path.join(ide_dir, "resources", "app", "resources", "linux"), exist_ok=True)
     icon_source = os.path.join(ide_dir, "resources", "app", "resources", "linux", "code.png")
-    with open(icon_source, "w") as f:
-        f.write("icon-data")
+    with open(icon_source, "w") as fdesc:
+        fdesc.write("icon-data")
 
     with patch("missing_ag_updater.desktop.USER_APPLICATIONS_DIR", user_app_dir):
         with patch("missing_ag_updater.desktop.USER_ICONS_DIR", user_icons_dir):
@@ -30,16 +30,16 @@ def test_install_ide_desktop(tmp_path) -> None:
                 # Verify desktop entry was written
                 desktop_file = os.path.join(user_app_dir, "antigravity-ide.desktop")
                 assert os.path.exists(desktop_file)
-                with open(desktop_file, "r") as f:
-                    content = f.read()
+                with open(desktop_file, "r") as fdesc:
+                    content = fdesc.read()
                     assert "Exec=" + launcher_path in content
                     assert "Icon=antigravity-ide" in content
 
                 # Verify icon was copied
                 dest_icon = os.path.join(user_icons_dir, "antigravity-ide.png")
                 assert os.path.exists(dest_icon)
-                with open(dest_icon, "r") as f:
-                    assert f.read() == "icon-data"
+                with open(dest_icon, "r") as fdesc:
+                    assert fdesc.read() == "icon-data"
 
                 mock_refresh.assert_called_once()
 
@@ -53,8 +53,8 @@ def test_install_hub_desktop(tmp_path) -> None:
     # Create dummy app.asar file to pass the existence check
     os.makedirs(os.path.join(hub_dir, "resources"), exist_ok=True)
     asar_path = os.path.join(hub_dir, "resources", "app.asar")
-    with open(asar_path, "w") as f:
-        f.write("asar-data")
+    with open(asar_path, "w") as fdesc:
+        fdesc.write("asar-data")
 
     with patch("missing_ag_updater.desktop.USER_APPLICATIONS_DIR", user_app_dir):
         with patch("missing_ag_updater.desktop.USER_ICONS_DIR", user_icons_dir):
@@ -64,8 +64,8 @@ def test_install_hub_desktop(tmp_path) -> None:
 
                     desktop_file = os.path.join(user_app_dir, "antigravity.desktop")
                     assert os.path.exists(desktop_file)
-                    with open(desktop_file, "r") as f:
-                        content = f.read()
+                    with open(desktop_file, "r") as fdesc:
+                        content = fdesc.read()
                         assert "Exec=" + launcher_path in content
                         assert "Icon=antigravity" in content
 
@@ -84,8 +84,8 @@ def test_install_ide_nautilus(tmp_path) -> None:
 
             nautilus_file = os.path.join(user_nautilus_dir, "open-in-antigravity-ide.py")
             assert os.path.exists(nautilus_file)
-            with open(nautilus_file, "r") as f:
-                content = f.read()
+            with open(nautilus_file, "r") as fdesc:
+                content = fdesc.read()
                 assert "class OpenInAntigravityIDE" in content
                 assert launcher_path in content
 
@@ -104,19 +104,21 @@ def test_cli_no_desktop_no_nautilus() -> None:
         ],
     ):
         with patch("missing_ag_updater.cli.OS_NAME", "linux"):
-            with patch("missing_ag_updater.cli.update_ide", return_value=True) as mock_ide:
-                with patch("sys.exit", side_effect=SystemExit) as mock_exit:
-                    with pytest.raises(SystemExit):
-                        main()
-                    mock_ide.assert_called_once_with(
-                        ANY,  # ide_dir
-                        DEFAULT_IDE_LAUNCHER,
-                        dry_run=False,
-                        force=False,
-                        install_desktop=False,
-                        install_nautilus=False,
-                    )
-                    mock_exit.assert_called_once_with(0)
+            with patch("missing_ag_updater.cli.load_toml_config", return_value={}):
+                with patch("missing_ag_updater.cli.update_ide", return_value=True) as mock_ide:
+                    with patch("sys.exit", side_effect=SystemExit) as mock_exit:
+                        with pytest.raises(SystemExit):
+                            main()
+                        mock_ide.assert_called_once_with(
+                            ANY,  # ide_dir
+                            DEFAULT_IDE_LAUNCHER,
+                            dry_run=False,
+                            force=False,
+                            install_desktop=False,
+                            install_nautilus=False,
+                            suid_sandbox=False,
+                        )
+                        mock_exit.assert_called_once_with(0)
 
 
 def test_cli_no_desktop_hub() -> None:
@@ -130,18 +132,19 @@ def test_cli_no_desktop_hub() -> None:
         ],
     ):
         with patch("missing_ag_updater.cli.OS_NAME", "linux"):
-            with patch("missing_ag_updater.cli.update_hub", return_value=True) as mock_hub:
-                with patch("sys.exit", side_effect=SystemExit) as mock_exit:
-                    with pytest.raises(SystemExit):
-                        main()
-                    mock_hub.assert_called_once_with(
-                        ANY,  # hub_dir
-                        ANY,  # DEFAULT_HUB_LAUNCHER
-                        dry_run=False,
-                        force=False,
-                        install_desktop=False,
-                    )
-                    mock_exit.assert_called_once_with(0)
+            with patch("missing_ag_updater.cli.load_toml_config", return_value={}):
+                with patch("missing_ag_updater.cli.update_hub", return_value=True) as mock_hub:
+                    with patch("sys.exit", side_effect=SystemExit) as mock_exit:
+                        with pytest.raises(SystemExit):
+                            main()
+                        mock_hub.assert_called_once_with(
+                            ANY,  # hub_dir
+                            ANY,  # DEFAULT_HUB_LAUNCHER
+                            dry_run=False,
+                            force=False,
+                            install_desktop=False,
+                        )
+                        mock_exit.assert_called_once_with(0)
 
 
 def test_cli_env_variables() -> None:
@@ -158,19 +161,21 @@ def test_cli_env_variables() -> None:
             },
         ):
             with patch("missing_ag_updater.cli.OS_NAME", "linux"):
-                with patch("missing_ag_updater.cli.update_ide", return_value=True) as mock_ide:
-                    with patch("sys.exit", side_effect=SystemExit) as mock_exit:
-                        with pytest.raises(SystemExit):
-                            main()
-                        mock_ide.assert_called_once_with(
-                            "/env/ide/path",
-                            DEFAULT_IDE_LAUNCHER,
-                            dry_run=True,
-                            force=True,
-                            install_desktop=False,
-                            install_nautilus=False,
-                        )
-                        mock_exit.assert_called_once_with(0)
+                with patch("missing_ag_updater.cli.load_toml_config", return_value={}):
+                    with patch("missing_ag_updater.cli.update_ide", return_value=True) as mock_ide:
+                        with patch("sys.exit", side_effect=SystemExit) as mock_exit:
+                            with pytest.raises(SystemExit):
+                                main()
+                            mock_ide.assert_called_once_with(
+                                "/env/ide/path",
+                                DEFAULT_IDE_LAUNCHER,
+                                dry_run=True,
+                                force=True,
+                                install_desktop=False,
+                                install_nautilus=False,
+                                suid_sandbox=False,
+                            )
+                            mock_exit.assert_called_once_with(0)
 
 
 def test_cli_env_variables_alt_prefix() -> None:
@@ -186,18 +191,19 @@ def test_cli_env_variables_alt_prefix() -> None:
             },
         ):
             with patch("missing_ag_updater.cli.OS_NAME", "linux"):
-                with patch("missing_ag_updater.cli.update_hub", return_value=True) as mock_hub:
-                    with patch("sys.exit", side_effect=SystemExit) as mock_exit:
-                        with pytest.raises(SystemExit):
-                            main()
-                        mock_hub.assert_called_once_with(
-                            "/env/hub/path",
-                            ANY,
-                            dry_run=True,
-                            force=True,
-                            install_desktop=False,
-                        )
-                        mock_exit.assert_called_once_with(0)
+                with patch("missing_ag_updater.cli.load_toml_config", return_value={}):
+                    with patch("missing_ag_updater.cli.update_hub", return_value=True) as mock_hub:
+                        with patch("sys.exit", side_effect=SystemExit) as mock_exit:
+                            with pytest.raises(SystemExit):
+                                main()
+                            mock_hub.assert_called_once_with(
+                                "/env/hub/path",
+                                ANY,
+                                dry_run=True,
+                                force=True,
+                                install_desktop=False,
+                            )
+                            mock_exit.assert_called_once_with(0)
 
 
 def test_cli_override_env_variables() -> None:
@@ -211,16 +217,18 @@ def test_cli_override_env_variables() -> None:
             },
         ):
             with patch("missing_ag_updater.cli.OS_NAME", "linux"):
-                with patch("missing_ag_updater.cli.update_ide", return_value=True) as mock_ide:
-                    with patch("sys.exit", side_effect=SystemExit) as mock_exit:
-                        with pytest.raises(SystemExit):
-                            main()
-                        mock_ide.assert_called_once_with(
-                            ANY,
-                            DEFAULT_IDE_LAUNCHER,
-                            dry_run=False,
-                            force=False,
-                            install_desktop=False,
-                            install_nautilus=False,
-                        )
-                        mock_exit.assert_called_once_with(0)
+                with patch("missing_ag_updater.cli.load_toml_config", return_value={}):
+                    with patch("missing_ag_updater.cli.update_ide", return_value=True) as mock_ide:
+                        with patch("sys.exit", side_effect=SystemExit) as mock_exit:
+                            with pytest.raises(SystemExit):
+                                main()
+                            mock_ide.assert_called_once_with(
+                                ANY,
+                                DEFAULT_IDE_LAUNCHER,
+                                dry_run=False,
+                                force=False,
+                                install_desktop=False,
+                                install_nautilus=False,
+                                suid_sandbox=False,
+                            )
+                            mock_exit.assert_called_once_with(0)

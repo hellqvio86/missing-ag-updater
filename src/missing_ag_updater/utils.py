@@ -38,6 +38,62 @@ def print_info(msg: str) -> None:
     print(f"  {msg}")
 
 
+# Distro allowlist for sandbox features (opt-in per distro)
+_SANDBOX_DISTROS = frozenset({"ubuntu"})
+
+
+def get_linux_distro_id() -> str:
+    """Return the lowercase distro ID from /etc/os-release (e.g. 'ubuntu', 'fedora').
+
+    Returns an empty string on non-Linux platforms or if the file cannot be read.
+    """
+    if OS_NAME != "linux":
+        return ""
+    try:
+        with open("/etc/os-release", "r", encoding="utf-8") as fdesc:
+            for line in fdesc:
+                if line.startswith("ID="):
+                    return line.strip().split("=", 1)[1].strip('"').lower()
+    except Exception:
+        pass
+    return ""
+
+
+def _get_linux_distro_id_like() -> list[str]:
+    """Return the lowercase ID_LIKE values from /etc/os-release as a list.
+
+    For example, Linux Mint returns ['ubuntu', 'debian'].
+    Returns an empty list on non-Linux or if the field is absent.
+    """
+    if OS_NAME != "linux":
+        return []
+    try:
+        with open("/etc/os-release", "r", encoding="utf-8") as fdesc:
+            for line in fdesc:
+                if line.startswith("ID_LIKE="):
+                    raw = line.strip().split("=", 1)[1].strip('"').lower()
+                    return raw.split()
+    except Exception:
+        pass
+    return []
+
+
+def is_ubuntu_sandbox_distro() -> bool:
+    """Return True if the current Linux distro is an Ubuntu-style distro requiring sandbox fixes.
+
+    Checks both the ID and ID_LIKE fields from /etc/os-release against the
+    Ubuntu allowlist. This covers Ubuntu itself as well as derivatives such as
+    Linux Mint with ID_LIKE='ubuntu debian'.
+    """
+    distro_id = get_linux_distro_id()
+    if distro_id in _SANDBOX_DISTROS:
+        return True
+    for like_id in _get_linux_distro_id_like():
+        if like_id in _SANDBOX_DISTROS:
+            return True
+    return False
+
+
 def get_running_pids(keyword: str) -> list[str]:
     """Get list of running PIDs matching the specified keyword (excluding current process)."""
     pids = []
@@ -64,18 +120,49 @@ def get_running_pids(keyword: str) -> list[str]:
     return [pid for pid in pids if pid != my_pid]
 
 
+def resolve_existing_ide_dir(ide_dir: str) -> str:
+    """Resolve existing IDE directory path, checking both hyphenated and spaced directory names."""
+    if os.path.exists(ide_dir):
+        return ide_dir
+    if "Antigravity-IDE" in ide_dir:
+        alt = ide_dir.replace("Antigravity-IDE", "Antigravity IDE")
+        if os.path.exists(alt):
+            return alt
+    elif "Antigravity IDE" in ide_dir:
+        alt = ide_dir.replace("Antigravity IDE", "Antigravity-IDE")
+        if os.path.exists(alt):
+            return alt
+    return ide_dir
+
+
+def resolve_existing_hub_dir(hub_dir: str) -> str:
+    """Resolve existing Hub directory path, checking both hyphenated and spaced directory names."""
+    if os.path.exists(hub_dir):
+        return hub_dir
+    if "Antigravity-x64" in hub_dir:
+        alt = hub_dir.replace("Antigravity-x64", "Antigravity Hub")
+        if os.path.exists(alt):
+            return alt
+    elif "Antigravity Hub" in hub_dir:
+        alt = hub_dir.replace("Antigravity Hub", "Antigravity-x64")
+        if os.path.exists(alt):
+            return alt
+    return hub_dir
+
+
 def get_ide_version(ide_dir: str) -> str:
     """Read the current local IDE version from product.json."""
+    resolved_dir = resolve_existing_ide_dir(ide_dir)
     if OS_NAME == "darwin":
-        product_json_path = os.path.join(ide_dir, "Contents", "Resources", "app", "product.json")
+        product_json_path = os.path.join(resolved_dir, "Contents", "Resources", "app", "product.json")
     else:
-        product_json_path = os.path.join(ide_dir, "resources", "app", "product.json")
+        product_json_path = os.path.join(resolved_dir, "resources", "app", "product.json")
 
     if not os.path.exists(product_json_path):
         return "0.0.0"
     try:
-        with open(product_json_path, "r", encoding="utf-8") as f:
-            product_json = json.load(f)
+        with open(product_json_path, "r", encoding="utf-8") as fdesc:
+            product_json = json.load(fdesc)
             return product_json.get("ideVersion", "0.0.0")
     except Exception:
         return "0.0.0"
@@ -116,10 +203,11 @@ def _read_asar_header(asar_path: str) -> tuple[dict[str, Any], int] | None:
 
 def get_hub_version(hub_dir: str) -> str:
     """Read the current local Hub version by parsing app.asar package.json."""
+    resolved_dir = resolve_existing_hub_dir(hub_dir)
     if OS_NAME == "darwin":
-        asar_path = os.path.join(hub_dir, "Contents", "Resources", "app.asar")
+        asar_path = os.path.join(resolved_dir, "Contents", "Resources", "app.asar")
     else:
-        asar_path = os.path.join(hub_dir, "resources", "app.asar")
+        asar_path = os.path.join(resolved_dir, "resources", "app.asar")
 
     parsed = _read_asar_header(asar_path)
     if parsed is None:
@@ -168,20 +256,20 @@ def fetch_json(url: str) -> Any:
             response = requests.get(url, headers=headers, timeout=10)
             response.raise_for_status()
             return response.json()
-        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
-            last_err = e
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as err:
+            last_err = err
             if attempt < max_retries:
                 time.sleep(backoff_factor * (2**attempt))
             continue
-        except requests.exceptions.HTTPError as e:
-            last_err = e
-            if e.response is not None and e.response.status_code in [500, 502, 503, 504]:
+        except requests.exceptions.HTTPError as err:
+            last_err = err
+            if err.response is not None and err.response.status_code in [500, 502, 503, 504]:
                 if attempt < max_retries:
                     time.sleep(backoff_factor * (2**attempt))
                     continue
-            raise RuntimeError(f"Failed to query {url}: {e}")
-        except Exception as e:
-            raise RuntimeError(f"Failed to query {url}: {e}")
+            raise RuntimeError(f"Failed to query {url}: {err}")
+        except Exception as err:
+            raise RuntimeError(f"Failed to query {url}: {err}")
 
     raise RuntimeError(f"Failed to query {url}: {last_err}")
 
@@ -203,10 +291,10 @@ def download_file(url: str, dest_path: str, *, label: str = "Downloading") -> No
                 block_size = 1024 * 64
                 downloaded = 0
 
-                with open(dest_path, "wb") as f:
+                with open(dest_path, "wb") as fdesc:
                     for chunk in response.iter_content(chunk_size=block_size):
                         if chunk:
-                            f.write(chunk)
+                            fdesc.write(chunk)
                             downloaded += len(chunk)
                             if total_size:
                                 percent = int(downloaded * 100 / total_size)
@@ -222,22 +310,22 @@ def download_file(url: str, dest_path: str, *, label: str = "Downloading") -> No
                                 sys.stdout.flush()
                     sys.stdout.write("\n")
                 return
-        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
-            last_err = e
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as err:
+            last_err = err
             if attempt < max_retries:
                 time.sleep(backoff_factor * (2**attempt))
             continue
-        except requests.exceptions.HTTPError as e:
-            last_err = e
-            if e.response is not None and e.response.status_code in [500, 502, 503, 504]:
+        except requests.exceptions.HTTPError as err:
+            last_err = err
+            if err.response is not None and err.response.status_code in [500, 502, 503, 504]:
                 if attempt < max_retries:
                     time.sleep(backoff_factor * (2**attempt))
                     continue
             sys.stdout.write("\n")
-            raise RuntimeError(f"Download error from {url}: {e}")
-        except Exception as e:
+            raise RuntimeError(f"Download error from {url}: {err}")
+        except Exception as err:
             sys.stdout.write("\n")
-            raise RuntimeError(f"Download error from {url}: {e}")
+            raise RuntimeError(f"Download error from {url}: {err}")
 
     sys.stdout.write("\n")
     raise RuntimeError(f"Download error from {url}: {last_err}")
@@ -246,9 +334,9 @@ def download_file(url: str, dest_path: str, *, label: str = "Downloading") -> No
 def compute_sha512(file_path: str) -> str:
     """Compute the SHA512 hash of a file."""
     h = hashlib.sha512()
-    with open(file_path, "rb") as f:
+    with open(file_path, "rb") as fdesc:
         while True:
-            chunk = f.read(8192)
+            chunk = fdesc.read(8192)
             if not chunk:
                 break
             h.update(chunk)
@@ -265,8 +353,8 @@ def update_symlink(target: str, link_name: str) -> None:
         os.makedirs(os.path.dirname(link_name), exist_ok=True)
         os.symlink(target, link_name)
         print_success(f"Linked command: {link_name} -> {target}")
-    except Exception as e:
-        print_warning(f"Could not update symbolic link {link_name}: {e}")
+    except Exception as err:
+        print_warning(f"Could not update symbolic link {link_name}: {err}")
 
 
 def extract_asar_icon(asar_path: str, dest_icon_path: str) -> bool:
@@ -310,3 +398,169 @@ def refresh_linux_desktop_caches() -> None:
             subprocess.run(["gtk-update-icon-cache", "-q", icon_parent], capture_output=True, check=False)
     except Exception:
         pass
+
+
+def is_apparmor_enabled() -> bool:
+    """Check if AppArmor is enabled and active on Linux.
+
+    Only checks on distros in the sandbox allowlist (e.g. Ubuntu).
+    Returns False immediately on non-allowlisted distros.
+    """
+    if OS_NAME != "linux":
+        return False
+    if not is_ubuntu_sandbox_distro():
+        return False
+
+    param_path = "/sys/module/apparmor/parameters/enabled"
+    if os.path.exists(param_path):
+        try:
+            with open(param_path, "r", encoding="utf-8") as fdesc:
+                if fdesc.read().strip().upper() == "Y":
+                    return True
+        except Exception:
+            pass
+
+    userns_path = "/proc/sys/kernel/apparmor_restrict_unprivileged_userns"
+    if os.path.exists(userns_path):
+        try:
+            with open(userns_path, "r", encoding="utf-8") as fdesc:
+                if fdesc.read().strip() == "1":
+                    return True
+        except Exception:
+            pass
+
+    try:
+        res = subprocess.run(["aa-enabled"], capture_output=True, text=True)
+        if res.returncode == 0:
+            return True
+    except Exception:
+        pass
+
+    return False
+
+
+def is_suid_sandbox_configured(sandbox_path: str) -> bool:
+    """Return True if chrome-sandbox is owned by root:root with mode 4755."""
+    try:
+        st = os.stat(sandbox_path)
+        import stat as stat_mod
+
+        uid_ok = st.st_uid == 0
+        gid_ok = st.st_gid == 0
+        mode_ok = bool(st.st_mode & stat_mod.S_ISUID) and (st.st_mode & 0o777) == 0o755
+        return uid_ok and gid_ok and mode_ok
+    except Exception:
+        return False
+
+
+def can_fix_suid_sandbox() -> tuple[bool, str]:
+    """Preflight check: can we actually fix chrome-sandbox permissions?
+
+    Returns (True, "") if we can, or (False, reason) if we cannot.
+    Used to bail out early — before downloading anything — when --suid-sandbox
+    is requested but we have no way to set root:root 4755.
+
+    Skips entirely on distros not in the sandbox allowlist.
+    """
+    if not is_ubuntu_sandbox_distro():
+        # Not a distro that needs sandbox fixes — always OK.
+        return True, ""
+
+    if not is_apparmor_enabled():
+        # No AppArmor means no sandbox fix needed at all — always OK.
+        return True, ""
+
+    # Already root — can always chown/chmod directly.
+    if hasattr(os, "geteuid") and os.geteuid() == 0:
+        return True, ""
+
+    # Non-root: check if sudo is available and usable non-interactively.
+    try:
+        res = subprocess.run(
+            ["sudo", "-n", "true"],
+            capture_output=True,
+            timeout=5,
+        )
+        if res.returncode == 0:
+            return True, ""
+    except Exception:
+        pass
+
+    return (
+        False,
+        "AppArmor is active and chrome-sandbox requires root:root 4755 permissions, "
+        "but you are not root and sudo is not available non-interactively.\n"
+        "  Fix options:\n"
+        "    1. Run as root:  sudo antigravity-updater --suid-sandbox\n"
+        "    2. Or fix manually after install:\n"
+        '       sudo chown root:root "$HOME/opt/Antigravity-IDE/chrome-sandbox" && '
+        'sudo chmod 4755 "$HOME/opt/Antigravity-IDE/chrome-sandbox"',
+    )
+
+
+def configure_suid_sandbox(ide_dir: str) -> bool:
+    """Configure root:root 4755 permissions on chrome-sandbox binary if AppArmor is active.
+
+    Checks the current state first:
+    - If already correctly configured (root:root 4755), skips with a success message.
+    - If misconfigured, attempts to fix via sudo.
+    - If fixing fails (no sudo / wrong permissions), prints a loud error with the manual
+      fix command and returns False so callers can signal overall failure.
+
+    Only runs on distros in the sandbox allowlist (e.g. Ubuntu).
+    """
+    if not is_ubuntu_sandbox_distro():
+        print_info("Distro does not require SUID sandbox configuration; skipped.")
+        return True
+
+    if not is_apparmor_enabled():
+        print_info("AppArmor is not active on this system; SUID sandbox configuration skipped.")
+        return True
+
+    dirs_to_check = [ide_dir]
+    resolved = resolve_existing_ide_dir(ide_dir)
+    if resolved not in dirs_to_check:
+        dirs_to_check.append(resolved)
+
+    found_any = False
+    success = True
+    for target_dir in dirs_to_check:
+        sandbox_path = os.path.join(target_dir, "chrome-sandbox")
+        if not os.path.exists(sandbox_path):
+            continue
+
+        found_any = True
+
+        # Check current state — skip if already correctly configured
+        if is_suid_sandbox_configured(sandbox_path):
+            print_success(f"SUID sandbox already correctly configured: {sandbox_path}")
+            continue
+
+        # Misconfigured — try to fix
+        is_root = hasattr(os, "geteuid") and os.geteuid() == 0
+
+        try:
+            if is_root:
+                os.chown(sandbox_path, 0, 0)
+                os.chmod(sandbox_path, 0o4755)
+                print_success(f"Configured root:root 4755 permissions on {sandbox_path}")
+            else:
+                print_info(f"Root privileges required. Requesting sudo for {sandbox_path}...")
+                subprocess.run(["sudo", "chown", "root:root", sandbox_path], check=True)
+                subprocess.run(["sudo", "chmod", "4755", sandbox_path], check=True)
+                print_success(f"Configured root:root 4755 permissions on {sandbox_path}")
+        except Exception as err:
+            print_error(
+                f"Cannot fix SUID sandbox permissions on {sandbox_path}: {err}\n"
+                f"  The sandbox binary is misconfigured — Antigravity IDE will refuse to start.\n"
+                f"  Run the following command manually to fix it:\n"
+                f'    sudo chown root:root "{sandbox_path}" && sudo chmod 4755 "{sandbox_path}"'
+            )
+            success = False
+
+    if not found_any:
+        sandbox_path = os.path.join(ide_dir, "chrome-sandbox")
+        print_warning(f"chrome-sandbox binary not found at {sandbox_path}")
+        return False
+
+    return success

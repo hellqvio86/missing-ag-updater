@@ -69,6 +69,12 @@ def main() -> None:
         help="Skip installing Nautilus context-menu integration on Linux",
     )
     parser.add_argument(
+        "--apparmor-sandbox",
+        action="store_true",
+        default=None,
+        help="Configure root:root 4755 permissions on chrome-sandbox for Ubuntu AppArmor compatibility",
+    )
+    parser.add_argument(
         "--config",
         type=str,
         default=None,
@@ -95,8 +101,8 @@ def main() -> None:
     # 2. Load TOML configuration if exists
     try:
         config_dict = load_toml_config(config_path, explicit=explicit_config)
-    except Exception as e:
-        print_error(str(e))
+    except Exception as err:
+        print_error(str(err))
         sys.exit(1)
 
     # 3. Settings Resolution Helpers
@@ -133,6 +139,9 @@ def main() -> None:
     hub = resolve_bool(args.hub, ["ANTIGRAVITY_HUB", "AG_HUB"], "hub", False)
     cli = resolve_bool(args.cli, ["ANTIGRAVITY_CLI", "AG_CLI"], "cli", False)
     force = resolve_bool(args.force, ["ANTIGRAVITY_FORCE", "AG_FORCE"], "force", False)
+    apparmor_sandbox = resolve_bool(
+        args.apparmor_sandbox, ["ANTIGRAVITY_APPARMOR_SANDBOX", "AG_APPARMOR_SANDBOX"], "apparmor_sandbox", False
+    )
 
     dir_ide = resolve_str(args.dir_ide, ["ANTIGRAVITY_DIR_IDE", "AG_DIR_IDE"], "dir_ide", DEFAULT_IDE_DIR)
     dir_hub = resolve_str(args.dir_hub, ["ANTIGRAVITY_DIR_HUB", "AG_DIR_HUB"], "dir_hub", DEFAULT_HUB_DIR)
@@ -223,6 +232,7 @@ def main() -> None:
             force=force,
             install_desktop=install_desktop,
             install_nautilus=install_nautilus,
+            suid_sandbox=apparmor_sandbox,
         )
         success = success and res
         print()
