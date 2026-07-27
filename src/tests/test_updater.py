@@ -180,7 +180,7 @@ def test_update_ide_skips_legacy_cleanup_on_non_sandbox_distro() -> None:
             ):
                 with patch("missing_ag_updater.updater.get_running_pids", return_value=[]):
                     with patch("missing_ag_updater.updater.download_file", side_effect=mock_download_write_tar):
-                        with patch("missing_ag_updater.updater.is_sandbox_distro", return_value=False):
+                        with patch("missing_ag_updater.updater.is_ubuntu_sandbox_distro", return_value=False):
                             original_rmtree = shutil.rmtree
 
                             def record_rmtree(path: str, *args: Any, **kwargs: Any) -> None:

@@ -24,7 +24,7 @@ from missing_ag_updater.utils import (
     get_linux_distro_id,
     get_running_pids,
     is_apparmor_enabled,
-    is_sandbox_distro,
+    is_ubuntu_sandbox_distro,
     is_suid_sandbox_configured,
     print_error,
     print_info,
@@ -512,31 +512,31 @@ def test_get_linux_distro_id_like_no_field() -> None:
             assert _get_linux_distro_id_like() == []
 
 
-def test_is_sandbox_distro_ubuntu() -> None:
-    """Ubuntu is in the sandbox allowlist."""
+def test_is_ubuntu_sandbox_distro_ubuntu() -> None:
+    """Ubuntu is in the Ubuntu sandbox allowlist."""
     with patch("missing_ag_updater.utils.get_linux_distro_id", return_value="ubuntu"):
-        assert is_sandbox_distro() is True
+        assert is_ubuntu_sandbox_distro() is True
 
 
-def test_is_sandbox_distro_fedora() -> None:
-    """Fedora is NOT in the sandbox allowlist."""
+def test_is_ubuntu_sandbox_distro_fedora() -> None:
+    """Fedora is NOT in the Ubuntu sandbox allowlist."""
     with patch("missing_ag_updater.utils.get_linux_distro_id", return_value="fedora"):
         with patch("missing_ag_updater.utils._get_linux_distro_id_like", return_value=[]):
-            assert is_sandbox_distro() is False
+            assert is_ubuntu_sandbox_distro() is False
 
 
-def test_is_sandbox_distro_mint_derivative() -> None:
+def test_is_ubuntu_sandbox_distro_mint_derivative() -> None:
     """Linux Mint (ID_LIKE=ubuntu) is covered by the allowlist."""
     with patch("missing_ag_updater.utils.get_linux_distro_id", return_value="linuxmint"):
         with patch("missing_ag_updater.utils._get_linux_distro_id_like", return_value=["ubuntu", "debian"]):
-            assert is_sandbox_distro() is True
+            assert is_ubuntu_sandbox_distro() is True
 
 
-def test_is_sandbox_distro_non_linux() -> None:
+def test_is_ubuntu_sandbox_distro_non_linux() -> None:
     """Non-Linux always returns False."""
     with patch("missing_ag_updater.utils.get_linux_distro_id", return_value=""):
         with patch("missing_ag_updater.utils._get_linux_distro_id_like", return_value=[]):
-            assert is_sandbox_distro() is False
+            assert is_ubuntu_sandbox_distro() is False
 
 
 # ── AppArmor / sandbox tests ──
@@ -547,7 +547,7 @@ def test_is_apparmor_enabled() -> None:
         assert is_apparmor_enabled() is False
 
     with patch("missing_ag_updater.utils.OS_NAME", "linux"):
-        with patch("missing_ag_updater.utils.is_sandbox_distro", return_value=True):
+        with patch("missing_ag_updater.utils.is_ubuntu_sandbox_distro", return_value=True):
             with patch("os.path.exists", side_effect=lambda p: p == "/sys/module/apparmor/parameters/enabled"):
                 with patch("builtins.open", mock_open(read_data="Y\n")):
                     assert is_apparmor_enabled() is True
@@ -563,31 +563,31 @@ def test_is_apparmor_enabled() -> None:
 def test_is_apparmor_enabled_non_sandbox_distro() -> None:
     """is_apparmor_enabled returns False on non-allowlisted distros even if AppArmor files exist."""
     with patch("missing_ag_updater.utils.OS_NAME", "linux"):
-        with patch("missing_ag_updater.utils.is_sandbox_distro", return_value=False):
+        with patch("missing_ag_updater.utils.is_ubuntu_sandbox_distro", return_value=False):
             assert is_apparmor_enabled() is False
 
 
 def test_configure_suid_sandbox_non_sandbox_distro() -> None:
     """configure_suid_sandbox skips entirely on non-allowlisted distros."""
-    with patch("missing_ag_updater.utils.is_sandbox_distro", return_value=False):
+    with patch("missing_ag_updater.utils.is_ubuntu_sandbox_distro", return_value=False):
         assert configure_suid_sandbox("/tmp/fake_ide") is True
 
 
 def test_configure_suid_sandbox_apparmor_disabled() -> None:
-    with patch("missing_ag_updater.utils.is_sandbox_distro", return_value=True):
+    with patch("missing_ag_updater.utils.is_ubuntu_sandbox_distro", return_value=True):
         with patch("missing_ag_updater.utils.is_apparmor_enabled", return_value=False):
             assert configure_suid_sandbox("/tmp/fake_ide") is True
 
 
 def test_configure_suid_sandbox_missing() -> None:
-    with patch("missing_ag_updater.utils.is_sandbox_distro", return_value=True):
+    with patch("missing_ag_updater.utils.is_ubuntu_sandbox_distro", return_value=True):
         with patch("missing_ag_updater.utils.is_apparmor_enabled", return_value=True):
             with tempfile.TemporaryDirectory() as tmpdir:
                 assert configure_suid_sandbox(tmpdir) is False
 
 
 def test_configure_suid_sandbox_as_root() -> None:
-    with patch("missing_ag_updater.utils.is_sandbox_distro", return_value=True):
+    with patch("missing_ag_updater.utils.is_ubuntu_sandbox_distro", return_value=True):
         with patch("missing_ag_updater.utils.is_apparmor_enabled", return_value=True):
             with patch("missing_ag_updater.utils.is_suid_sandbox_configured", return_value=False):
                 with tempfile.TemporaryDirectory() as tmpdir:
@@ -602,7 +602,7 @@ def test_configure_suid_sandbox_as_root() -> None:
 
 
 def test_configure_suid_sandbox_via_sudo() -> None:
-    with patch("missing_ag_updater.utils.is_sandbox_distro", return_value=True):
+    with patch("missing_ag_updater.utils.is_ubuntu_sandbox_distro", return_value=True):
         with patch("missing_ag_updater.utils.is_apparmor_enabled", return_value=True):
             with patch("missing_ag_updater.utils.is_suid_sandbox_configured", return_value=False):
                 with tempfile.TemporaryDirectory() as tmpdir:
@@ -617,7 +617,7 @@ def test_configure_suid_sandbox_via_sudo() -> None:
 
 
 def test_configure_suid_sandbox_failure() -> None:
-    with patch("missing_ag_updater.utils.is_sandbox_distro", return_value=True):
+    with patch("missing_ag_updater.utils.is_ubuntu_sandbox_distro", return_value=True):
         with patch("missing_ag_updater.utils.is_apparmor_enabled", return_value=True):
             with patch("missing_ag_updater.utils.is_suid_sandbox_configured", return_value=False):
                 with tempfile.TemporaryDirectory() as tmpdir:
@@ -630,7 +630,7 @@ def test_configure_suid_sandbox_failure() -> None:
 
 def test_configure_suid_sandbox_already_ok() -> None:
     """If sandbox is already root:root 4755, no chown/chmod should be called."""
-    with patch("missing_ag_updater.utils.is_sandbox_distro", return_value=True):
+    with patch("missing_ag_updater.utils.is_ubuntu_sandbox_distro", return_value=True):
         with patch("missing_ag_updater.utils.is_apparmor_enabled", return_value=True):
             with patch("missing_ag_updater.utils.is_suid_sandbox_configured", return_value=True):
                 with tempfile.TemporaryDirectory() as tmpdir:
@@ -681,7 +681,7 @@ def test_is_suid_sandbox_configured_exception() -> None:
 
 def test_can_fix_suid_sandbox_non_sandbox_distro() -> None:
     """can_fix_suid_sandbox returns OK on non-allowlisted distros."""
-    with patch("missing_ag_updater.utils.is_sandbox_distro", return_value=False):
+    with patch("missing_ag_updater.utils.is_ubuntu_sandbox_distro", return_value=False):
         ok, reason = can_fix_suid_sandbox()
         assert ok is True
         assert reason == ""
@@ -689,7 +689,7 @@ def test_can_fix_suid_sandbox_non_sandbox_distro() -> None:
 
 def test_can_fix_suid_sandbox_no_apparmor() -> None:
     """If AppArmor is not active, sandbox fix is never needed — always OK."""
-    with patch("missing_ag_updater.utils.is_sandbox_distro", return_value=True):
+    with patch("missing_ag_updater.utils.is_ubuntu_sandbox_distro", return_value=True):
         with patch("missing_ag_updater.utils.is_apparmor_enabled", return_value=False):
             ok, reason = can_fix_suid_sandbox()
             assert ok is True
@@ -698,7 +698,7 @@ def test_can_fix_suid_sandbox_no_apparmor() -> None:
 
 def test_can_fix_suid_sandbox_as_root() -> None:
     """If we are root, we can always fix sandbox permissions directly."""
-    with patch("missing_ag_updater.utils.is_sandbox_distro", return_value=True):
+    with patch("missing_ag_updater.utils.is_ubuntu_sandbox_distro", return_value=True):
         with patch("missing_ag_updater.utils.is_apparmor_enabled", return_value=True):
             with patch("os.geteuid", return_value=0, create=True):
                 ok, reason = can_fix_suid_sandbox()
@@ -708,7 +708,7 @@ def test_can_fix_suid_sandbox_as_root() -> None:
 
 def test_can_fix_suid_sandbox_sudo_available() -> None:
     """Non-root but sudo -n true succeeds — fix is possible."""
-    with patch("missing_ag_updater.utils.is_sandbox_distro", return_value=True):
+    with patch("missing_ag_updater.utils.is_ubuntu_sandbox_distro", return_value=True):
         with patch("missing_ag_updater.utils.is_apparmor_enabled", return_value=True):
             with patch("os.geteuid", return_value=1000, create=True):
                 mock_result: subprocess.CompletedProcess[bytes] = subprocess.CompletedProcess(
@@ -722,7 +722,7 @@ def test_can_fix_suid_sandbox_sudo_available() -> None:
 
 def test_can_fix_suid_sandbox_sudo_unavailable() -> None:
     """Non-root and sudo -n true fails — bail out early with a clear reason."""
-    with patch("missing_ag_updater.utils.is_sandbox_distro", return_value=True):
+    with patch("missing_ag_updater.utils.is_ubuntu_sandbox_distro", return_value=True):
         with patch("missing_ag_updater.utils.is_apparmor_enabled", return_value=True):
             with patch("os.geteuid", return_value=1000, create=True):
                 mock_result: subprocess.CompletedProcess[bytes] = subprocess.CompletedProcess(
@@ -737,7 +737,7 @@ def test_can_fix_suid_sandbox_sudo_unavailable() -> None:
 
 def test_can_fix_suid_sandbox_sudo_exception() -> None:
     """sudo not found or times out — bail out early with a clear reason."""
-    with patch("missing_ag_updater.utils.is_sandbox_distro", return_value=True):
+    with patch("missing_ag_updater.utils.is_ubuntu_sandbox_distro", return_value=True):
         with patch("missing_ag_updater.utils.is_apparmor_enabled", return_value=True):
             with patch("os.geteuid", return_value=1000, create=True):
                 with patch("subprocess.run", side_effect=FileNotFoundError("sudo not found")):

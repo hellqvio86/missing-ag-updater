@@ -78,12 +78,12 @@ def _get_linux_distro_id_like() -> list[str]:
     return []
 
 
-def is_sandbox_distro() -> bool:
-    """Return True if the current Linux distro requires sandbox fixes.
+def is_ubuntu_sandbox_distro() -> bool:
+    """Return True if the current Linux distro is an Ubuntu-style distro requiring sandbox fixes.
 
-    Checks both the ID and ID_LIKE fields from /etc/os-release against a
-    curated allowlist.  This covers the primary distro (e.g. 'ubuntu') as
-    well as derivatives (e.g. Linux Mint with ID_LIKE='ubuntu debian').
+    Checks both the ID and ID_LIKE fields from /etc/os-release against the
+    Ubuntu allowlist. This covers Ubuntu itself as well as derivatives such as
+    Linux Mint with ID_LIKE='ubuntu debian'.
     """
     distro_id = get_linux_distro_id()
     if distro_id in _SANDBOX_DISTROS:
@@ -408,7 +408,7 @@ def is_apparmor_enabled() -> bool:
     """
     if OS_NAME != "linux":
         return False
-    if not is_sandbox_distro():
+    if not is_ubuntu_sandbox_distro():
         return False
 
     param_path = "/sys/module/apparmor/parameters/enabled"
@@ -462,7 +462,7 @@ def can_fix_suid_sandbox() -> tuple[bool, str]:
 
     Skips entirely on distros not in the sandbox allowlist.
     """
-    if not is_sandbox_distro():
+    if not is_ubuntu_sandbox_distro():
         # Not a distro that needs sandbox fixes — always OK.
         return True, ""
 
@@ -509,7 +509,7 @@ def configure_suid_sandbox(ide_dir: str) -> bool:
 
     Only runs on distros in the sandbox allowlist (e.g. Ubuntu).
     """
-    if not is_sandbox_distro():
+    if not is_ubuntu_sandbox_distro():
         print_info("Distro does not require SUID sandbox configuration; skipped.")
         return True
 
