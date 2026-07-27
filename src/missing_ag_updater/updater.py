@@ -203,6 +203,15 @@ def update_ide(
                     shutil.rmtree(ide_dir)
                 shutil.move(extracted_folder, ide_dir)
 
+                # Migrate: remove legacy spaced directory if present, so the old
+                # broken path (Antigravity IDE with spaces) doesn't linger and
+                # cause the Chromium zygote / SUID sandbox to point at it.
+                legacy_ide_dir = os.path.join(os.path.dirname(ide_dir), "Antigravity IDE")
+                if legacy_ide_dir != ide_dir and os.path.exists(legacy_ide_dir):
+                    print_status("Removing legacy 'Antigravity IDE' directory (migrating to hyphenated path)...")
+                    shutil.rmtree(legacy_ide_dir)
+                    print_success("Removed legacy directory: " + legacy_ide_dir)
+
                 # Update launchers
                 if launcher_path:
                     target_launcher = os.path.join(ide_dir, "bin", "antigravity-ide")
