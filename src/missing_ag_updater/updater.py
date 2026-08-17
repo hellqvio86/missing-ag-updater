@@ -1,6 +1,8 @@
+"""Update routines for Antigravity IDE, Hub, and CLI."""
+
 import os
 import shutil
-import subprocess
+import subprocess  # nosec B404
 import tarfile
 import tempfile
 import zipfile
@@ -16,6 +18,7 @@ from .const import (
     OS_NAME,
 )
 from .desktop import install_hub_desktop, install_ide_desktop
+from .discovery import _is_system_path
 from .models import CliManifest, Release
 from .nautilus import install_ide_nautilus
 from .utils import (
@@ -28,12 +31,15 @@ from .utils import (
     get_hub_version,
     get_ide_version,
     get_running_pids,
+    is_path_writable,
     is_ubuntu_sandbox_distro,
     print_error,
     print_info,
     print_status,
     print_success,
     print_warning,
+    resolve_existing_hub_dir,
+    resolve_existing_ide_dir,
     update_symlink,
 )
 
@@ -43,11 +49,19 @@ def install_macos_dmg(dmg_path: str, dest_app_path: str) -> bool:
     mountpoint = tempfile.mkdtemp(prefix="antigravity_mount_")
     try:
         # Attach DMG
-        cmd = ["hdiutil", "attach", "-nobrowse", "-readonly", "-mountpoint", mountpoint, dmg_path]
-        subprocess.run(cmd, check=True, capture_output=True)
+        cmd = [
+            "hdiutil",
+            "attach",
+            "-nobrowse",
+            "-readonly",
+            "-mountpoint",
+            mountpoint,
+            dmg_path,
+        ]
+        subprocess.run(cmd, check=True, capture_output=True)  # nosec B603, B607
 
         # Locate .app bundle inside the DMG mountpoint
-        apps = [f for f in os.listdir(mountpoint) if f.endswith(".app")]
+        apps = [filename for filename in os.listdir(mountpoint) if filename.endswith(".app")]
         if not apps:
             print_error("No .app bundle found in the mounted DMG.")
             return False
@@ -67,18 +81,25 @@ def install_macos_dmg(dmg_path: str, dest_app_path: str) -> bool:
     finally:
         # Detach DMG
         try:
-            subprocess.run(["hdiutil", "detach", "-force", mountpoint], capture_output=True)
-        except Exception:
+            subprocess.run(
+                ["hdiutil", "detach", "-force", mountpoint],
+                check=False,
+                capture_output=True,
+            )  # nosec B603, B607
+        except Exception:  # nosec B110
             pass
         if os.path.exists(mountpoint):
-            os.rmdir(mountpoint)
+            try:
+                os.rmdir(mountpoint)
+            except OSError:
+                pass
 
 
 def install_windows_exe(exe_path: str) -> bool:
     """Launch standard Windows installer silently."""
     try:
         print_status("Running silent installer (/S)...")
-        subprocess.run([exe_path, "/S"], check=True)
+        subprocess.run([exe_path, "/S"], check=True)  # nosec B603
         return True
     except Exception as err:
         print_error(f"Windows EXE installation failed: {err}")
@@ -89,21 +110,39 @@ def get_download_url(app_type: str, version: str, exec_id: str) -> str:
     """Get the download URL based on application type, OS, and Architecture."""
     if app_type == "ide":
         if OS_NAME == "linux":
-            return f"https://dl.google.com/release2/j0qc3/antigravity/stable/{version}-{exec_id}/linux-x64/Antigravity%20IDE.tar.gz"
+            return (
+                f"https://dl.google.com/release2/j0qc3/antigravity/stable/"
+                f"{version}-{exec_id}/linux-x64/Antigravity%20IDE.tar.gz"
+            )
         elif OS_NAME == "darwin":
             arch = "arm" if ARCH_NAME == "arm64" else "x64"
-            return f"https://edgedl.me.gvt1.com/edgedl/release2/j0qc3/antigravity/stable/{version}-{exec_id}/darwin-{arch}/Antigravity%20IDE.dmg"
+            return (
+                f"https://edgedl.me.gvt1.com/edgedl/release2/j0qc3/antigravity/stable/"
+                f"{version}-{exec_id}/darwin-{arch}/Antigravity%20IDE.dmg"
+            )
         elif OS_NAME == "windows":
-            return f"https://edgedl.me.gvt1.com/edgedl/release2/j0qc3/antigravity/stable/{version}-{exec_id}/windows-x64/Antigravity%20IDE.exe"
+            return (
+                f"https://edgedl.me.gvt1.com/edgedl/release2/j0qc3/antigravity/stable/"
+                f"{version}-{exec_id}/windows-x64/Antigravity%20IDE.exe"
+            )
 
     elif app_type == "hub":
         if OS_NAME == "linux":
-            return f"https://storage.googleapis.com/antigravity-public/antigravity-hub/{version}-{exec_id}/linux-x64/Antigravity.tar.gz"
+            return (
+                f"https://storage.googleapis.com/antigravity-public/antigravity-hub/"
+                f"{version}-{exec_id}/linux-x64/Antigravity.tar.gz"
+            )
         elif OS_NAME == "darwin":
             arch = "arm" if ARCH_NAME == "arm64" else "x64"
-            return f"https://storage.googleapis.com/antigravity-public/antigravity-hub/{version}-{exec_id}/darwin-{arch}/Antigravity.dmg"
+            return (
+                f"https://storage.googleapis.com/antigravity-public/antigravity-hub/"
+                f"{version}-{exec_id}/darwin-{arch}/Antigravity.dmg"
+            )
         elif OS_NAME == "windows":
-            return f"https://storage.googleapis.com/antigravity-public/antigravity-hub/{version}-{exec_id}/windows-x64/Antigravity-x64.exe"
+            return (
+                f"https://storage.googleapis.com/antigravity-public/antigravity-hub/"
+                f"{version}-{exec_id}/windows-x64/Antigravity-x64.exe"
+            )
 
     return ""
 
@@ -117,10 +156,13 @@ def update_ide(
     install_desktop: bool = True,
     install_nautilus: bool = True,
     suid_sandbox: bool = False,
+    scope: Optional[str] = None,
 ) -> bool:
     """Check and execute updates for Antigravity IDE."""
     print_status("Checking for Antigravity IDE updates...")
-    current_ver = get_ide_version(ide_dir)
+    target_ide_dir = resolve_existing_ide_dir(ide_dir)
+    current_ver = get_ide_version(target_ide_dir)
+    effective_scope = scope or ("system" if _is_system_path(target_ide_dir) else "user")
 
     try:
         releases_json = fetch_json(IDE_RELEASES_URL)
@@ -128,7 +170,7 @@ def update_ide(
             print_error("No IDE releases found from update server.")
             return False
 
-        releases = [Release.model_validate(r) for r in releases_json]
+        releases = [Release.model_validate(release_dict) for release_dict in releases_json]
         latest = releases[0]
         latest_ver = latest.version
         exec_id = latest.execution_id
@@ -136,13 +178,14 @@ def update_ide(
         print_error(f"Failed to check IDE updates: {err}")
         return False
 
+    print_info(f"Target IDE Path:    {COLOR_BOLD}{target_ide_dir}{COLOR_ENDC} ({effective_scope})")
     print_info(f"Local IDE Version:  {COLOR_BOLD}{current_ver}{COLOR_ENDC}")
     print_info(f"Latest IDE Version: {COLOR_BOLD}{latest_ver}{COLOR_ENDC}")
 
     if current_ver == latest_ver and not force:
         print_success("Antigravity IDE is up to date.")
         if suid_sandbox and OS_NAME == "linux":
-            if not configure_suid_sandbox(ide_dir):
+            if not configure_suid_sandbox(target_ide_dir):
                 return False
         return True
 
@@ -159,6 +202,17 @@ def update_ide(
             print_error("Aborting IDE upgrade. Please close the IDE or run with --force.")
             return False
         print_warning("Proceeding anyway due to --force.")
+
+    # Permission check
+    if not is_path_writable(target_ide_dir):
+        print_error(
+            f"Permission denied: Target directory '{target_ide_dir}' is not writable.\n"
+            f"  To update a system-wide installation in /opt, please run with sudo:\n"
+            f"    sudo antigravity-updater\n"
+            f"  Or to install a user-level copy in your home directory, run:\n"
+            f"    antigravity-updater --user"
+        )
+        return False
 
     # Sandbox preflight: fail early before downloading if we cannot fix permissions.
     if suid_sandbox and OS_NAME == "linux":
@@ -181,7 +235,7 @@ def update_ide(
 
             if OS_NAME == "darwin":
                 # macOS dmg installation
-                res = install_macos_dmg(archive_path, ide_dir)
+                res = install_macos_dmg(archive_path, target_ide_dir)
                 if not res:
                     return False
             elif OS_NAME == "windows":
@@ -193,13 +247,13 @@ def update_ide(
                 # Linux tarball installation
                 print_status("Extracting archive...")
                 with tarfile.open(archive_path, "r:gz") as tar:
-                    tar.extractall(path=tmpdir, filter="fully_trusted")
+                    tar.extractall(path=tmpdir, filter="data")  # nosec B202
 
                 extracted_folder = os.path.join(tmpdir, "Antigravity IDE")
                 if not os.path.exists(extracted_folder):
                     extracted_folder = os.path.join(tmpdir, "Antigravity-IDE")
                 if not os.path.exists(extracted_folder):
-                    subdirs = [d for d in os.listdir(tmpdir) if os.path.isdir(os.path.join(tmpdir, d))]
+                    subdirs = [subdir for subdir in os.listdir(tmpdir) if os.path.isdir(os.path.join(tmpdir, subdir))]
                     if len(subdirs) == 1:
                         extracted_folder = os.path.join(tmpdir, subdirs[0])
                     else:
@@ -207,35 +261,43 @@ def update_ide(
                         return False
 
                 print_status("Installing IDE...")
-                os.makedirs(os.path.dirname(ide_dir), exist_ok=True)
-                if os.path.exists(ide_dir):
-                    shutil.rmtree(ide_dir)
-                shutil.move(extracted_folder, ide_dir)
+                os.makedirs(os.path.dirname(target_ide_dir), exist_ok=True)
+                if os.path.exists(target_ide_dir):
+                    shutil.rmtree(target_ide_dir)
+                shutil.move(extracted_folder, target_ide_dir)
 
                 # Migrate: remove legacy spaced directory only on Ubuntu-style
                 # distros, where the Chromium zygote / SUID sandbox can be
                 # affected by stale paths.
                 if OS_NAME == "linux" and is_ubuntu_sandbox_distro():
-                    legacy_ide_dir = os.path.join(os.path.dirname(ide_dir), "Antigravity IDE")
-                    if legacy_ide_dir != ide_dir and os.path.exists(legacy_ide_dir):
+                    legacy_ide_dir = os.path.join(os.path.dirname(target_ide_dir), "Antigravity IDE")
+                    if legacy_ide_dir != target_ide_dir and os.path.exists(legacy_ide_dir):
                         print_status("Removing legacy 'Antigravity IDE' directory (migrating to hyphenated path)...")
                         shutil.rmtree(legacy_ide_dir)
                         print_success("Removed legacy directory: " + legacy_ide_dir)
 
                 # Update launchers
                 if launcher_path:
-                    target_launcher = os.path.join(ide_dir, "bin", "antigravity-ide")
+                    target_launcher = os.path.join(target_ide_dir, "bin", "antigravity-ide")
                     if os.path.exists(target_launcher):
                         update_symlink(target_launcher, launcher_path)
 
                 if install_desktop and OS_NAME == "linux":
-                    install_ide_desktop(ide_dir=ide_dir, launcher_path=launcher_path)
+                    install_ide_desktop(
+                        ide_dir=target_ide_dir,
+                        launcher_path=launcher_path,
+                        scope=effective_scope,
+                    )
 
                 if install_nautilus and OS_NAME == "linux":
-                    install_ide_nautilus(ide_dir=ide_dir, launcher_path=launcher_path)
+                    install_ide_nautilus(
+                        ide_dir=target_ide_dir,
+                        launcher_path=launcher_path,
+                        scope=effective_scope,
+                    )
 
                 if suid_sandbox and OS_NAME == "linux":
-                    if not configure_suid_sandbox(ide_dir):
+                    if not configure_suid_sandbox(target_ide_dir):
                         return False
 
             print_success(f"Antigravity IDE successfully upgraded to version {latest_ver}!")
@@ -252,10 +314,14 @@ def update_hub(
     dry_run: bool = False,
     force: bool = False,
     install_desktop: bool = True,
+    suid_sandbox: bool = False,
+    scope: Optional[str] = None,
 ) -> bool:
     """Check and execute updates for Antigravity Hub."""
     print_status("Checking for Antigravity Hub updates...")
-    current_ver = get_hub_version(hub_dir)
+    target_hub_dir = resolve_existing_hub_dir(hub_dir)
+    current_ver = get_hub_version(target_hub_dir)
+    effective_scope = scope or ("system" if _is_system_path(target_hub_dir) else "user")
 
     try:
         releases_json = fetch_json(HUB_RELEASES_URL)
@@ -263,7 +329,7 @@ def update_hub(
             print_error("No Hub releases found from update server.")
             return False
 
-        releases = [Release.model_validate(r) for r in releases_json]
+        releases = [Release.model_validate(release_dict) for release_dict in releases_json]
         latest = releases[0]
         latest_ver = latest.version
         exec_id = latest.execution_id
@@ -271,11 +337,15 @@ def update_hub(
         print_error(f"Failed to check Hub updates: {err}")
         return False
 
+    print_info(f"Target Hub Path:   {COLOR_BOLD}{target_hub_dir}{COLOR_ENDC} ({effective_scope})")
     print_info(f"Local Hub Version:  {COLOR_BOLD}{current_ver}{COLOR_ENDC}")
     print_info(f"Latest Hub Version: {COLOR_BOLD}{latest_ver}{COLOR_ENDC}")
 
     if current_ver == latest_ver and not force:
         print_success("Antigravity Hub is up to date.")
+        if suid_sandbox and OS_NAME == "linux":
+            if not configure_suid_sandbox(target_hub_dir):
+                return False
         return True
 
     if dry_run:
@@ -292,6 +362,24 @@ def update_hub(
             return False
         print_warning("Proceeding anyway due to --force.")
 
+    # Permission check
+    if not is_path_writable(target_hub_dir):
+        print_error(
+            f"Permission denied: Target directory '{target_hub_dir}' is not writable.\n"
+            f"  To update a system-wide installation in /opt, please run with sudo:\n"
+            f"    sudo antigravity-updater\n"
+            f"  Or to install a user-level copy in your home directory, run:\n"
+            f"    antigravity-updater --user"
+        )
+        return False
+
+    # Sandbox preflight: fail early before downloading if we cannot fix permissions.
+    if suid_sandbox and OS_NAME == "linux":
+        ok, reason = can_fix_suid_sandbox()
+        if not ok:
+            print_error(f"Cannot proceed with sandbox fix: {reason}")
+            return False
+
     download_url = get_download_url("hub", latest_ver, exec_id)
     if not download_url:
         print_error(f"No Hub download URL resolved for current platform ({OS_NAME}).")
@@ -306,7 +394,7 @@ def update_hub(
 
             if OS_NAME == "darwin":
                 # macOS dmg installation
-                res = install_macos_dmg(archive_path, hub_dir)
+                res = install_macos_dmg(archive_path, target_hub_dir)
                 if not res:
                     return False
             elif OS_NAME == "windows":
@@ -318,7 +406,7 @@ def update_hub(
                 # Linux tarball installation
                 print_status("Extracting archive...")
                 with tarfile.open(archive_path, "r:gz") as tar:
-                    tar.extractall(path=tmpdir, filter="fully_trusted")
+                    tar.extractall(path=tmpdir, filter="data")  # nosec B202
 
                 extracted_folder = os.path.join(tmpdir, "Antigravity-x64")
                 if not os.path.exists(extracted_folder):
@@ -326,19 +414,27 @@ def update_hub(
                     return False
 
                 print_status("Installing Hub...")
-                os.makedirs(os.path.dirname(hub_dir), exist_ok=True)
-                if os.path.exists(hub_dir):
-                    shutil.rmtree(hub_dir)
-                shutil.move(extracted_folder, hub_dir)
+                os.makedirs(os.path.dirname(target_hub_dir), exist_ok=True)
+                if os.path.exists(target_hub_dir):
+                    shutil.rmtree(target_hub_dir)
+                shutil.move(extracted_folder, target_hub_dir)
 
                 # Update launchers
                 if launcher_path:
-                    target_launcher = os.path.join(hub_dir, "antigravity")
+                    target_launcher = os.path.join(target_hub_dir, "antigravity")
                     if os.path.exists(target_launcher):
                         update_symlink(target_launcher, launcher_path)
 
                 if install_desktop and OS_NAME == "linux":
-                    install_hub_desktop(hub_dir=hub_dir, launcher_path=launcher_path)
+                    install_hub_desktop(
+                        hub_dir=target_hub_dir,
+                        launcher_path=launcher_path,
+                        scope=effective_scope,
+                    )
+
+                if suid_sandbox and OS_NAME == "linux":
+                    if not configure_suid_sandbox(target_hub_dir):
+                        return False
 
             print_success(f"Antigravity Hub successfully upgraded to version {latest_ver}!")
             return True
@@ -347,10 +443,17 @@ def update_hub(
             return False
 
 
-def update_cli(cli_binary: str, *, dry_run: bool = False, force: bool = False) -> bool:
+def update_cli(
+    cli_binary: str,
+    *,
+    dry_run: bool = False,
+    force: bool = False,
+    scope: Optional[str] = None,
+) -> bool:
     """Check and execute updates for Antigravity CLI."""
     print_status("Checking for Antigravity CLI updates...")
     current_ver = get_cli_version(cli_binary)
+    effective_scope = scope or ("system" if _is_system_path(cli_binary) else "user")
 
     try:
         manifest_json = fetch_json(CLI_MANIFEST_URL)
@@ -362,6 +465,7 @@ def update_cli(cli_binary: str, *, dry_run: bool = False, force: bool = False) -
         print_error(f"Failed to check CLI updates: {err}")
         return False
 
+    print_info(f"Target CLI Path:   {COLOR_BOLD}{cli_binary}{COLOR_ENDC} ({effective_scope})")
     print_info(f"Local CLI Version:  {COLOR_BOLD}{current_ver}{COLOR_ENDC}")
     print_info(f"Latest CLI Version: {COLOR_BOLD}{latest_ver}{COLOR_ENDC}")
 
@@ -372,6 +476,17 @@ def update_cli(cli_binary: str, *, dry_run: bool = False, force: bool = False) -
     if dry_run:
         print_warning(f"Update available to version {latest_ver} (Dry Run: skipping installation).")
         return True
+
+    # Permission check
+    if not is_path_writable(cli_binary):
+        print_error(
+            f"Permission denied: Target CLI path '{cli_binary}' is not writable.\n"
+            f"  To update a system-wide binary in /usr/local/bin, please run with sudo:\n"
+            f"    sudo antigravity-updater\n"
+            f"  Or to install to user ~/.local/bin, run:\n"
+            f"    antigravity-updater --user"
+        )
+        return False
 
     with tempfile.TemporaryDirectory() as tmpdir:
         archive_path = os.path.join(tmpdir, "cli_archive")
@@ -395,17 +510,25 @@ def update_cli(cli_binary: str, *, dry_run: bool = False, force: bool = False) -
             # Handle Windows .zip vs Unix .tar.gz
             if download_url.endswith(".zip"):
                 with zipfile.ZipFile(archive_path, "r") as zip_ref:
-                    zip_ref.extractall(tmpdir)
+                    for member in zip_ref.infolist():
+                        # Prevent path traversal
+                        target_path = os.path.abspath(os.path.join(tmpdir, member.filename))
+                        if not target_path.startswith(
+                            os.path.abspath(tmpdir) + os.sep
+                        ) and target_path != os.path.abspath(tmpdir):
+                            print_error(f"Unsafe path in zip archive: {member.filename}")
+                            return False
+                    zip_ref.extractall(tmpdir)  # nosec B202
             else:
                 with tarfile.open(archive_path, "r:gz") as tar:
-                    tar.extractall(path=tmpdir, filter="fully_trusted")
+                    tar.extractall(path=tmpdir, filter="data")  # nosec B202
 
             if not os.path.exists(extracted_binary):
                 # Try finding any file that matches 'antigravity' or 'agy' in the directory
                 potential = [
-                    os.path.join(tmpdir, f)
-                    for f in os.listdir(tmpdir)
-                    if f.startswith("antigravity") or f.startswith("agy")
+                    os.path.join(tmpdir, filename)
+                    for filename in os.listdir(tmpdir)
+                    if filename.startswith("antigravity") or filename.startswith("agy")
                 ]
                 if potential:
                     extracted_binary = potential[0]
@@ -423,7 +546,7 @@ def update_cli(cli_binary: str, *, dry_run: bool = False, force: bool = False) -
             shutil.move(extracted_binary, cli_binary)
 
             if OS_NAME != "windows":
-                os.chmod(cli_binary, 0o755)
+                os.chmod(cli_binary, 0o755)  # nosec B103
 
             print_success(f"Antigravity CLI successfully upgraded to version {latest_ver}!")
             return True

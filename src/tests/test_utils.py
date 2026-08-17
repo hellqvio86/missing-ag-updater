@@ -141,7 +141,7 @@ def test_get_cli_version() -> None:
         assert get_cli_version(cli_binary) == "0.0.0"
 
         # Create dummy file
-        with open(cli_binary, "w") as fdesc:
+        with open(cli_binary, "w", encoding="utf-8") as fdesc:
             fdesc.write("#!/bin/sh\necho 1.0.8")
         os.chmod(cli_binary, 0o755)
 
@@ -231,7 +231,7 @@ def test_update_symlink() -> None:
     with patch("missing_ag_updater.utils.OS_NAME", "linux"):
         with tempfile.TemporaryDirectory() as tmpdir:
             target = os.path.join(tmpdir, "target_file")
-            with open(target, "w") as fdesc:
+            with open(target, "w", encoding="utf-8") as fdesc:
                 fdesc.write("target contents")
 
             link_name = os.path.join(tmpdir, "symlink_file")
@@ -241,7 +241,7 @@ def test_update_symlink() -> None:
 
             # Update link again to see if it replaces correctly
             new_target = os.path.join(tmpdir, "new_target_file")
-            with open(new_target, "w") as fdesc:
+            with open(new_target, "w", encoding="utf-8") as fdesc:
                 fdesc.write("new target contents")
 
             update_symlink(new_target, link_name)
@@ -592,7 +592,7 @@ def test_configure_suid_sandbox_as_root() -> None:
             with patch("missing_ag_updater.utils.is_suid_sandbox_configured", return_value=False):
                 with tempfile.TemporaryDirectory() as tmpdir:
                     sandbox_file = os.path.join(tmpdir, "chrome-sandbox")
-                    open(sandbox_file, "w").close()
+                    open(sandbox_file, "w", encoding="utf-8").close()
                     with patch("os.geteuid", return_value=0, create=True):
                         with patch("os.chown") as mock_chown:
                             with patch("os.chmod") as mock_chmod:
@@ -607,7 +607,7 @@ def test_configure_suid_sandbox_via_sudo() -> None:
             with patch("missing_ag_updater.utils.is_suid_sandbox_configured", return_value=False):
                 with tempfile.TemporaryDirectory() as tmpdir:
                     sandbox_file = os.path.join(tmpdir, "chrome-sandbox")
-                    open(sandbox_file, "w").close()
+                    open(sandbox_file, "w", encoding="utf-8").close()
                     with patch("os.geteuid", return_value=1000, create=True):
                         with patch("subprocess.run") as mock_run:
                             assert configure_suid_sandbox(tmpdir) is True
@@ -622,7 +622,7 @@ def test_configure_suid_sandbox_failure() -> None:
             with patch("missing_ag_updater.utils.is_suid_sandbox_configured", return_value=False):
                 with tempfile.TemporaryDirectory() as tmpdir:
                     sandbox_file = os.path.join(tmpdir, "chrome-sandbox")
-                    open(sandbox_file, "w").close()
+                    open(sandbox_file, "w", encoding="utf-8").close()
                     with patch("os.geteuid", return_value=1000, create=True):
                         with patch("subprocess.run", side_effect=subprocess.CalledProcessError(1, "sudo")):
                             assert configure_suid_sandbox(tmpdir) is False
@@ -635,7 +635,7 @@ def test_configure_suid_sandbox_already_ok() -> None:
             with patch("missing_ag_updater.utils.is_suid_sandbox_configured", return_value=True):
                 with tempfile.TemporaryDirectory() as tmpdir:
                     sandbox_file = os.path.join(tmpdir, "chrome-sandbox")
-                    open(sandbox_file, "w").close()
+                    open(sandbox_file, "w", encoding="utf-8").close()
                     with patch("os.chown") as mock_chown:
                         with patch("os.chmod") as mock_chmod:
                             with patch("subprocess.run") as mock_run:

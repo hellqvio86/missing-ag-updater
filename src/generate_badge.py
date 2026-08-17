@@ -9,7 +9,7 @@ def main():
     subprocess.run([sys.executable, "-m", "coverage", "json"], check=True)
 
     # Load percentage
-    with open("coverage.json") as fdesc:
+    with open("coverage.json", "r", encoding="utf-8") as fdesc:
         data = json.load(fdesc)
 
     percent = round(data["totals"]["percent_covered"])
@@ -51,7 +51,7 @@ def main():
   </g>
 </svg>"""
 
-    with open("coverage.svg", "w") as fdesc:
+    with open("coverage.svg", "w", encoding="utf-8") as fdesc:
         fdesc.write(svg)
 
     print(f"Generated coverage.svg with {percent}% ({color})")

@@ -1,9 +1,13 @@
+"""General utilities, process checking, hash verification, downloads, and sandbox configuration."""
+
 import hashlib
 import json
 import os
+import stat as stat_mod
 import struct
-import subprocess
+import subprocess  # nosec B404
 import sys
+import time
 from typing import Any
 
 import requests
@@ -15,26 +19,34 @@ from .const import (
     COLOR_GREEN,
     COLOR_WARNING,
     OS_NAME,
+    USER_AGENT,
+    USER_APPLICATIONS_DIR,
+    USER_ICONS_DIR,
 )
 
 
 def print_status(msg: str) -> None:
+    """Print a status message with a spinner icon."""
     print(f"{COLOR_BLUE}⠋{COLOR_ENDC} {msg}")
 
 
 def print_success(msg: str) -> None:
+    """Print a success message with a checkmark."""
     print(f"{COLOR_GREEN}✓{COLOR_ENDC} {msg}")
 
 
 def print_warning(msg: str) -> None:
+    """Print a warning message with an alert icon."""
     print(f"{COLOR_WARNING}⚠{COLOR_ENDC} {COLOR_WARNING}{msg}{COLOR_ENDC}")
 
 
 def print_error(msg: str) -> None:
+    """Print an error message with a cross icon."""
     print(f"{COLOR_FAIL}✗{COLOR_ENDC} {COLOR_FAIL}{msg}{COLOR_ENDC}")
 
 
 def print_info(msg: str) -> None:
+    """Print an informational message with indentation."""
     print(f"  {msg}")
 
 
@@ -54,7 +66,7 @@ def get_linux_distro_id() -> str:
             for line in fdesc:
                 if line.startswith("ID="):
                     return line.strip().split("=", 1)[1].strip('"').lower()
-    except Exception:
+    except OSError:
         pass
     return ""
 
@@ -73,7 +85,7 @@ def _get_linux_distro_id_like() -> list[str]:
                 if line.startswith("ID_LIKE="):
                     raw = line.strip().split("=", 1)[1].strip('"').lower()
                     return raw.split()
-    except Exception:
+    except OSError:
         pass
     return []
 
@@ -94,59 +106,153 @@ def is_ubuntu_sandbox_distro() -> bool:
     return False
 
 
+def is_path_writable(path: str) -> bool:
+    """Check if the given path or its nearest existing parent directory is writable."""
+    if not path:
+        return False
+    target = path
+    while not os.path.exists(target):
+        parent = os.path.dirname(target)
+        if parent == target or not parent:
+            break
+        target = parent
+    return os.access(target, os.W_OK)
+
+
 def get_running_pids(keyword: str) -> list[str]:
-    """Get list of running PIDs matching the specified keyword (excluding current process)."""
-    pids = []
+    """Get running PIDs matching keyword, excluding updater and agent processes."""
+    pids: list[str] = []
     my_pid = str(os.getpid())
+    my_ppid = str(os.getppid()) if hasattr(os, "getppid") else ""
     if OS_NAME == "windows":
         try:
-            res = subprocess.run(["tasklist", "/NH", "/FO", "CSV"], capture_output=True, text=True)
+            res = subprocess.run(
+                ["tasklist", "/NH", "/FO", "CSV"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )  # nosec B603, B607
             for line in res.stdout.strip().split("\n"):
                 if not line.strip():
                     continue
-                parts = [p.strip('"') for p in line.split(",")]
+                parts = [part.strip('"') for part in line.split(",")]
                 if len(parts) >= 2 and keyword.lower() in parts[0].lower():
+                    image_name = parts[0].lower()
+                    if keyword.lower() == "antigravity" and "antigravity-ide" in image_name:
+                        continue
+                    if "updater" in image_name:
+                        continue
                     pids.append(parts[1])
-        except Exception:
+        except Exception:  # nosec B110
             pass
     else:
         try:
-            res = subprocess.run(["pgrep", "-f", keyword], capture_output=True, text=True)
+            res = subprocess.run(
+                ["pgrep", "-f", keyword],
+                capture_output=True,
+                text=True,
+                check=False,
+            )  # nosec B603, B607
             if res.returncode == 0:
                 pids = [pid.strip() for pid in res.stdout.strip().split("\n") if pid.strip()]
-        except Exception:
+        except Exception:  # nosec B110
             pass
-    # Exclude our own process PID to avoid false positives (e.g. matching launcher name)
-    return [pid for pid in pids if pid != my_pid]
+
+    # Exclude our own process PID and parent process to avoid false positives
+    filtered: list[str] = []
+    ignored_substrings = [
+        "missing_ag_updater",
+        "missing-ag-updater",
+        "antigravity-updater",
+        "antigravity-cli",
+        "antigravity_daemon",
+        ".gemini/antigravity",
+        "pytest",
+        "/bin/agy",
+        " agy",
+    ]
+    for pid in pids:
+        if pid in (my_pid, my_ppid):
+            continue
+        if OS_NAME == "linux" and os.path.exists(f"/proc/{pid}/cmdline"):
+            try:
+                with open(f"/proc/{pid}/cmdline", "rb") as fdesc:
+                    cmdline = fdesc.read().decode("utf-8", errors="ignore").replace("\x00", " ")
+                    if any(ignored in cmdline for ignored in ignored_substrings):
+                        continue
+                    if keyword.lower() == "antigravity" and (
+                        "antigravity-ide" in cmdline or "Antigravity IDE" in cmdline or "Antigravity-IDE" in cmdline
+                    ):
+                        continue
+            except OSError:
+                pass
+        filtered.append(pid)
+    return filtered
 
 
 def resolve_existing_ide_dir(ide_dir: str) -> str:
-    """Resolve existing IDE directory path, checking both hyphenated and spaced directory names."""
-    if os.path.exists(ide_dir):
-        return ide_dir
+    """Resolve existing IDE directory path across nested, hyphenated, and spaced names."""
+    if not ide_dir:
+        return ""
+    candidates = [
+        ide_dir,
+        os.path.join(ide_dir, "Antigravity-IDE"),
+        os.path.join(ide_dir, "Antigravity IDE"),
+    ]
     if "Antigravity-IDE" in ide_dir:
-        alt = ide_dir.replace("Antigravity-IDE", "Antigravity IDE")
-        if os.path.exists(alt):
-            return alt
+        candidates.append(ide_dir.replace("Antigravity-IDE", "Antigravity IDE"))
     elif "Antigravity IDE" in ide_dir:
-        alt = ide_dir.replace("Antigravity IDE", "Antigravity-IDE")
-        if os.path.exists(alt):
-            return alt
+        candidates.append(ide_dir.replace("Antigravity IDE", "Antigravity-IDE"))
+    elif "antigravity-ide" in ide_dir:
+        candidates.append(os.path.join(ide_dir, "Antigravity-IDE"))
+        candidates.append(os.path.join(ide_dir, "Antigravity IDE"))
+
+    for cand in candidates:
+        if OS_NAME == "darwin":
+            pj = os.path.join(cand, "Contents", "Resources", "app", "product.json")
+        else:
+            pj = os.path.join(cand, "resources", "app", "product.json")
+        if os.path.exists(pj):
+            return cand
+
+    for cand in candidates:
+        if os.path.exists(cand):
+            return cand
+
     return ide_dir
 
 
 def resolve_existing_hub_dir(hub_dir: str) -> str:
-    """Resolve existing Hub directory path, checking both hyphenated and spaced directory names."""
-    if os.path.exists(hub_dir):
-        return hub_dir
+    """Resolve existing Hub directory path across nested, hyphenated, and spaced names."""
+    if not hub_dir:
+        return ""
+    candidates = [
+        hub_dir,
+        os.path.join(hub_dir, "Antigravity-x64"),
+        os.path.join(hub_dir, "Antigravity Hub"),
+        os.path.join(hub_dir, "Antigravity"),
+    ]
     if "Antigravity-x64" in hub_dir:
-        alt = hub_dir.replace("Antigravity-x64", "Antigravity Hub")
-        if os.path.exists(alt):
-            return alt
+        candidates.append(hub_dir.replace("Antigravity-x64", "Antigravity Hub"))
+        candidates.append(hub_dir.replace("Antigravity-x64", "Antigravity"))
     elif "Antigravity Hub" in hub_dir:
-        alt = hub_dir.replace("Antigravity Hub", "Antigravity-x64")
-        if os.path.exists(alt):
-            return alt
+        candidates.append(hub_dir.replace("Antigravity Hub", "Antigravity-x64"))
+    elif "antigravity" in hub_dir.lower():
+        candidates.append(os.path.join(hub_dir, "Antigravity-x64"))
+        candidates.append(os.path.join(hub_dir, "Antigravity"))
+
+    for cand in candidates:
+        if OS_NAME == "darwin":
+            asar = os.path.join(cand, "Contents", "Resources", "app.asar")
+        else:
+            asar = os.path.join(cand, "resources", "app.asar")
+        if os.path.exists(asar):
+            return cand
+
+    for cand in candidates:
+        if os.path.exists(cand):
+            return cand
+
     return hub_dir
 
 
@@ -164,7 +270,7 @@ def get_ide_version(ide_dir: str) -> str:
         with open(product_json_path, "r", encoding="utf-8") as fdesc:
             product_json = json.load(fdesc)
             return product_json.get("ideVersion", "0.0.0")
-    except Exception:
+    except (OSError, json.JSONDecodeError, KeyError, TypeError):
         return "0.0.0"
 
 
@@ -197,7 +303,7 @@ def _read_asar_header(asar_path: str) -> tuple[dict[str, Any], int] | None:
             fdesc.seek(16)
             header_json = json.loads(fdesc.read(json_size).decode("utf-8"))
             return header_json, 8 + header_size
-    except Exception:
+    except (OSError, struct.error, json.JSONDecodeError, UnicodeDecodeError):
         return None
 
 
@@ -224,7 +330,14 @@ def get_hub_version(hub_dir: str) -> str:
             fdesc.seek(data_start_offset + offset)
             pkg_json = json.loads(fdesc.read(size).decode("utf-8"))
         return pkg_json.get("version", "0.0.0")
-    except Exception:
+    except (
+        OSError,
+        json.JSONDecodeError,
+        UnicodeDecodeError,
+        KeyError,
+        ValueError,
+        TypeError,
+    ):
         return "0.0.0"
 
 
@@ -233,20 +346,23 @@ def get_cli_version(cli_binary: str) -> str:
     if not os.path.exists(cli_binary):
         return "0.0.0"
     try:
-        res = subprocess.run([cli_binary, "--version"], capture_output=True, text=True, check=True)
+        res = subprocess.run(
+            [cli_binary, "--version"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )  # nosec B603
         lines = res.stdout.strip().split("\n")
         if lines:
             return lines[0].strip()
         return "0.0.0"
-    except Exception:
+    except (subprocess.SubprocessError, OSError, UnicodeDecodeError):
         return "0.0.0"
 
 
 def fetch_json(url: str) -> Any:
     """Fetch JSON from a URL with custom user agent headers, retrying on transient failures."""
-    import time
-
-    headers = {"User-Agent": "Mozilla/5.0 (AntigravityUpdater)"}
+    headers = {"User-Agent": USER_AGENT}
     max_retries = 3
     backoff_factor = 0.5
     last_err: Exception | None = None
@@ -256,29 +372,35 @@ def fetch_json(url: str) -> Any:
             response = requests.get(url, headers=headers, timeout=10)
             response.raise_for_status()
             return response.json()
-        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as err:
+        except (
+            requests.exceptions.ConnectionError,
+            requests.exceptions.Timeout,
+        ) as err:
             last_err = err
             if attempt < max_retries:
                 time.sleep(backoff_factor * (2**attempt))
             continue
         except requests.exceptions.HTTPError as err:
             last_err = err
-            if err.response is not None and err.response.status_code in [500, 502, 503, 504]:
+            if err.response is not None and err.response.status_code in [
+                500,
+                502,
+                503,
+                504,
+            ]:
                 if attempt < max_retries:
                     time.sleep(backoff_factor * (2**attempt))
                     continue
-            raise RuntimeError(f"Failed to query {url}: {err}")
-        except Exception as err:
-            raise RuntimeError(f"Failed to query {url}: {err}")
+            raise RuntimeError(f"Failed to query {url}: {err}") from err
+        except (requests.exceptions.RequestException, json.JSONDecodeError) as err:
+            raise RuntimeError(f"Failed to query {url}: {err}") from err
 
-    raise RuntimeError(f"Failed to query {url}: {last_err}")
+    raise RuntimeError(f"Failed to query {url}: {last_err}") from last_err
 
 
 def download_file(url: str, dest_path: str, *, label: str = "Downloading") -> None:
-    """Download a file with a visually appealing text progress bar, retrying on transient failures."""
-    import time
-
-    headers = {"User-Agent": "Mozilla/5.0 (AntigravityUpdater)"}
+    """Download a file with a visually appealing progress bar, retrying on transient failures."""
+    headers = {"User-Agent": USER_AGENT}
     max_retries = 3
     backoff_factor = 0.5
     last_err: Exception | None = None
@@ -300,47 +422,55 @@ def download_file(url: str, dest_path: str, *, label: str = "Downloading") -> No
                                 percent = int(downloaded * 100 / total_size)
                                 bar_len = 40
                                 filled_len = int(bar_len * downloaded // total_size)
-                                bar = "█" * filled_len + "-" * (bar_len - filled_len)
+                                progress_bar = "█" * filled_len + "-" * (bar_len - filled_len)
                                 current_mb = downloaded / 1024 / 1024
                                 total_mb = total_size / 1024 / 1024
                                 sys.stdout.write(
-                                    f"\r{COLOR_BLUE}⠋{COLOR_ENDC} {label}: [{bar}] {percent}% "
+                                    f"\r{COLOR_BLUE}⠋{COLOR_ENDC} {label}: [{progress_bar}] {percent}% "
                                     f"({current_mb:.1f}/{total_mb:.1f} MB)"
                                 )
                                 sys.stdout.flush()
                     sys.stdout.write("\n")
                 return
-        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as err:
+        except (
+            requests.exceptions.ConnectionError,
+            requests.exceptions.Timeout,
+        ) as err:
             last_err = err
             if attempt < max_retries:
                 time.sleep(backoff_factor * (2**attempt))
             continue
         except requests.exceptions.HTTPError as err:
             last_err = err
-            if err.response is not None and err.response.status_code in [500, 502, 503, 504]:
+            if err.response is not None and err.response.status_code in [
+                500,
+                502,
+                503,
+                504,
+            ]:
                 if attempt < max_retries:
                     time.sleep(backoff_factor * (2**attempt))
                     continue
             sys.stdout.write("\n")
-            raise RuntimeError(f"Download error from {url}: {err}")
-        except Exception as err:
+            raise RuntimeError(f"Download error from {url}: {err}") from err
+        except (requests.exceptions.RequestException, OSError) as err:
             sys.stdout.write("\n")
-            raise RuntimeError(f"Download error from {url}: {err}")
+            raise RuntimeError(f"Download error from {url}: {err}") from err
 
     sys.stdout.write("\n")
-    raise RuntimeError(f"Download error from {url}: {last_err}")
+    raise RuntimeError(f"Download error from {url}: {last_err}") from last_err
 
 
 def compute_sha512(file_path: str) -> str:
     """Compute the SHA512 hash of a file."""
-    h = hashlib.sha512()
+    hasher = hashlib.sha512()
     with open(file_path, "rb") as fdesc:
         while True:
             chunk = fdesc.read(8192)
             if not chunk:
                 break
-            h.update(chunk)
-    return h.hexdigest()
+            hasher.update(chunk)
+    return hasher.hexdigest()
 
 
 def update_symlink(target: str, link_name: str) -> None:
@@ -377,26 +507,32 @@ def extract_asar_icon(asar_path: str, dest_icon_path: str) -> bool:
         with open(dest_icon_path, "wb") as icon_file:
             icon_file.write(icon_data)
         return True
-    except Exception:
+    except (OSError, KeyError, ValueError, TypeError):
         return False
 
 
 def refresh_linux_desktop_caches() -> None:
     """Refresh the user-level desktop database and icon cache on Linux."""
-    from .const import USER_APPLICATIONS_DIR, USER_ICONS_DIR
-
     if OS_NAME != "linux":
         return
     try:
         if os.path.exists(USER_APPLICATIONS_DIR):
-            subprocess.run(["update-desktop-database", USER_APPLICATIONS_DIR], capture_output=True, check=False)
-    except Exception:
+            subprocess.run(
+                ["update-desktop-database", USER_APPLICATIONS_DIR],
+                capture_output=True,
+                check=False,
+            )  # nosec B603, B607
+    except (subprocess.SubprocessError, OSError):
         pass
     try:
         icon_parent = os.path.dirname(os.path.dirname(USER_ICONS_DIR))
         if os.path.exists(icon_parent):
-            subprocess.run(["gtk-update-icon-cache", "-q", icon_parent], capture_output=True, check=False)
-    except Exception:
+            subprocess.run(
+                ["gtk-update-icon-cache", "-q", icon_parent],
+                capture_output=True,
+                check=False,
+            )  # nosec B603, B607
+    except (subprocess.SubprocessError, OSError):
         pass
 
 
@@ -417,7 +553,7 @@ def is_apparmor_enabled() -> bool:
             with open(param_path, "r", encoding="utf-8") as fdesc:
                 if fdesc.read().strip().upper() == "Y":
                     return True
-        except Exception:
+        except OSError:
             pass
 
     userns_path = "/proc/sys/kernel/apparmor_restrict_unprivileged_userns"
@@ -426,14 +562,19 @@ def is_apparmor_enabled() -> bool:
             with open(userns_path, "r", encoding="utf-8") as fdesc:
                 if fdesc.read().strip() == "1":
                     return True
-        except Exception:
+        except OSError:
             pass
 
     try:
-        res = subprocess.run(["aa-enabled"], capture_output=True, text=True)
+        res = subprocess.run(
+            ["aa-enabled"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )  # nosec B603, B607
         if res.returncode == 0:
             return True
-    except Exception:
+    except (subprocess.SubprocessError, OSError):
         pass
 
     return False
@@ -443,13 +584,11 @@ def is_suid_sandbox_configured(sandbox_path: str) -> bool:
     """Return True if chrome-sandbox is owned by root:root with mode 4755."""
     try:
         st = os.stat(sandbox_path)
-        import stat as stat_mod
-
         uid_ok = st.st_uid == 0
         gid_ok = st.st_gid == 0
         mode_ok = bool(st.st_mode & stat_mod.S_ISUID) and (st.st_mode & 0o777) == 0o755
         return uid_ok and gid_ok and mode_ok
-    except Exception:
+    except OSError:
         return False
 
 
@@ -480,10 +619,11 @@ def can_fix_suid_sandbox() -> tuple[bool, str]:
             ["sudo", "-n", "true"],
             capture_output=True,
             timeout=5,
-        )
+            check=False,
+        )  # nosec B603, B607
         if res.returncode == 0:
             return True, ""
-    except Exception:
+    except (subprocess.SubprocessError, OSError):
         pass
 
     return (
@@ -498,7 +638,7 @@ def can_fix_suid_sandbox() -> tuple[bool, str]:
     )
 
 
-def configure_suid_sandbox(ide_dir: str) -> bool:
+def configure_suid_sandbox(app_dir: str) -> bool:
     """Configure root:root 4755 permissions on chrome-sandbox binary if AppArmor is active.
 
     Checks the current state first:
@@ -517,50 +657,42 @@ def configure_suid_sandbox(ide_dir: str) -> bool:
         print_info("AppArmor is not active on this system; SUID sandbox configuration skipped.")
         return True
 
-    dirs_to_check = [ide_dir]
-    resolved = resolve_existing_ide_dir(ide_dir)
-    if resolved not in dirs_to_check:
-        dirs_to_check.append(resolved)
-
-    found_any = False
-    success = True
-    for target_dir in dirs_to_check:
-        sandbox_path = os.path.join(target_dir, "chrome-sandbox")
-        if not os.path.exists(sandbox_path):
-            continue
-
-        found_any = True
-
-        # Check current state — skip if already correctly configured
-        if is_suid_sandbox_configured(sandbox_path):
-            print_success(f"SUID sandbox already correctly configured: {sandbox_path}")
-            continue
-
-        # Misconfigured — try to fix
-        is_root = hasattr(os, "geteuid") and os.geteuid() == 0
-
-        try:
-            if is_root:
-                os.chown(sandbox_path, 0, 0)
-                os.chmod(sandbox_path, 0o4755)
-                print_success(f"Configured root:root 4755 permissions on {sandbox_path}")
-            else:
-                print_info(f"Root privileges required. Requesting sudo for {sandbox_path}...")
-                subprocess.run(["sudo", "chown", "root:root", sandbox_path], check=True)
-                subprocess.run(["sudo", "chmod", "4755", sandbox_path], check=True)
-                print_success(f"Configured root:root 4755 permissions on {sandbox_path}")
-        except Exception as err:
-            print_error(
-                f"Cannot fix SUID sandbox permissions on {sandbox_path}: {err}\n"
-                f"  The sandbox binary is misconfigured — Antigravity IDE will refuse to start.\n"
-                f"  Run the following command manually to fix it:\n"
-                f'    sudo chown root:root "{sandbox_path}" && sudo chmod 4755 "{sandbox_path}"'
-            )
-            success = False
-
-    if not found_any:
-        sandbox_path = os.path.join(ide_dir, "chrome-sandbox")
+    sandbox_path = os.path.join(app_dir, "chrome-sandbox")
+    if not os.path.exists(sandbox_path):
         print_warning(f"chrome-sandbox binary not found at {sandbox_path}")
         return False
 
-    return success
+    # Check current state — skip if already correctly configured
+    if is_suid_sandbox_configured(sandbox_path):
+        print_success(f"SUID sandbox already correctly configured: {sandbox_path}")
+        return True
+
+    # Misconfigured — try to fix
+    is_root = hasattr(os, "geteuid") and os.geteuid() == 0
+
+    try:
+        if is_root:
+            os.chown(sandbox_path, 0, 0)
+            os.chmod(sandbox_path, 0o4755)  # nosec B103
+            print_success(f"Configured root:root 4755 permissions on {sandbox_path}")
+        else:
+            print_info(f"Root privileges required. Requesting sudo for {sandbox_path}...")
+            subprocess.run(
+                ["sudo", "chown", "root:root", sandbox_path],
+                check=True,
+            )  # nosec B603, B607
+            subprocess.run(
+                ["sudo", "chmod", "4755", sandbox_path],
+                check=True,
+            )  # nosec B603, B607
+            print_success(f"Configured root:root 4755 permissions on {sandbox_path}")
+    except (subprocess.SubprocessError, OSError) as err:
+        print_error(
+            f"Cannot fix SUID sandbox permissions on {sandbox_path}: {err}\n"
+            f"  The sandbox binary is misconfigured — the application may crash or refuse input.\n"
+            f"  Run the following command manually to fix it:\n"
+            f'    sudo chown root:root "{sandbox_path}" && sudo chmod 4755 "{sandbox_path}"'
+        )
+        return False
+
+    return True

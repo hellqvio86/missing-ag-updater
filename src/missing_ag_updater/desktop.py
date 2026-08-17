@@ -1,15 +1,36 @@
+"""Linux desktop entry and icon installation for Antigravity IDE and Hub."""
+
 import os
 import shutil
 from typing import Optional
 
-from .const import USER_APPLICATIONS_DIR, USER_ICONS_DIR
-from .utils import extract_asar_icon, print_success, print_warning, refresh_linux_desktop_caches
+from .const import (
+    SYSTEM_APPLICATIONS_DIR,
+    SYSTEM_ICONS_DIR,
+    USER_APPLICATIONS_DIR,
+    USER_ICONS_DIR,
+)
+from .utils import (
+    extract_asar_icon,
+    print_info,
+    print_success,
+    print_warning,
+    refresh_linux_desktop_caches,
+)
 
 
-def install_ide_desktop(ide_dir: str, launcher_path: Optional[str]) -> None:
-    """Create local Linux desktop entry and install icon for Antigravity IDE."""
-    os.makedirs(USER_APPLICATIONS_DIR, exist_ok=True)
-    desktop_file = os.path.join(USER_APPLICATIONS_DIR, "antigravity-ide.desktop")
+def install_ide_desktop(
+    ide_dir: str,
+    launcher_path: Optional[str],
+    *,
+    scope: str = "user",
+) -> None:
+    """Create Linux desktop entry and install icon for Antigravity IDE (user or system scope)."""
+    app_dir = SYSTEM_APPLICATIONS_DIR if scope == "system" else USER_APPLICATIONS_DIR
+    icons_dir = SYSTEM_ICONS_DIR if scope == "system" else USER_ICONS_DIR
+
+    os.makedirs(app_dir, exist_ok=True)
+    desktop_file = os.path.join(app_dir, "antigravity-ide.desktop")
     exec_path = launcher_path or os.path.join(ide_dir, "bin", "antigravity-ide")
 
     desktop_content = f"""[Desktop Entry]
@@ -28,26 +49,60 @@ StartupWMClass=antigravity-ide
         with open(desktop_file, "w", encoding="utf-8") as df:
             df.write(desktop_content)
         print_success(f"Installed desktop entry: {desktop_file}")
-    except Exception as de:
-        print_warning(f"Could not install desktop entry: {de}")
+    except OSError as de:
+        print_warning(f"Could not install desktop entry {desktop_file}: {de}")
 
     # Copy icon
     icon_source = os.path.join(ide_dir, "resources", "app", "resources", "linux", "code.png")
+    if not os.path.exists(icon_source):
+        # Check nested directory
+        icon_source = os.path.join(
+            ide_dir,
+            "Antigravity-IDE",
+            "resources",
+            "app",
+            "resources",
+            "linux",
+            "code.png",
+        )
+
     if os.path.exists(icon_source):
-        os.makedirs(USER_ICONS_DIR, exist_ok=True)
+        os.makedirs(icons_dir, exist_ok=True)
         try:
-            shutil.copy2(icon_source, os.path.join(USER_ICONS_DIR, "antigravity-ide.png"))
-            print_success("Installed local IDE icon.")
-        except Exception as ie:
-            print_warning(f"Could not install local IDE icon: {ie}")
+            shutil.copy2(icon_source, os.path.join(icons_dir, "antigravity-ide.png"))
+            print_success(f"Installed {'system' if scope == 'system' else 'local'} IDE icon.")
+        except (OSError, shutil.Error) as ie:
+            print_warning(f"Could not install IDE icon: {ie}")
+
+    # If installing to system, check and remove duplicate user desktop entry if present
+    if scope == "system":
+        user_dt = os.path.join(USER_APPLICATIONS_DIR, "antigravity-ide.desktop")
+        if os.path.exists(user_dt):
+            try:
+                os.remove(user_dt)
+                print_info(f"Removed shadowed user desktop entry to prevent duplicate icons: {user_dt}")
+            except OSError:
+                pass
+    elif scope == "user":
+        sys_dt = os.path.join(SYSTEM_APPLICATIONS_DIR, "antigravity-ide.desktop")
+        if os.path.exists(sys_dt):
+            print_info(f"Notice: System desktop entry also exists at {sys_dt}. User entry will take precedence.")
 
     refresh_linux_desktop_caches()
 
 
-def install_hub_desktop(hub_dir: str, launcher_path: Optional[str]) -> None:
-    """Create local Linux desktop entry and extract icon for Antigravity Hub."""
-    os.makedirs(USER_APPLICATIONS_DIR, exist_ok=True)
-    desktop_file = os.path.join(USER_APPLICATIONS_DIR, "antigravity.desktop")
+def install_hub_desktop(
+    hub_dir: str,
+    launcher_path: Optional[str],
+    *,
+    scope: str = "user",
+) -> None:
+    """Create Linux desktop entry and extract icon for Antigravity Hub (user or system scope)."""
+    app_dir = SYSTEM_APPLICATIONS_DIR if scope == "system" else USER_APPLICATIONS_DIR
+    icons_dir = SYSTEM_ICONS_DIR if scope == "system" else USER_ICONS_DIR
+
+    os.makedirs(app_dir, exist_ok=True)
+    desktop_file = os.path.join(app_dir, "antigravity.desktop")
     exec_path = launcher_path or os.path.join(hub_dir, "antigravity")
 
     desktop_content = f"""[Desktop Entry]
@@ -65,16 +120,32 @@ StartupWMClass=Antigravity
         with open(desktop_file, "w", encoding="utf-8") as df:
             df.write(desktop_content)
         print_success(f"Installed desktop entry: {desktop_file}")
-    except Exception as de:
-        print_warning(f"Could not install desktop entry: {de}")
+    except OSError as de:
+        print_warning(f"Could not install desktop entry {desktop_file}: {de}")
 
     # Extract icon from app.asar
     asar_path = os.path.join(hub_dir, "resources", "app.asar")
+    if not os.path.exists(asar_path):
+        asar_path = os.path.join(hub_dir, "Antigravity-x64", "resources", "app.asar")
+
     if os.path.exists(asar_path):
-        dest_icon = os.path.join(USER_ICONS_DIR, "antigravity.png")
+        dest_icon = os.path.join(icons_dir, "antigravity.png")
         if extract_asar_icon(asar_path, dest_icon):
-            print_success("Extracted and installed local Hub icon.")
+            print_success(f"Extracted and installed {'system' if scope == 'system' else 'local'} Hub icon.")
         else:
-            print_warning("Could not extract local Hub icon.")
+            print_warning("Could not extract Hub icon.")
+
+    if scope == "system":
+        user_dt = os.path.join(USER_APPLICATIONS_DIR, "antigravity.desktop")
+        if os.path.exists(user_dt):
+            try:
+                os.remove(user_dt)
+                print_info(f"Removed shadowed user desktop entry to prevent duplicate icons: {user_dt}")
+            except OSError:
+                pass
+    elif scope == "user":
+        sys_dt = os.path.join(SYSTEM_APPLICATIONS_DIR, "antigravity.desktop")
+        if os.path.exists(sys_dt):
+            print_info(f"Notice: System desktop entry also exists at {sys_dt}. User entry will take precedence.")
 
     refresh_linux_desktop_caches()

@@ -1,9 +1,11 @@
 import os
 import shutil
 import subprocess
+import tarfile
 import tempfile
+import zipfile
 from typing import Any
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from missing_ag_updater.updater import (
     get_download_url,
@@ -39,366 +41,477 @@ def test_get_download_url() -> None:
         assert "windows-x64/Antigravity%20IDE.exe" in url
 
 
-def test_install_windows_exe() -> None:
-    with patch("subprocess.run") as mock_run:
-        mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
-        assert install_windows_exe("dummy.exe") is True
-        mock_run.assert_called_once_with(["dummy.exe", "/S"], check=True)
-
-    with patch("subprocess.run", side_effect=Exception("error")):
-        assert install_windows_exe("dummy.exe") is False
+@patch("subprocess.run")
+def test_install_windows_exe_success(mock_run: MagicMock) -> None:
+    mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
+    assert install_windows_exe("dummy.exe") is True
+    mock_run.assert_called_once_with(["dummy.exe", "/S"], check=True)
 
 
-def test_install_macos_dmg() -> None:
-    with patch("tempfile.mkdtemp", return_value="/tmp/mock_mount"):
-        with patch("subprocess.run") as mock_run:
-            with patch("os.listdir", return_value=["Antigravity IDE.app"]):
-                with patch("os.path.exists", return_value=True):
-                    with patch("shutil.rmtree") as mock_rm:
-                        with patch("shutil.copytree") as mock_cp:
-                            with patch("os.rmdir") as mock_rmdir:
-                                mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
-                                res = install_macos_dmg("dummy.dmg", "/Applications/Target.app")
-                                assert res is True
-                                mock_rm.assert_called_once_with("/Applications/Target.app")
-                                mock_cp.assert_called_once_with(
-                                    "/tmp/mock_mount/Antigravity IDE.app",
-                                    "/Applications/Target.app",
-                                    symlinks=True,
-                                )
-                                mock_rmdir.assert_called_once_with("/tmp/mock_mount")
+@patch("subprocess.run", side_effect=Exception("error"))
+def test_install_windows_exe_failure(mock_run: MagicMock) -> None:
+    assert install_windows_exe("dummy.exe") is False
 
 
-def test_update_ide_up_to_date() -> None:
-    with patch("missing_ag_updater.updater.get_ide_version", return_value="2.0.4"):
-        with patch(
-            "missing_ag_updater.updater.fetch_json",
-            return_value=[{"version": "2.0.4", "execution_id": "1234"}],
-        ):
-            res = update_ide("/dummy/ide", None)
-            assert res is True
+@patch("os.rmdir")
+@patch("shutil.copytree")
+@patch("shutil.rmtree")
+@patch("os.path.exists", return_value=True)
+@patch("os.listdir", return_value=["Antigravity IDE.app"])
+@patch("subprocess.run")
+@patch("tempfile.mkdtemp", return_value="/tmp/mock_mount")
+def test_install_macos_dmg(
+    mock_mkdtemp: MagicMock,
+    mock_run: MagicMock,
+    mock_listdir: MagicMock,
+    mock_exists: MagicMock,
+    mock_rm: MagicMock,
+    mock_cp: MagicMock,
+    mock_rmdir: MagicMock,
+) -> None:
+    mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
+    res = install_macos_dmg("dummy.dmg", "/Applications/Target.app")
+    assert res is True
+    mock_rm.assert_called_once_with("/Applications/Target.app")
+    mock_cp.assert_called_once_with(
+        "/tmp/mock_mount/Antigravity IDE.app",
+        "/Applications/Target.app",
+        symlinks=True,
+    )
+    mock_rmdir.assert_called_once_with("/tmp/mock_mount")
 
 
-def test_update_ide_dry_run() -> None:
-    with patch("missing_ag_updater.updater.get_ide_version", return_value="2.0.3"):
-        with patch(
-            "missing_ag_updater.updater.fetch_json",
-            return_value=[{"version": "2.0.4", "execution_id": "1234"}],
-        ):
-            res = update_ide("/dummy/ide", None, dry_run=True)
-            assert res is True
+@patch("missing_ag_updater.updater.fetch_json", return_value=[{"version": "2.0.4", "execution_id": "1234"}])
+@patch("missing_ag_updater.updater.get_ide_version", return_value="2.0.4")
+def test_update_ide_up_to_date(mock_ver: MagicMock, mock_fetch: MagicMock) -> None:
+    res = update_ide("/dummy/ide", None)
+    assert res is True
 
 
-def test_update_ide_running_process_aborts() -> None:
-    with patch("missing_ag_updater.updater.get_ide_version", return_value="2.0.3"):
-        with patch(
-            "missing_ag_updater.updater.fetch_json",
-            return_value=[{"version": "2.0.4", "execution_id": "1234"}],
-        ):
-            with patch("missing_ag_updater.updater.get_running_pids", return_value=["1111", "2222"]):
-                res = update_ide("/dummy/ide", None)
-                assert res is False
+@patch("missing_ag_updater.updater.fetch_json", return_value=[{"version": "2.0.4", "execution_id": "1234"}])
+@patch("missing_ag_updater.updater.get_ide_version", return_value="2.0.3")
+def test_update_ide_dry_run(mock_ver: MagicMock, mock_fetch: MagicMock) -> None:
+    res = update_ide("/dummy/ide", None, dry_run=True)
+    assert res is True
 
 
-def test_update_hub_up_to_date() -> None:
-    with patch("missing_ag_updater.updater.get_hub_version", return_value="2.1.4"):
-        with patch(
-            "missing_ag_updater.updater.fetch_json",
-            return_value=[{"version": "2.1.4", "execution_id": "1234"}],
-        ):
-            res = update_hub("/dummy/hub", None)
-            assert res is True
+@patch("missing_ag_updater.updater.get_running_pids", return_value=["1111", "2222"])
+@patch("missing_ag_updater.updater.fetch_json", return_value=[{"version": "2.0.4", "execution_id": "1234"}])
+@patch("missing_ag_updater.updater.get_ide_version", return_value="2.0.3")
+def test_update_ide_running_process_aborts(
+    mock_ver: MagicMock,
+    mock_fetch: MagicMock,
+    mock_pids: MagicMock,
+) -> None:
+    res = update_ide("/dummy/ide", None)
+    assert res is False
 
 
-def test_update_cli_up_to_date() -> None:
-    with patch("missing_ag_updater.updater.get_cli_version", return_value="1.0.8"):
-        with patch(
-            "missing_ag_updater.updater.fetch_json",
-            return_value={
-                "version": "1.0.8",
-                "url": "https://example.com/agy.tar.gz",
-                "sha512": "hash",
-            },
-        ):
-            res = update_cli("/dummy/cli")
-            assert res is True
+@patch("missing_ag_updater.updater.fetch_json", return_value=[{"version": "2.1.4", "execution_id": "1234"}])
+@patch("missing_ag_updater.updater.get_hub_version", return_value="2.1.4")
+def test_update_hub_up_to_date(mock_ver: MagicMock, mock_fetch: MagicMock) -> None:
+    res = update_hub("/dummy/hub", None)
+    assert res is True
+
+
+@patch(
+    "missing_ag_updater.updater.fetch_json",
+    return_value={
+        "version": "1.0.8",
+        "url": "https://example.com/agy.tar.gz",
+        "sha512": "hash",
+    },
+)
+@patch("missing_ag_updater.updater.get_cli_version", return_value="1.0.8")
+def test_update_cli_up_to_date(mock_ver: MagicMock, mock_fetch: MagicMock) -> None:
+    res = update_cli("/dummy/cli")
+    assert res is True
 
 
 def test_update_ide_success_linux() -> None:
-    import tarfile
-
     def mock_download_write_tar(url: str, dest_path: str, **kwargs: Any) -> None:
         with tempfile.TemporaryDirectory() as td:
-            d = os.path.join(td, "Antigravity IDE", "bin")
-            os.makedirs(d)
-            with open(os.path.join(d, "antigravity-ide"), "w") as fdesc:
+            bin_dir = os.path.join(td, "Antigravity IDE", "bin")
+            os.makedirs(bin_dir)
+            with open(os.path.join(bin_dir, "antigravity-ide"), "w", encoding="utf-8") as fdesc:
                 fdesc.write("launcher content")
             with tarfile.open(dest_path, "w:gz") as tar:
                 tar.add(os.path.join(td, "Antigravity IDE"), arcname="Antigravity IDE")
 
-    with patch("missing_ag_updater.updater.OS_NAME", "linux"):
-        with patch("missing_ag_updater.updater.get_ide_version", return_value="2.0.3"):
-            with patch(
-                "missing_ag_updater.updater.fetch_json",
-                return_value=[{"version": "2.0.4", "execution_id": "1234"}],
-            ):
-                with patch("missing_ag_updater.updater.get_running_pids", return_value=[]):
-                    with patch(
-                        "missing_ag_updater.updater.download_file",
-                        side_effect=mock_download_write_tar,
-                    ):
-                        with patch("missing_ag_updater.updater.install_ide_desktop") as mock_desktop:
-                            with patch("missing_ag_updater.updater.install_ide_nautilus") as mock_nautilus:
-                                with tempfile.TemporaryDirectory() as target_ide_dir:
-                                    launcher = os.path.join(target_ide_dir, "bin_launcher", "ide-launch")
-                                    res = update_ide(target_ide_dir, launcher, force=True)
-                                    assert res is True
-                                    assert os.path.exists(os.path.join(target_ide_dir, "bin", "antigravity-ide"))
-                                    mock_desktop.assert_called_once_with(ide_dir=target_ide_dir, launcher_path=launcher)
-                                    mock_nautilus.assert_called_once_with(
-                                        ide_dir=target_ide_dir, launcher_path=launcher
-                                    )
+    @patch("missing_ag_updater.updater.install_ide_nautilus")
+    @patch("missing_ag_updater.updater.install_ide_desktop")
+    @patch("missing_ag_updater.updater.download_file", side_effect=mock_download_write_tar)
+    @patch("missing_ag_updater.updater.get_running_pids", return_value=[])
+    @patch("missing_ag_updater.updater.fetch_json", return_value=[{"version": "2.0.4", "execution_id": "1234"}])
+    @patch("missing_ag_updater.updater.get_ide_version", return_value="2.0.3")
+    @patch("missing_ag_updater.updater.OS_NAME", "linux")
+    def _run_test(
+        mock_ver: MagicMock,
+        mock_fetch: MagicMock,
+        mock_pids: MagicMock,
+        mock_dl: MagicMock,
+        mock_dt: MagicMock,
+        mock_naut: MagicMock,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as target_ide_dir:
+            launcher = os.path.join(target_ide_dir, "bin_launcher", "ide-launch")
+            res = update_ide(target_ide_dir, launcher, force=True)
+            assert res is True
+            assert os.path.exists(os.path.join(target_ide_dir, "bin", "antigravity-ide"))
+            mock_dt.assert_called_once_with(ide_dir=target_ide_dir, launcher_path=launcher, scope="user")
+            mock_naut.assert_called_once_with(ide_dir=target_ide_dir, launcher_path=launcher, scope="user")
+
+    _run_test()
 
 
 def test_update_ide_skips_legacy_cleanup_on_non_sandbox_distro() -> None:
-    import tarfile
-
     def mock_download_write_tar(url: str, dest_path: str, **kwargs: Any) -> None:
         with tempfile.TemporaryDirectory() as td:
-            d = os.path.join(td, "Antigravity IDE", "bin")
-            os.makedirs(d)
-            with open(os.path.join(d, "antigravity-ide"), "w") as fdesc:
+            bin_dir = os.path.join(td, "Antigravity IDE", "bin")
+            os.makedirs(bin_dir)
+            with open(os.path.join(bin_dir, "antigravity-ide"), "w", encoding="utf-8") as fdesc:
                 fdesc.write("launcher content")
             with tarfile.open(dest_path, "w:gz") as tar:
                 tar.add(os.path.join(td, "Antigravity IDE"), arcname="Antigravity IDE")
 
-    with patch("missing_ag_updater.updater.OS_NAME", "linux"):
-        with patch("missing_ag_updater.updater.get_ide_version", return_value="2.0.3"):
-            with patch(
-                "missing_ag_updater.updater.fetch_json",
-                return_value=[{"version": "2.0.4", "execution_id": "1234"}],
-            ):
-                with patch("missing_ag_updater.updater.get_running_pids", return_value=[]):
-                    with patch("missing_ag_updater.updater.download_file", side_effect=mock_download_write_tar):
-                        with patch("missing_ag_updater.updater.is_ubuntu_sandbox_distro", return_value=False):
-                            original_rmtree = shutil.rmtree
+    original_rmtree = shutil.rmtree
 
-                            def record_rmtree(path: str, *args: Any, **kwargs: Any) -> None:
-                                if path.endswith("Antigravity IDE"):
-                                    raise AssertionError("legacy directory should not be removed")
-                                return original_rmtree(path, *args, **kwargs)
+    def record_rmtree(path: str, *args: Any, **kwargs: Any) -> None:
+        if path.endswith("Antigravity IDE"):
+            raise AssertionError("legacy directory should not be removed")
+        return original_rmtree(path, *args, **kwargs)
 
-                            with patch("missing_ag_updater.updater.shutil.rmtree", side_effect=record_rmtree):
-                                with tempfile.TemporaryDirectory() as root:
-                                    target_ide_dir = os.path.join(root, "target-ide")
-                                    legacy_ide_dir = os.path.join(root, "Antigravity IDE")
-                                    os.makedirs(legacy_ide_dir)
-                                    res = update_ide(target_ide_dir, None, force=True)
-                                    assert res is True
+    @patch("missing_ag_updater.updater.shutil.rmtree", side_effect=record_rmtree)
+    @patch("missing_ag_updater.updater.is_ubuntu_sandbox_distro", return_value=False)
+    @patch("missing_ag_updater.updater.download_file", side_effect=mock_download_write_tar)
+    @patch("missing_ag_updater.updater.get_running_pids", return_value=[])
+    @patch("missing_ag_updater.updater.fetch_json", return_value=[{"version": "2.0.4", "execution_id": "1234"}])
+    @patch("missing_ag_updater.updater.get_ide_version", return_value="2.0.3")
+    @patch("missing_ag_updater.updater.OS_NAME", "linux")
+    def _run_test(
+        mock_ver: MagicMock,
+        mock_fetch: MagicMock,
+        mock_pids: MagicMock,
+        mock_dl: MagicMock,
+        mock_distro: MagicMock,
+        mock_rm: MagicMock,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as root:
+            target_ide_dir = os.path.join(root, "target-ide")
+            legacy_ide_dir = os.path.join(root, "Antigravity IDE")
+            os.makedirs(legacy_ide_dir)
+            res = update_ide(target_ide_dir, None, force=True)
+            assert res is True
 
-
-def test_update_ide_empty_releases() -> None:
-    with patch("missing_ag_updater.updater.get_ide_version", return_value="2.0.3"):
-        with patch("missing_ag_updater.updater.fetch_json", return_value=[]):
-            assert update_ide("/dummy/ide", None) is False
-
-
-def test_update_ide_fetch_error() -> None:
-    with patch("missing_ag_updater.updater.get_ide_version", return_value="2.0.3"):
-        with patch("missing_ag_updater.updater.fetch_json", side_effect=Exception("api down")):
-            assert update_ide("/dummy/ide", None) is False
+    _run_test()
 
 
-def test_update_ide_running_process_forced() -> None:
-    with patch("missing_ag_updater.updater.get_ide_version", return_value="2.0.3"):
-        with patch(
-            "missing_ag_updater.updater.fetch_json",
-            return_value=[{"version": "2.0.4", "execution_id": "1234"}],
-        ):
-            with patch("missing_ag_updater.updater.get_running_pids", return_value=["1111"]):
-                # Force should bypass and proceed (fails later on download URL resolved)
-                assert update_ide("/dummy/ide", None, force=True) is False
+@patch("missing_ag_updater.updater.fetch_json", return_value=[])
+@patch("missing_ag_updater.updater.get_ide_version", return_value="2.0.3")
+def test_update_ide_empty_releases(mock_ver: MagicMock, mock_fetch: MagicMock) -> None:
+    assert update_ide("/dummy/ide", None) is False
 
 
-def test_update_ide_download_url_failure() -> None:
-    with patch("missing_ag_updater.updater.get_ide_version", return_value="2.0.3"):
-        with patch(
-            "missing_ag_updater.updater.fetch_json",
-            return_value=[{"version": "2.0.4", "execution_id": "1234"}],
-        ):
-            with patch("missing_ag_updater.updater.get_running_pids", return_value=[]):
-                with patch("missing_ag_updater.updater.get_download_url", return_value=""):
-                    assert update_ide("/dummy/ide", None) is False
+@patch("missing_ag_updater.updater.fetch_json", side_effect=Exception("api down"))
+@patch("missing_ag_updater.updater.get_ide_version", return_value="2.0.3")
+def test_update_ide_fetch_error(mock_ver: MagicMock, mock_fetch: MagicMock) -> None:
+    assert update_ide("/dummy/ide", None) is False
+
+
+@patch("missing_ag_updater.updater.get_running_pids", return_value=["1111"])
+@patch("missing_ag_updater.updater.fetch_json", return_value=[{"version": "2.0.4", "execution_id": "1234"}])
+@patch("missing_ag_updater.updater.get_ide_version", return_value="2.0.3")
+def test_update_ide_running_process_forced(
+    mock_ver: MagicMock,
+    mock_fetch: MagicMock,
+    mock_pids: MagicMock,
+) -> None:
+    assert update_ide("/dummy/ide", None, force=True) is False
+
+
+@patch("missing_ag_updater.updater.get_download_url", return_value="")
+@patch("missing_ag_updater.updater.get_running_pids", return_value=[])
+@patch("missing_ag_updater.updater.fetch_json", return_value=[{"version": "2.0.4", "execution_id": "1234"}])
+@patch("missing_ag_updater.updater.get_ide_version", return_value="2.0.3")
+def test_update_ide_download_url_failure(
+    mock_ver: MagicMock,
+    mock_fetch: MagicMock,
+    mock_pids: MagicMock,
+    mock_url: MagicMock,
+) -> None:
+    assert update_ide("/dummy/ide", None) is False
 
 
 def test_update_ide_invalid_tarball() -> None:
-    # Test when tarball extracts but doesn't have the expected root folder
-    import tarfile
-
     def mock_download_empty_tar(url: str, dest_path: str, **kwargs: Any) -> None:
         with tarfile.open(dest_path, "w:gz"):
-            pass  # empty tarball
+            pass
 
-    with patch("missing_ag_updater.updater.OS_NAME", "linux"):
-        with patch("missing_ag_updater.updater.get_ide_version", return_value="2.0.3"):
-            with patch(
-                "missing_ag_updater.updater.fetch_json",
-                return_value=[{"version": "2.0.4", "execution_id": "1234"}],
-            ):
-                with patch("missing_ag_updater.updater.get_running_pids", return_value=[]):
-                    with patch(
-                        "missing_ag_updater.updater.download_file",
-                        side_effect=mock_download_empty_tar,
-                    ):
-                        with tempfile.TemporaryDirectory() as target_ide_dir:
-                            res = update_ide(target_ide_dir, None)
-                            assert res is False
+    @patch("missing_ag_updater.updater.download_file", side_effect=mock_download_empty_tar)
+    @patch("missing_ag_updater.updater.get_running_pids", return_value=[])
+    @patch("missing_ag_updater.updater.fetch_json", return_value=[{"version": "2.0.4", "execution_id": "1234"}])
+    @patch("missing_ag_updater.updater.get_ide_version", return_value="2.0.3")
+    @patch("missing_ag_updater.updater.OS_NAME", "linux")
+    def _run_test(
+        mock_ver: MagicMock,
+        mock_fetch: MagicMock,
+        mock_pids: MagicMock,
+        mock_dl: MagicMock,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as target_ide_dir:
+            res = update_ide(target_ide_dir, None)
+            assert res is False
+
+    _run_test()
 
 
 def test_update_hub_success_linux() -> None:
-    import tarfile
-
     def mock_download_write_tar_hub(url: str, dest_path: str, **kwargs: Any) -> None:
         with tempfile.TemporaryDirectory() as td:
-            d = os.path.join(td, "Antigravity-x64")
-            os.makedirs(d)
-            with open(os.path.join(d, "antigravity"), "w") as fdesc:
+            hub_dir = os.path.join(td, "Antigravity-x64")
+            os.makedirs(hub_dir)
+            with open(os.path.join(hub_dir, "antigravity"), "w", encoding="utf-8") as fdesc:
                 fdesc.write("hub launcher content")
             with tarfile.open(dest_path, "w:gz") as tar:
-                tar.add(d, arcname="Antigravity-x64")
+                tar.add(hub_dir, arcname="Antigravity-x64")
 
-    with patch("missing_ag_updater.updater.OS_NAME", "linux"):
-        with patch("missing_ag_updater.updater.get_hub_version", return_value="2.1.3"):
-            with patch(
-                "missing_ag_updater.updater.fetch_json",
-                return_value=[{"version": "2.1.4", "execution_id": "1234"}],
-            ):
-                with patch("missing_ag_updater.updater.get_running_pids", return_value=[]):
-                    with patch(
-                        "missing_ag_updater.updater.download_file",
-                        side_effect=mock_download_write_tar_hub,
-                    ):
-                        with patch("missing_ag_updater.updater.install_hub_desktop") as mock_desktop:
-                            with tempfile.TemporaryDirectory() as target_hub_dir:
-                                launcher = os.path.join(target_hub_dir, "bin_launcher", "hub-launch")
-                                res = update_hub(target_hub_dir, launcher)
-                                assert res is True
-                                mock_desktop.assert_called_once_with(hub_dir=target_hub_dir, launcher_path=launcher)
+    @patch("missing_ag_updater.updater.install_hub_desktop")
+    @patch("missing_ag_updater.updater.download_file", side_effect=mock_download_write_tar_hub)
+    @patch("missing_ag_updater.updater.get_running_pids", return_value=[])
+    @patch("missing_ag_updater.updater.fetch_json", return_value=[{"version": "2.1.4", "execution_id": "1234"}])
+    @patch("missing_ag_updater.updater.get_hub_version", return_value="2.1.3")
+    @patch("missing_ag_updater.updater.OS_NAME", "linux")
+    def _run_test(
+        mock_ver: MagicMock,
+        mock_fetch: MagicMock,
+        mock_pids: MagicMock,
+        mock_dl: MagicMock,
+        mock_dt: MagicMock,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as target_hub_dir:
+            launcher = os.path.join(target_hub_dir, "bin_launcher", "hub-launch")
+            res = update_hub(target_hub_dir, launcher)
+            assert res is True
+            mock_dt.assert_called_once_with(hub_dir=target_hub_dir, launcher_path=launcher, scope="user")
+
+    _run_test()
 
 
 def test_update_hub_invalid_tarball() -> None:
-    import tarfile
-
     def mock_download_empty_tar(url: str, dest_path: str, **kwargs: Any) -> None:
         with tarfile.open(dest_path, "w:gz"):
             pass
 
-    with patch("missing_ag_updater.updater.OS_NAME", "linux"):
-        with patch("missing_ag_updater.updater.get_hub_version", return_value="2.1.3"):
-            with patch(
-                "missing_ag_updater.updater.fetch_json",
-                return_value=[{"version": "2.1.4", "execution_id": "1234"}],
-            ):
-                with patch("missing_ag_updater.updater.get_running_pids", return_value=[]):
-                    with patch(
-                        "missing_ag_updater.updater.download_file",
-                        side_effect=mock_download_empty_tar,
-                    ):
-                        with tempfile.TemporaryDirectory() as target_hub_dir:
-                            res = update_hub(target_hub_dir, None)
-                            assert res is False
+    @patch("missing_ag_updater.updater.download_file", side_effect=mock_download_empty_tar)
+    @patch("missing_ag_updater.updater.get_running_pids", return_value=[])
+    @patch("missing_ag_updater.updater.fetch_json", return_value=[{"version": "2.1.4", "execution_id": "1234"}])
+    @patch("missing_ag_updater.updater.get_hub_version", return_value="2.1.3")
+    @patch("missing_ag_updater.updater.OS_NAME", "linux")
+    def _run_test(
+        mock_ver: MagicMock,
+        mock_fetch: MagicMock,
+        mock_pids: MagicMock,
+        mock_dl: MagicMock,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as target_hub_dir:
+            res = update_hub(target_hub_dir, None)
+            assert res is False
+
+    _run_test()
 
 
 def test_update_cli_success_linux() -> None:
-    import tarfile
-
     def mock_download_write_tar_cli(url: str, dest_path: str, **kwargs: Any) -> None:
         with tempfile.TemporaryDirectory() as td:
-            p = os.path.join(td, "antigravity")
-            with open(p, "w") as fdesc:
+            binary_path = os.path.join(td, "antigravity")
+            with open(binary_path, "w", encoding="utf-8") as fdesc:
                 fdesc.write("cli binary content")
             with tarfile.open(dest_path, "w:gz") as tar:
-                tar.add(p, arcname="antigravity")
+                tar.add(binary_path, arcname="antigravity")
 
-    with patch("missing_ag_updater.updater.OS_NAME", "linux"):
-        with patch("missing_ag_updater.updater.get_cli_version", return_value="1.0.7"):
-            with patch(
-                "missing_ag_updater.updater.fetch_json",
-                return_value={
-                    "version": "1.0.8",
-                    "url": "https://example.com/agy.tar.gz",
-                    "sha512": "expectedhash",
-                },
-            ):
-                with patch("missing_ag_updater.updater.download_file", side_effect=mock_download_write_tar_cli):
-                    with patch("missing_ag_updater.updater.compute_sha512", return_value="expectedhash"):
-                        with tempfile.TemporaryDirectory() as target_dir:
-                            cli_binary = os.path.join(target_dir, "bin", "agy")
-                            res = update_cli(cli_binary)
-                            assert res is True
-                            assert os.path.exists(cli_binary)
+    @patch("missing_ag_updater.updater.compute_sha512", return_value="expectedhash")
+    @patch("missing_ag_updater.updater.download_file", side_effect=mock_download_write_tar_cli)
+    @patch(
+        "missing_ag_updater.updater.fetch_json",
+        return_value={
+            "version": "1.0.8",
+            "url": "https://example.com/agy.tar.gz",
+            "sha512": "expectedhash",
+        },
+    )
+    @patch("missing_ag_updater.updater.get_cli_version", return_value="1.0.7")
+    @patch("missing_ag_updater.updater.OS_NAME", "linux")
+    def _run_test(
+        mock_ver: MagicMock,
+        mock_fetch: MagicMock,
+        mock_dl: MagicMock,
+        mock_sha: MagicMock,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as target_dir:
+            cli_binary = os.path.join(target_dir, "bin", "agy")
+            res = update_cli(cli_binary)
+            assert res is True
+            assert os.path.exists(cli_binary)
+
+    _run_test()
 
 
-def test_update_cli_checksum_mismatch() -> None:
-    with patch("missing_ag_updater.updater.OS_NAME", "linux"):
-        with patch("missing_ag_updater.updater.get_cli_version", return_value="1.0.7"):
-            with patch(
-                "missing_ag_updater.updater.fetch_json",
-                return_value={
-                    "version": "1.0.8",
-                    "url": "https://example.com/agy.tar.gz",
-                    "sha512": "expectedhash",
-                },
-            ):
-                with patch("missing_ag_updater.updater.download_file"):
-                    with patch("missing_ag_updater.updater.compute_sha512", return_value="wronghash"):
-                        assert update_cli("/dummy/cli") is False
+@patch("missing_ag_updater.updater.compute_sha512", return_value="wronghash")
+@patch("missing_ag_updater.updater.download_file")
+@patch(
+    "missing_ag_updater.updater.fetch_json",
+    return_value={
+        "version": "1.0.8",
+        "url": "https://example.com/agy.tar.gz",
+        "sha512": "expectedhash",
+    },
+)
+@patch("missing_ag_updater.updater.get_cli_version", return_value="1.0.7")
+@patch("missing_ag_updater.updater.OS_NAME", "linux")
+def test_update_cli_checksum_mismatch(
+    mock_ver: MagicMock,
+    mock_fetch: MagicMock,
+    mock_dl: MagicMock,
+    mock_sha: MagicMock,
+) -> None:
+    assert update_cli("/dummy/cli") is False
 
 
 def test_update_cli_zip_success_windows() -> None:
-    import zipfile
-
     def mock_download_write_zip_cli(url: str, dest_path: str, **kwargs: Any) -> None:
         with tempfile.TemporaryDirectory() as td:
-            p = os.path.join(td, "agy.exe")
-            with open(p, "w") as fdesc:
+            binary_path = os.path.join(td, "agy.exe")
+            with open(binary_path, "w", encoding="utf-8") as fdesc:
                 fdesc.write("cli binary exe content")
             with zipfile.ZipFile(dest_path, "w") as z:
-                z.write(p, arcname="agy.exe")
+                z.write(binary_path, arcname="agy.exe")
 
-    with patch("missing_ag_updater.updater.OS_NAME", "windows"):
-        with patch("missing_ag_updater.updater.get_cli_version", return_value="1.0.7"):
-            with patch(
-                "missing_ag_updater.updater.fetch_json",
-                return_value={
-                    "version": "1.0.8",
-                    "url": "https://example.com/agy.zip",
-                    "sha512": None,
-                },
-            ):
-                with patch("missing_ag_updater.updater.download_file", side_effect=mock_download_write_zip_cli):
-                    with tempfile.TemporaryDirectory() as target_dir:
-                        cli_binary = os.path.join(target_dir, "agy.exe")
-                        res = update_cli(cli_binary)
-                        assert res is True
+    @patch("missing_ag_updater.updater.download_file", side_effect=mock_download_write_zip_cli)
+    @patch(
+        "missing_ag_updater.updater.fetch_json",
+        return_value={
+            "version": "1.0.8",
+            "url": "https://example.com/agy.zip",
+            "sha512": None,
+        },
+    )
+    @patch("missing_ag_updater.updater.get_cli_version", return_value="1.0.7")
+    @patch("missing_ag_updater.updater.OS_NAME", "windows")
+    def _run_test(
+        mock_ver: MagicMock,
+        mock_fetch: MagicMock,
+        mock_dl: MagicMock,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as target_dir:
+            cli_binary = os.path.join(target_dir, "agy.exe")
+            res = update_cli(cli_binary)
+            assert res is True
+
+    _run_test()
 
 
 def test_update_cli_missing_extracted_binary() -> None:
-    import tarfile
-
     def mock_download_empty_tar(url: str, dest_path: str, **kwargs: Any) -> None:
         with tarfile.open(dest_path, "w:gz"):
             pass
 
-    with patch("missing_ag_updater.updater.OS_NAME", "linux"):
-        with patch("missing_ag_updater.updater.get_cli_version", return_value="1.0.7"):
-            with patch(
-                "missing_ag_updater.updater.fetch_json",
-                return_value={
-                    "version": "1.0.8",
-                    "url": "https://example.com/agy.tar.gz",
-                    "sha512": None,
-                },
-            ):
-                with patch("missing_ag_updater.updater.download_file", side_effect=mock_download_empty_tar):
-                    assert update_cli("/dummy/cli") is False
+    @patch("missing_ag_updater.updater.download_file", side_effect=mock_download_empty_tar)
+    @patch(
+        "missing_ag_updater.updater.fetch_json",
+        return_value={
+            "version": "1.0.8",
+            "url": "https://example.com/agy.tar.gz",
+            "sha512": None,
+        },
+    )
+    @patch("missing_ag_updater.updater.get_cli_version", return_value="1.0.7")
+    @patch("missing_ag_updater.updater.OS_NAME", "linux")
+    def _run_test(
+        mock_ver: MagicMock,
+        mock_fetch: MagicMock,
+        mock_dl: MagicMock,
+    ) -> None:
+        assert update_cli("/dummy/cli") is False
+
+    _run_test()
+
+
+@patch("subprocess.run", side_effect=Exception("hdiutil error"))
+@patch("tempfile.mkdtemp", return_value="/tmp/mock_mount")
+def test_install_macos_dmg_mount_error(mock_mkdtemp: MagicMock, mock_run: MagicMock) -> None:
+    assert install_macos_dmg("dummy.dmg", "/Applications/Target.app") is False
+
+
+@patch("os.listdir", return_value=["SomeOtherFile.txt"])
+@patch("subprocess.run")
+@patch("tempfile.mkdtemp", return_value="/tmp/mock_mount")
+def test_install_macos_dmg_no_app_bundle(
+    mock_mkdtemp: MagicMock,
+    mock_run: MagicMock,
+    mock_listdir: MagicMock,
+) -> None:
+    mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
+    assert install_macos_dmg("dummy.dmg", "/Applications/Target.app") is False
+
+
+@patch("missing_ag_updater.updater.is_path_writable", return_value=False)
+@patch("missing_ag_updater.updater.get_running_pids", return_value=[])
+@patch("missing_ag_updater.updater.fetch_json", return_value=[{"version": "2.0.4", "execution_id": "1"}])
+@patch("missing_ag_updater.updater.get_ide_version", return_value="2.0.3")
+def test_update_ide_permission_denied(
+    mock_ver: MagicMock,
+    mock_fetch: MagicMock,
+    mock_pids: MagicMock,
+    mock_writable: MagicMock,
+) -> None:
+    assert update_ide("/opt/antigravity-ide", None) is False
+
+
+@patch("missing_ag_updater.updater.is_path_writable", return_value=False)
+@patch("missing_ag_updater.updater.get_running_pids", return_value=[])
+@patch("missing_ag_updater.updater.fetch_json", return_value=[{"version": "2.0.4", "execution_id": "1"}])
+@patch("missing_ag_updater.updater.get_hub_version", return_value="2.0.3")
+def test_update_hub_permission_denied(
+    mock_ver: MagicMock,
+    mock_fetch: MagicMock,
+    mock_pids: MagicMock,
+    mock_writable: MagicMock,
+) -> None:
+    assert update_hub("/opt/antigravity", None) is False
+
+
+@patch("missing_ag_updater.updater.is_path_writable", return_value=False)
+@patch("missing_ag_updater.updater.get_running_pids", return_value=[])
+@patch("missing_ag_updater.updater.fetch_json", return_value={"version": "1.0.8", "url": "http://x"})
+@patch("missing_ag_updater.updater.get_cli_version", return_value="1.0.7")
+def test_update_cli_permission_denied(
+    mock_ver: MagicMock,
+    mock_fetch: MagicMock,
+    mock_pids: MagicMock,
+    mock_writable: MagicMock,
+) -> None:
+    assert update_cli("/usr/local/bin/agy") is False
+
+
+@patch("missing_ag_updater.updater.fetch_json", return_value=[])
+@patch("missing_ag_updater.updater.get_hub_version", return_value="2.0.3")
+def test_update_hub_empty_releases(mock_ver: MagicMock, mock_fetch: MagicMock) -> None:
+    assert update_hub("/dummy/hub", None) is False
+
+
+@patch("missing_ag_updater.updater.fetch_json", return_value=None)
+@patch("missing_ag_updater.updater.get_cli_version", return_value="1.0.7")
+def test_update_cli_invalid_manifest(mock_ver: MagicMock, mock_fetch: MagicMock) -> None:
+    assert update_cli("/dummy/cli") is False
+
+
+@patch("missing_ag_updater.updater.get_running_pids", return_value=["1111"])
+@patch("missing_ag_updater.updater.fetch_json", return_value=[{"version": "2.0.4", "execution_id": "1234"}])
+@patch("missing_ag_updater.updater.get_hub_version", return_value="2.0.3")
+def test_update_hub_running_process_aborts(
+    mock_ver: MagicMock,
+    mock_fetch: MagicMock,
+    mock_pids: MagicMock,
+) -> None:
+    res = update_hub("/dummy/hub", None)
+    assert res is False

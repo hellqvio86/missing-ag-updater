@@ -1,14 +1,20 @@
 import os
 from typing import Optional
 
-from .const import USER_NAUTILUS_DIR
+from .const import SYSTEM_NAUTILUS_DIR, USER_NAUTILUS_DIR
 from .utils import print_success, print_warning, refresh_linux_desktop_caches
 
 
-def install_ide_nautilus(ide_dir: str, launcher_path: Optional[str]) -> None:
-    """Install Nautilus context-menu integration script for user."""
-    os.makedirs(USER_NAUTILUS_DIR, exist_ok=True)
-    nautilus_file = os.path.join(USER_NAUTILUS_DIR, "open-in-antigravity-ide.py")
+def install_ide_nautilus(
+    ide_dir: str,
+    launcher_path: Optional[str],
+    *,
+    scope: str = "user",
+) -> None:
+    """Install Nautilus context-menu integration script for user or system."""
+    target_dir = SYSTEM_NAUTILUS_DIR if scope == "system" else USER_NAUTILUS_DIR
+    os.makedirs(target_dir, exist_ok=True)
+    nautilus_file = os.path.join(target_dir, "open-in-antigravity-ide.py")
     exec_path = launcher_path or os.path.join(ide_dir, "bin", "antigravity-ide")
     nautilus_content = f"""import subprocess
 from urllib.parse import unquote, urlparse

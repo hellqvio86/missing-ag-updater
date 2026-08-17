@@ -1,26 +1,27 @@
 [project]
 name = "missing-ag-updater"
-version = "0.2.1"
+version = "0.3.0"
 description = "Auto-updater utility for Google Antigravity developer tools (IDE, Hub, CLI)"
 readme = "README.md"
 requires-python = ">=3.12"
-license = {text = "MIT"}
-authors = [
-    {name = "hellqvio"}
-]
+license = { text = "MIT" }
+authors = [{ name = "hellqvio" }]
 classifiers = [
-    "Development Status :: 3 - Alpha",
-    "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent",
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
 ]
-dependencies = [
-    "pydantic>=2.0.0",
-    "requests>=2.31.0",
-]
+dependencies = ["pydantic>=2.0.0", "requests>=2.31.0"]
 
 [project.scripts]
 antigravity-updater = "missing_ag_updater:main"
+
+[project.urls]
+Homepage = "https://github.com/hellqvio86/missing-ag-updater"
+Documentation = "https://github.com/hellqvio86/missing-ag-updater#readme"
+Repository = "https://github.com/hellqvio86/missing-ag-updater.git"
+Issues = "https://github.com/hellqvio86/missing-ag-updater/issues"
 
 [build-system]
 requires = ["hatchling"]
@@ -31,17 +32,17 @@ packages = ["src/missing_ag_updater"]
 
 [dependency-groups]
 dev = [
-    "pytest>=8.0.0",
-    "ruff>=0.3.0",
-    "pytest-cov>=4.0.0",
-    "mypy>=1.0.0",
-    "responses>=0.25.0",
-    "types-requests>=2.31.0.0",
+  "pytest>=8.0.0",
+  "ruff>=0.3.0",
+  "pytest-cov>=4.0.0",
+  "mypy>=1.0.0",
+  "responses>=0.25.0",
+  "types-requests>=2.31.0.0",
 ]
 
 [tool.ruff]
 line-length = 120
-target-version = "py39"
+target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I"]
