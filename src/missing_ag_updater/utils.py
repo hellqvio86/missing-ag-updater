@@ -19,6 +19,7 @@ from .const import (
     COLOR_GREEN,
     COLOR_WARNING,
     OS_NAME,
+    USER_AGENT,
     USER_APPLICATIONS_DIR,
     USER_ICONS_DIR,
 )
@@ -134,7 +135,7 @@ def get_running_pids(keyword: str) -> list[str]:
             for line in res.stdout.strip().split("\n"):
                 if not line.strip():
                     continue
-                parts = [p.strip('"') for p in line.split(",")]
+                parts = [part.strip('"') for part in line.split(",")]
                 if len(parts) >= 2 and keyword.lower() in parts[0].lower():
                     image_name = parts[0].lower()
                     if keyword.lower() == "antigravity" and "antigravity-ide" in image_name:
@@ -361,7 +362,7 @@ def get_cli_version(cli_binary: str) -> str:
 
 def fetch_json(url: str) -> Any:
     """Fetch JSON from a URL with custom user agent headers, retrying on transient failures."""
-    headers = {"User-Agent": "Mozilla/5.0 (AntigravityUpdater)"}
+    headers = {"User-Agent": USER_AGENT}
     max_retries = 3
     backoff_factor = 0.5
     last_err: Exception | None = None
@@ -399,7 +400,7 @@ def fetch_json(url: str) -> Any:
 
 def download_file(url: str, dest_path: str, *, label: str = "Downloading") -> None:
     """Download a file with a visually appealing progress bar, retrying on transient failures."""
-    headers = {"User-Agent": "Mozilla/5.0 (AntigravityUpdater)"}
+    headers = {"User-Agent": USER_AGENT}
     max_retries = 3
     backoff_factor = 0.5
     last_err: Exception | None = None
@@ -462,14 +463,14 @@ def download_file(url: str, dest_path: str, *, label: str = "Downloading") -> No
 
 def compute_sha512(file_path: str) -> str:
     """Compute the SHA512 hash of a file."""
-    h = hashlib.sha512()
+    hasher = hashlib.sha512()
     with open(file_path, "rb") as fdesc:
         while True:
             chunk = fdesc.read(8192)
             if not chunk:
                 break
-            h.update(chunk)
-    return h.hexdigest()
+            hasher.update(chunk)
+    return hasher.hexdigest()
 
 
 def update_symlink(target: str, link_name: str) -> None:

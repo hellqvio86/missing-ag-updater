@@ -61,7 +61,7 @@ def install_macos_dmg(dmg_path: str, dest_app_path: str) -> bool:
         subprocess.run(cmd, check=True, capture_output=True)  # nosec B603, B607
 
         # Locate .app bundle inside the DMG mountpoint
-        apps = [f for f in os.listdir(mountpoint) if f.endswith(".app")]
+        apps = [filename for filename in os.listdir(mountpoint) if filename.endswith(".app")]
         if not apps:
             print_error("No .app bundle found in the mounted DMG.")
             return False
@@ -86,7 +86,7 @@ def install_macos_dmg(dmg_path: str, dest_app_path: str) -> bool:
                 check=False,
                 capture_output=True,
             )  # nosec B603, B607
-        except (subprocess.SubprocessError, OSError):  # nosec B110
+        except Exception:  # nosec B110
             pass
         if os.path.exists(mountpoint):
             try:
@@ -170,7 +170,7 @@ def update_ide(
             print_error("No IDE releases found from update server.")
             return False
 
-        releases = [Release.model_validate(r) for r in releases_json]
+        releases = [Release.model_validate(release_dict) for release_dict in releases_json]
         latest = releases[0]
         latest_ver = latest.version
         exec_id = latest.execution_id
@@ -253,7 +253,7 @@ def update_ide(
                 if not os.path.exists(extracted_folder):
                     extracted_folder = os.path.join(tmpdir, "Antigravity-IDE")
                 if not os.path.exists(extracted_folder):
-                    subdirs = [d for d in os.listdir(tmpdir) if os.path.isdir(os.path.join(tmpdir, d))]
+                    subdirs = [subdir for subdir in os.listdir(tmpdir) if os.path.isdir(os.path.join(tmpdir, subdir))]
                     if len(subdirs) == 1:
                         extracted_folder = os.path.join(tmpdir, subdirs[0])
                     else:
@@ -329,7 +329,7 @@ def update_hub(
             print_error("No Hub releases found from update server.")
             return False
 
-        releases = [Release.model_validate(r) for r in releases_json]
+        releases = [Release.model_validate(release_dict) for release_dict in releases_json]
         latest = releases[0]
         latest_ver = latest.version
         exec_id = latest.execution_id
@@ -526,9 +526,9 @@ def update_cli(
             if not os.path.exists(extracted_binary):
                 # Try finding any file that matches 'antigravity' or 'agy' in the directory
                 potential = [
-                    os.path.join(tmpdir, f)
-                    for f in os.listdir(tmpdir)
-                    if f.startswith("antigravity") or f.startswith("agy")
+                    os.path.join(tmpdir, filename)
+                    for filename in os.listdir(tmpdir)
+                    if filename.startswith("antigravity") or filename.startswith("agy")
                 ]
                 if potential:
                     extracted_binary = potential[0]

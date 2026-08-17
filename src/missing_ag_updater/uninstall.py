@@ -246,6 +246,15 @@ def uninstall_cli(
         print_info("No Antigravity CLI binary found to uninstall.")
         return True
 
+    # Check active running processes
+    running_pids = get_running_pids("agy")
+    if running_pids and not force:
+        print_warning(
+            f"Antigravity CLI is currently running (PID: {', '.join(running_pids)}). "
+            "Please close active CLI sessions or run with --force to uninstall anyway."
+        )
+        return False
+
     # Preflight write permissions
     if not is_path_writable(cli_path):
         print_error(

@@ -1,6 +1,6 @@
 # Linux Troubleshooting & Diagnostics Guide
 
-This document covers common issues, system quirks, and diagnostic steps when installing, running, and updating the Google Antigravity developer suite on Linux distributions (Ubuntu, Pop!_OS, Debian, Fedora, Arch Linux, etc.).
+This document covers common issues, system quirks, and diagnostic steps when installing, running, and updating the Google Antigravity developer suite on Linux distributions (Ubuntu, Debian, Fedora, Arch Linux, etc.).
 
 ---
 
@@ -21,7 +21,64 @@ This will print a complete system report detailing:
 
 ---
 
-## 2. "Command not found: `agy`" or "`antigravity-ide`"
+## 2. Fixing Multiple / Duplicate Launcher Icons
+
+### Symptom
+Your application launcher shows multiple icons for Antigravity IDE or Antigravity Hub.
+
+### Cause
+You may have installed Antigravity to both user-level directories (`~/opt`) and system-wide directories (`/opt`), or manually installed `.desktop` files in both `~/.local/share/applications` and `/usr/share/applications`.
+
+### Solution
+Use the automated `--clean-duplicates` tool:
+
+```bash
+# Keep system-wide installation and purge user-level desktop shortcuts:
+antigravity-updater --clean-duplicates --system
+
+# Optional: Also remove stale user installation folders (~/opt/Antigravity*):
+antigravity-updater --clean-duplicates --system --remove-user-dirs
+```
+
+---
+
+## 3. Ubuntu 24.04+ AppArmor / Sandbox Crashes
+
+### Symptom
+Launching Antigravity IDE crashes immediately with errors such as:
+```text
+[FATAL:zygote_host_impl_linux.cc] Check failed: . : Invalid argument (22)
+```
+or
+```text
+The SUID sandbox helper binary was found, but is not configured with proper permissions.
+```
+
+### Cause
+1. **AppArmor Unprivileged User Namespaces:** Ubuntu 24.04 enables kernel-level AppArmor restrictions on unprivileged user namespaces (`apparmor_restrict_unprivileged_userns`). Chromium-based Electron applications require either a setuid root sandbox helper (`chrome-sandbox`) or an unprivileged namespace profile.
+2. **Directory Spaces Bug:** An upstream Chromium bug in `zygote_host_impl_linux.cc` causes crashes if the application directory path contains spaces (e.g., `~/opt/Antigravity IDE`). The updater defaults to hyphenated names (`~/opt/Antigravity-IDE`) on Ubuntu to avoid this.
+
+### Solution
+
+#### Option A: Configure Setuid Root Permissions (Recommended for Sandbox Issues)
+Run the updater with the `--apparmor-sandbox` flag using `sudo`:
+
+```bash
+sudo env "PATH=$PATH" antigravity-updater --apparmor-sandbox
+```
+
+This sets `root:root` ownership and `4755` permissions on the `chrome-sandbox` binary.
+
+#### Option B: Clean Existing Duplicate/Spaced Folders
+If an older installation used a folder name with spaces, migrate or clean duplicates:
+
+```bash
+antigravity-updater --clean-duplicates
+```
+
+---
+
+## 4. "Command not found: `agy`" or "`antigravity-ide`"
 
 ### Symptom
 After installing or updating as a regular user, running `agy` or `antigravity-ide` in the terminal returns:
@@ -53,27 +110,6 @@ Add `~/.local/bin` to your shell's configuration file:
   ```
 
 ---
-
-## 3. Ubuntu 24.04+ & Pop!_OS AppArmor / Sandbox Crashes
-
-### Symptom
-Launching Antigravity IDE crashes immediately with errors such as:
-```text
-[FATAL:zygote_host_impl_linux.cc] Check failed: . : Invalid argument (22)
-```
-or
-```text
-The SUID sandbox helper binary was found, but is not configured with proper permissions.
-```
-
-### Cause
-1. **AppArmor Unprivileged User Namespaces:** Ubuntu 24.04 and Pop!_OS enable kernel-level AppArmor restrictions on unprivileged user namespaces (`apparmor_restrict_unprivileged_userns`). Chromium-based Electron applications require either a setuid root sandbox helper (`chrome-sandbox`) or an unprivileged namespace profile.
-2. **Directory Spaces Bug:** An upstream Chromium bug in `zygote_host_impl_linux.cc` causes crashes if the application directory path contains spaces (e.g., `~/opt/Antigravity IDE`). The updater defaults to hyphenated names (`~/opt/Antigravity-IDE`) on Ubuntu/Pop!_OS to avoid this.
-
-### Solution
-
-#### Option A: Configure Setuid Root Permissions (Recommended for Sandbox Issues)
-Run the updater with the `--apparmor-sandbox` flag using `sudo`:
 
 ```bash
 sudo env "PATH=$PATH" antigravity-updater --apparmor-sandbox
@@ -196,7 +232,7 @@ GNOME requires the `nautilus-python` binding to be installed, and the Nautilus p
 
 1. **Install `nautilus-python` for your distribution:**
 
-   - **Ubuntu / Debian / Pop!_OS**:
+   - **Ubuntu / Debian**:
      ```bash
      sudo apt install python3-nautilus
      ```

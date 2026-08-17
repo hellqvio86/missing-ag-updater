@@ -25,6 +25,11 @@ def _is_ubuntu_style_distro() -> bool:
     return False
 
 
+__version__ = "0.3.0"
+
+# Truthy string values for environment variables and config parsing
+TRUTHY_VALUES: tuple[str, ...] = ("1", "true", "yes", "on")
+
 # Color output helpers for premium terminal feedback
 COLOR_HEADER = "\033[95m"
 COLOR_BLUE = "\033[94m"
@@ -155,7 +160,8 @@ else:
     DEFAULT_HUB_DIR = ""
     DEFAULT_CLI_BINARY = ""
 
-# API URLs
+# API URLs & User Agent
+USER_AGENT = "Mozilla/5.0 (AntigravityUpdater)"
 IDE_RELEASES_URL = "https://antigravity-ide-auto-updater-974169037036.us-central1.run.app/releases"
 HUB_RELEASES_URL = "https://antigravity-hub-auto-updater-974169037036.us-central1.run.app/releases"
 CLI_MANIFEST_URL = (

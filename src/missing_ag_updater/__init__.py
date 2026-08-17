@@ -9,12 +9,17 @@ Disclaimer: This tool is not affiliated with, sponsored by, or supported by Goog
 """
 
 from .cli import main
+from .config import ResolvedConfig, resolve_config
+from .const import __version__
 from .discovery import clean_duplicate_desktop_entries, diagnose_all
 from .uninstall import uninstall_cli, uninstall_hub, uninstall_ide
 from .updater import update_cli, update_hub, update_ide
 
 __all__ = [
+    "__version__",
     "main",
+    "resolve_config",
+    "ResolvedConfig",
     "diagnose_all",
     "clean_duplicate_desktop_entries",
     "update_ide",

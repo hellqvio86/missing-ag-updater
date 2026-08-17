@@ -342,9 +342,9 @@ def find_all_cli_installations() -> list[InstallationInfo]:
                 (os.path.join(HOME, ".antigravity", "bin", "agy"), "user"),
             ]
         )
-        for b in _find_binaries_in_path("agy"):
-            scope = "system" if _is_system_path(b) else "user"
-            candidate_bins.append((b, scope))
+        for binary_path in _find_binaries_in_path("agy"):
+            scope = "system" if _is_system_path(binary_path) else "user"
+            candidate_bins.append((binary_path, scope))
 
     elif OS_NAME == "darwin":
         candidate_bins.extend(
@@ -353,9 +353,9 @@ def find_all_cli_installations() -> list[InstallationInfo]:
                 (USER_CLI_BINARY, "user"),
             ]
         )
-        for b in _find_binaries_in_path("agy"):
-            scope = "system" if _is_system_path(b) else "user"
-            candidate_bins.append((b, scope))
+        for binary_path in _find_binaries_in_path("agy"):
+            scope = "system" if _is_system_path(binary_path) else "user"
+            candidate_bins.append((binary_path, scope))
 
     elif OS_NAME == "windows":
         candidate_bins.extend(
@@ -422,7 +422,7 @@ def detect_preferred_ide(scope: Optional[str] = None) -> tuple[str, Optional[str
         return SYSTEM_IDE_DIR, SYSTEM_IDE_LAUNCHER, "system"
 
     # If non-root: if an active user install exists, prefer that
-    user_inst = next((i for i in all_installs if i.scope == "user"), None)
+    user_inst = next((inst for inst in all_installs if inst.scope == "user"), None)
     if user_inst:
         return (
             user_inst.install_dir,
@@ -431,7 +431,7 @@ def detect_preferred_ide(scope: Optional[str] = None) -> tuple[str, Optional[str
         )
 
     # If only system install exists
-    sys_inst = next((i for i in all_installs if i.scope == "system"), None)
+    sys_inst = next((inst for inst in all_installs if inst.scope == "system"), None)
     if sys_inst:
         return (
             sys_inst.install_dir,
@@ -474,7 +474,7 @@ def detect_preferred_hub(scope: Optional[str] = None) -> tuple[str, Optional[str
                 )
         return SYSTEM_HUB_DIR, SYSTEM_HUB_LAUNCHER, "system"
 
-    user_inst = next((i for i in all_installs if i.scope == "user"), None)
+    user_inst = next((inst for inst in all_installs if inst.scope == "user"), None)
     if user_inst:
         return (
             user_inst.install_dir,
@@ -482,7 +482,7 @@ def detect_preferred_hub(scope: Optional[str] = None) -> tuple[str, Optional[str
             "user",
         )
 
-    sys_inst = next((i for i in all_installs if i.scope == "system"), None)
+    sys_inst = next((inst for inst in all_installs if inst.scope == "system"), None)
     if sys_inst:
         return (
             sys_inst.install_dir,
@@ -516,11 +516,11 @@ def detect_preferred_cli(scope: Optional[str] = None) -> tuple[str, str]:
                 return inst.launcher_path, "system"
         return SYSTEM_CLI_BINARY, "system"
 
-    user_inst = next((i for i in all_installs if i.scope == "user" and i.launcher_path), None)
+    user_inst = next((inst for inst in all_installs if inst.scope == "user" and inst.launcher_path), None)
     if user_inst and user_inst.launcher_path:
         return user_inst.launcher_path, "user"
 
-    sys_inst = next((i for i in all_installs if i.scope == "system" and i.launcher_path), None)
+    sys_inst = next((inst for inst in all_installs if inst.scope == "system" and inst.launcher_path), None)
     if sys_inst and sys_inst.launcher_path:
         return sys_inst.launcher_path, "system"
 
@@ -557,14 +557,14 @@ def diagnose_all() -> dict[str, Any]:
             ),
             (os.path.join(USER_APPLICATIONS_DIR, "antigravity.desktop"), "user", "Hub"),
         ]
-        for p, scope, comp in dt_paths:
-            if os.path.exists(p):
+        for desktop_path, scope, comp in dt_paths:
+            if os.path.exists(desktop_path):
                 desktop_files.append(
                     {
-                        "path": p,
+                        "path": desktop_path,
                         "scope": scope,
                         "component": comp,
-                        "exec": _find_exec_from_desktop(p),
+                        "exec": _find_exec_from_desktop(desktop_path),
                     }
                 )
 
@@ -578,9 +578,9 @@ def diagnose_all() -> dict[str, Any]:
 
     return {
         "os": OS_NAME,
-        "ide_installations": [i.to_dict() for i in ide_installs],
-        "hub_installations": [i.to_dict() for i in hub_installs],
-        "cli_installations": [i.to_dict() for i in cli_installs],
+        "ide_installations": [inst.to_dict() for inst in ide_installs],
+        "hub_installations": [inst.to_dict() for inst in hub_installs],
+        "cli_installations": [inst.to_dict() for inst in cli_installs],
         "running_processes": {
             "ide_pids": running_ide,
             "hub_pids": running_hub,
