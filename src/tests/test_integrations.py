@@ -4,7 +4,6 @@ from unittest.mock import ANY, patch
 import pytest
 
 from missing_ag_updater.cli import main
-from missing_ag_updater.const import DEFAULT_IDE_LAUNCHER
 from missing_ag_updater.desktop import install_hub_desktop, install_ide_desktop
 from missing_ag_updater.nautilus import install_ide_nautilus
 
@@ -101,6 +100,7 @@ def test_cli_no_desktop_no_nautilus() -> None:
             "--ide",
             "--no-desktop",
             "--no-nautilus",
+            "--no-apparmor-sandbox",
         ],
     ):
         with patch("missing_ag_updater.cli.OS_NAME", "linux"):
@@ -111,12 +111,13 @@ def test_cli_no_desktop_no_nautilus() -> None:
                             main()
                         mock_ide.assert_called_once_with(
                             ANY,  # ide_dir
-                            DEFAULT_IDE_LAUNCHER,
+                            ANY,  # launcher_path
                             dry_run=False,
                             force=False,
                             install_desktop=False,
                             install_nautilus=False,
                             suid_sandbox=False,
+                            scope=None,
                         )
                         mock_exit.assert_called_once_with(0)
 
@@ -129,6 +130,7 @@ def test_cli_no_desktop_hub() -> None:
             "antigravity-updater",
             "--hub",
             "--no-desktop",
+            "--no-apparmor-sandbox",
         ],
     ):
         with patch("missing_ag_updater.cli.OS_NAME", "linux"):
@@ -143,6 +145,8 @@ def test_cli_no_desktop_hub() -> None:
                             dry_run=False,
                             force=False,
                             install_desktop=False,
+                            suid_sandbox=False,
+                            scope=None,
                         )
                         mock_exit.assert_called_once_with(0)
 
@@ -158,6 +162,7 @@ def test_cli_env_variables() -> None:
                 "ANTIGRAVITY_DIR_IDE": "/env/ide/path",
                 "ANTIGRAVITY_NO_DESKTOP": "1",
                 "ANTIGRAVITY_NO_NAUTILUS": "true",
+                "ANTIGRAVITY_APPARMOR_SANDBOX": "0",
             },
         ):
             with patch("missing_ag_updater.cli.OS_NAME", "linux"):
@@ -168,19 +173,20 @@ def test_cli_env_variables() -> None:
                                 main()
                             mock_ide.assert_called_once_with(
                                 "/env/ide/path",
-                                DEFAULT_IDE_LAUNCHER,
+                                ANY,
                                 dry_run=True,
                                 force=True,
                                 install_desktop=False,
                                 install_nautilus=False,
                                 suid_sandbox=False,
+                                scope=None,
                             )
                             mock_exit.assert_called_once_with(0)
 
 
 def test_cli_env_variables_alt_prefix() -> None:
     # Test AG_ prefix env variables
-    with patch("sys.argv", ["antigravity-updater", "--hub"]):
+    with patch("sys.argv", ["antigravity-updater", "--hub", "--no-apparmor-sandbox"]):
         with patch.dict(
             "os.environ",
             {
@@ -202,13 +208,15 @@ def test_cli_env_variables_alt_prefix() -> None:
                                 dry_run=True,
                                 force=True,
                                 install_desktop=False,
+                                suid_sandbox=False,
+                                scope=None,
                             )
                             mock_exit.assert_called_once_with(0)
 
 
 def test_cli_override_env_variables() -> None:
     # Test CLI overrides env variables
-    with patch("sys.argv", ["antigravity-updater", "--ide", "--no-desktop"]):
+    with patch("sys.argv", ["antigravity-updater", "--ide", "--no-desktop", "--no-apparmor-sandbox"]):
         with patch.dict(
             "os.environ",
             {
@@ -224,11 +232,12 @@ def test_cli_override_env_variables() -> None:
                                 main()
                             mock_ide.assert_called_once_with(
                                 ANY,
-                                DEFAULT_IDE_LAUNCHER,
+                                ANY,
                                 dry_run=False,
                                 force=False,
                                 install_desktop=False,
                                 install_nautilus=False,
                                 suid_sandbox=False,
+                                scope=None,
                             )
                             mock_exit.assert_called_once_with(0)

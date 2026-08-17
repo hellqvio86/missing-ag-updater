@@ -10,3 +10,4 @@ __pycache__/
 coverage.json
 .pytest_cache/
 .ruff_cache/
+.mypy_cache/

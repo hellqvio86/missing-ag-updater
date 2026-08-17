@@ -1,13 +1,10 @@
 # Missing-AG-Updater
-[![CI/CD](https://github.com/hellqvio86/missing-ag-updater/actions/workflows/ci.yml/badge.svg)](https://github.com/hellqvio86/missing-ag-updater/actions/workflows/ci.yml)
-[![Coverage](coverage.svg)](https://github.com/hellqvio86/missing-ag-updater/actions)
-[![PyPI Version](https://img.shields.io/pypi/v/missing-ag-updater.svg)](https://pypi.org/project/missing-ag-updater/)
-[![PyPI Downloads](https://img.shields.io/pypi/dm/missing-ag-updater.svg)](https://pypi.org/project/missing-ag-updater/)
-[![Python Versions](https://img.shields.io/pypi/pyversions/missing-ag-updater.svg)](https://pypi.org/project/missing-ag-updater/)
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python Versions](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue.svg)](https://www.python.org/)
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
 [![Checked with mypy](https://www.mypy-lang.org/static/mypy_badge.svg)](https://mypy-lang.org/)
-[![Pydantic](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/pydantic/pydantic/main/docs/badge/v2.json)](https://pydantic.dev)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 
 ```
 ╔═════════════════════════════════════════════════════════════════════════════╗
@@ -29,367 +26,161 @@
 ```
 
 > [!IMPORTANT]
-> **Disclaimer:** This project is an unofficial, community-maintained utility. It is **NOT** affiliated with, sponsored by, or supported by Google LLC.
+> **Disclaimer:** This project is a community fork of [Kx101/missing-ag-updater](https://github.com/Kx101/missing-ag-updater).
+> It is an unofficial utility and is **NOT** affiliated with, sponsored by, or supported by Google LLC.
 
-> [!WARNING]
-> **Alpha Software:** This utility is currently in an early **alpha** stage of development. Features may change without notice, and bugs may occur. Use with caution.
-
-This repository contains a Python utility to check for and apply updates to the Google Antigravity developer suite on Linux, macOS, and Windows.
-
----
-
-## Why This Project Exists
-
-The Google Antigravity developer suite (incorporating the IDE, Hub, and CLI) is standard tooling for AI agent engineering. However, Google does not provide an official, centralized auto-updater utility to manage upgrades for all three applications under a single interface. 
-
-This leads to several developer pain points that this project solves:
-* **Manual Cross-Platform Workflows**: Developers have to manually fetch Linux tarballs, mount macOS `.dmg` bundles, or run Windows installer `.exe` files for each component.
-* **Corrupted Active Installs**: Attempting to upgrade files while the IDE or Hub is running in the background causes file corruption and locked processes. This tool checks and warns of active processes before writing files.
-* **Lack of Automation for AI Agents**: AI coding agents operating in dev containers or headless environments need a simple CLI command (`antigravity-updater`) to verify and configure their tooling without manual browser navigation.
+A fast, reliable installer and auto-updater for the **Google Antigravity** developer suite on Linux:
+- **Antigravity IDE** (VS Code-based AI Editor)
+- **Antigravity Hub** (Standalone Agent Desktop Application)
+- **Antigravity CLI** (`agy` command-line tool)
 
 ---
 
-## Features
+## ⚡ Quick Start (Linux)
 
-- **Component Support:** Independently check and upgrade:
-  - **Antigravity IDE** (VS Code-based AI Editor)
-  - **Antigravity Hub** (Standalone Agent Desktop Application)
-  - **Antigravity CLI** (`agy` command line tool)
-- **Cross-Platform:** Supports Linux (`.tar.gz`), macOS (`.dmg` mount installation), and Windows (`.exe` silent installation).
-- **Safe Installation:** Warns if the target application is running before attempting to overwrite files.
-- **Verification:** Downloads the CLI directly and verifies SHA512 checksums prior to installation.
-- **Rich Terminal UI:** Displays download progress bars and clear success/warning logs.
-- **Dry Run Support:** Check if any updates are available without changing any files.
-- **Development Tooling:** Complete with linter, test coverage, and environment creation via `uv`.
+### 1. Install the Updater
 
-## Installation
-
-### For Users (via pipx)
-
-The recommended way to install and run the tool in an isolated environment is via `pipx`:
+The fastest and cleanest way to run or install is via [`uv`](https://github.com/astral-sh/uv):
 
 ```bash
-# Install the stable release from PyPI (recommended):
-pipx install missing-ag-updater
-
-# Alternatively, install the development version directly from GitHub:
-pipx install git+https://github.com/hellqvio86/missing-ag-updater.git
+# Option A: Run immediately without installing
+uvx --from git+https://github.com/angrysky56/missing-ag-updater.git antigravity-updater
 ```
 
-Once installed, the `antigravity-updater` command will be globally available.
-
-### For Developers
-
-Create the local virtual environment and install development tools (`pytest`, `ruff`) using `uv` and the provided `Makefile`:
 ```bash
-make venv
+# Option B: Install globally to ~/.local/bin (Recommended)
+uv tool install git+https://github.com/angrysky56/missing-ag-updater.git
 ```
 
-## Usage
+*(Alternatively, use `pipx install git+https://github.com/angrysky56/missing-ag-updater.git`)*
 
-Run the package directly to check and update all components:
+---
+
+### 2. Install or Upgrade Antigravity
+
+By default, the updater automatically checks Google's release feed, downloads missing or out-of-date tools, creates desktop launcher icons, and configures CLI symlinks:
+
 ```bash
-python -m missing_ag_updater
-# or using the installed entrypoint:
+# Install / Upgrade to your user directory (Recommended - No sudo required):
 antigravity-updater
 ```
 
-### Example Output
-
-```text
-$ antigravity-updater
-
-=== Unofficial Antigravity Applications Auto-Updater (missing-ag-updater) ===
-⚠ This project is a community tool and is NOT affiliated with, sponsored by, or supported by Google.
-  Target Platform: linux (x64)
-
-⠋ Checking for Antigravity IDE updates...
-  Local IDE Version:  2.0.4
-  Latest IDE Version: 2.0.4
-✓ Antigravity IDE is up to date.
-
-⠋ Checking for Antigravity Hub updates...
-  Local Hub Version:  2.1.4
-  Latest Hub Version: 2.1.4
-✓ Antigravity Hub is up to date.
-
-⠋ Checking for Antigravity CLI updates...
-  Local CLI Version:  1.0.8
-  Latest CLI Version: 1.0.8
-✓ Antigravity CLI is up to date.
-
-✓ Operation completed successfully.
-```
-
-### Options
-
-```text
-usage: python -m missing_ag_updater [-h] [--check] [--ide] [--hub] [--cli] [--force]
-                 [--dir-ide DIR_IDE] [--dir-hub DIR_HUB] [--path-cli PATH_CLI]
-                 [--no-desktop] [--no-nautilus] [--apparmor-sandbox]
-
-Auto-updater utility for Google Antigravity developer tools (Cross-Platform).
-
-options:
-  -h, --help         show this help message and exit
-  --check            Check for available updates without installing (dry run)
-  --ide              Update only the Antigravity IDE
-  --hub              Update only the Antigravity Hub
-  --cli              Update only the Antigravity CLI
-  --force            Bypass version checks and active process warnings
-  --dir-ide DIR_IDE  Override path to Antigravity IDE folder/bundle
-  --dir-hub DIR_HUB  Override path to Antigravity Hub folder/bundle
-  --path-cli PATH_CLI Override path to Antigravity CLI binary
-  --no-desktop       Skip installing local .desktop files and application icons on Linux
-  --no-nautilus      Skip installing Nautilus context-menu integration on Linux
-```
-
-### Environment Variables
-
-You can configure the behavior of the auto-updater using environment variables. These act as fallbacks if the corresponding CLI options are not explicitly provided:
-
-| CLI Option | Environment Variables | Type | Description |
-| :--- | :--- | :--- | :--- |
-| `--check` | `ANTIGRAVITY_CHECK` or `AG_CHECK` | Boolean | Check for available updates without installing (dry run) |
-| `--ide` | `ANTIGRAVITY_IDE` or `AG_IDE` | Boolean | Update only the Antigravity IDE |
-| `--hub` | `ANTIGRAVITY_HUB` or `AG_HUB` | Boolean | Update only the Antigravity Hub |
-| `--cli` | `ANTIGRAVITY_CLI` or `AG_CLI` | Boolean | Update only the Antigravity CLI |
-| `--force` | `ANTIGRAVITY_FORCE` or `AG_FORCE` | Boolean | Bypass version checks and active process warnings |
-| `--dir-ide` | `ANTIGRAVITY_DIR_IDE` or `AG_DIR_IDE` | String | Override path to Antigravity IDE folder/bundle |
-| `--dir-hub` | `ANTIGRAVITY_DIR_HUB` or `AG_DIR_HUB` | String | Override path to Antigravity Hub folder/bundle |
-| `--path-cli` | `ANTIGRAVITY_PATH_CLI` or `AG_PATH_CLI` | String | Override path to Antigravity CLI binary |
-| `--no-desktop` | `ANTIGRAVITY_DESKTOP` / `AG_DESKTOP` (Boolean, default `true`) or `ANTIGRAVITY_NO_DESKTOP` / `AG_NO_DESKTOP` (Boolean, default `false`) | Boolean | Set to `false` or `1` (for `NO_DESKTOP`) to skip installing local `.desktop` launcher and application icons on Linux |
-| `--no-nautilus` | `ANTIGRAVITY_NAUTILUS` / `AG_NAUTILUS` (Boolean, default `true`) or `ANTIGRAVITY_NO_NAUTILUS` / `AG_NO_NAUTILUS` (Boolean, default `false`) | Boolean | Set to `false` or `1` (for `NO_NAUTILUS`) to skip installing the Nautilus context-menu extension |
-| `--apparmor-sandbox` | `ANTIGRAVITY_APPARMOR_SANDBOX` or `AG_APPARMOR_SANDBOX` | Boolean | **(Ubuntu only)** Configure `root:root 4755` permissions on `chrome-sandbox` for AppArmor compatibility |
-
-> [!NOTE]
-> Boolean environment variables accept `1`, `true`, `yes`, or `on` as `True`, and any other value (or unset) as `False`.
-
-### Configuration File (TOML)
-
-You can also use a TOML configuration file to save your settings persistently. By default, the updater looks for a configuration file in the following standard user directories:
-
-- **Linux**: `~/.config/missing-ag-updater/config.toml` (honors `XDG_CONFIG_HOME`)
-- **macOS**: `~/Library/Application Support/missing-ag-updater/config.toml`
-- **Windows**: `%APPDATA%\missing-ag-updater\config.toml`
-
-You can override the config file location using the `--config PATH` option or the `ANTIGRAVITY_CONFIG` / `AG_CONFIG` environment variables. A template is provided in [`config.example.toml`](file:///home/hellqvio/git/missing-ag-updater/config.example.toml).
-
-#### Settings Resolution Hierarchy
-
-Values are resolved in the following priority order (highest to lowest):
-1. **CLI Arguments** (explicitly passed)
-2. **Environment Variables**
-3. **TOML Configuration File**
-4. **Default Values**
-
-#### Example TOML Configuration
-
-```toml
-check = false
-ide = true
-hub = true
-cli = true
-force = false
-apparmor_sandbox = false  # Ubuntu only
-dir_ide = "/home/user/opt/Antigravity-IDE"
-desktop = true
-nautilus = true
-```
-
-### Examples
-
-- **Dry run check for all tools:**
-  ```bash
-  python -m missing_ag_updater --check
-  ```
-
-- **Update only Antigravity IDE and create desktop / Nautilus integration:**
-  ```bash
-  python -m missing_ag_updater --ide
-  ```
-
-- **Force update all components regardless of version:**
-  ```bash
-  python -m missing_ag_updater --force
-  ```
-
-## Default Installation Paths
-
-When running an update, the tool first downloads the application packages (such as `.tar.gz`, `.dmg`, or `.exe` installers) to a **temporary system directory** (e.g. `/tmp` on Linux/macOS, or `%TEMP%` on Windows). Once the extraction and installation are complete, these temporary files are automatically deleted.
-
-After the update finishes, the permanent application files are stored in the following default paths:
-
-| Platform | Antigravity IDE Path | Antigravity Hub Path | Antigravity CLI Path | Launcher/Symlink Path |
-| :--- | :--- | :--- | :--- | :--- |
-| **Linux** | `~/opt/Antigravity-IDE` | `~/opt/Antigravity-x64` | `~/.local/bin/agy` | `~/.local/bin/antigravity-ide`<br>`~/.local/bin/antigravity` |
-| **macOS** | `/Applications/Antigravity IDE.app` | `/Applications/Antigravity.app` | `~/.local/bin/agy` | *N/A (installed in Applications)* |
-| **Windows** | `%LOCALAPPDATA%\Programs\antigravity-ide` | `%LOCALAPPDATA%\Programs\antigravity` | `%LOCALAPPDATA%\Microsoft\WindowsApps\agy.exe` | *N/A (added to PATH)* |
-
-> [!NOTE]
-> **Linux Path & Chromium SUID Sandbox Bug:**
-> On Linux, the IDE default directory is `~/opt/Antigravity-IDE` (hyphenated without spaces). This avoids an upstream Chromium bug in [`zygote_host_impl_linux.cc`](https://chromium.googlesource.com/chromium/src/+/refs/heads/main/content/browser/zygote_host/zygote_host_impl_linux.cc), where binary paths containing spaces (e.g., `~/opt/Antigravity IDE`) are truncated at space boundaries when executing `chrome-sandbox` via `execvp`, crashing with `FATAL: Check failed: . : Invalid argument (22)`.
-> 
-> The updater automatically checks both `~/opt/Antigravity-IDE` and legacy `~/opt/Antigravity IDE` paths to resolve versions for existing installations.
-
-You can override these default paths at execution time using the `--dir-ide`, `--dir-hub`, and `--path-cli` flags.
-
----
-
-## Upstream Sources (Where Google Stores the Binaries)
-
-All application packages are fetched directly from official Google distribution servers:
-
-* **Antigravity IDE**: Downloaded from Google's stable release CDN domains (`dl.google.com` and `edgedl.me.gvt1.com`).
-* **Antigravity Hub**: Downloaded from Google's public Google Cloud Storage bucket (`storage.googleapis.com/antigravity-public`).
-* **Antigravity CLI**: Downloaded from URLs specified in the official updates manifests hosted on Google Cloud.
-
----
-
-## How It Works
-
-The auto-updater acts as a secure, cross-platform layer to keep your local developer environment up to date:
-
-1. **Update Resolution**:
-   Queries the unofficial update API endpoints to parse the latest version info. For the IDE and Hub, this resolves to Google release manifests. For the CLI, it parses the architecture-specific manifest.
-
-2. **Process Integrity Check**:
-   Before writing any files, the utility checks if the IDE or Hub is currently running. If active PIDs are detected, the update will abort (unless bypassed with `--force`) to prevent file lockups and corruption.
-
-3. **Secure CLI Checksum Verification**:
-   When updating the CLI, the manifest provides a SHA-512 checksum. The tool computes the hash of the downloaded zip or tarball locally and compares them to ensure integrity before extraction.
-
-4. **Platform-Specific Installation**:
-   - **Linux**: Extracts the tarball to a temporary directory, replaces the target directory under `~/opt`, and creates/updates symbolic links under `~/.local/bin`.
-   - **macOS**: Mounts the downloaded `.dmg` file securely via `hdiutil attach`, replaces the `.app` bundle under `/Applications`, and unmounts the volume.
-   - **Windows**: Executes the installer binary with the silent installation flag (`/S`) to perform a background upgrade.
-
----
-
-## Launching the Applications
-
-Once updated, you can launch the Antigravity tools using their standard terminal commands:
-
-- **Antigravity IDE** (VS Code-based AI Editor):
-  ```bash
-  antigravity-ide
-  ```
-- **Antigravity Hub** (Standalone agent desktop application):
-  ```bash
-  antigravity
-  ```
-- **Antigravity CLI** (Terminal utility):
-  ```bash
-  agy
-  ```
-
-## Nautilus Context Menu Integration (Linux)
-
-On Linux systems running GNOME, the installer automatically writes a context menu extension for the Nautilus file manager, allowing you to right-click folders or files and select **"Open in Antigravity IDE"**.
-
-For Nautilus to load this extension, you must have the `nautilus-python` package installed on your system.
-
-### Prerequisites
-
-Install the `nautilus-python` bindings using your distribution's package manager:
-
-- **Fedora**:
-  ```bash
-  sudo dnf install nautilus-python
-  ```
-- **Ubuntu / Debian**:
-  ```bash
-  sudo apt install python3-nautilus
-  ```
-- **Arch Linux**:
-  ```bash
-  sudo pacman -S python-nautilus
-  ```
-
-### Activating the Context Menu
-
-After installing the package, restart Nautilus to reload all python extensions:
 ```bash
-nautilus -q
+# Or install system-wide in /opt (Requires sudo):
+# 1. If installed globally via uv tool / pipx:
+sudo env "PATH=$PATH" antigravity-updater --system
+
+# 2. Or if running directly from this cloned repo / virtualenv:
+sudo ./.venv/bin/antigravity-updater --system
 ```
 
-## Linux Sandbox (Ubuntu)
+---
 
-On **Ubuntu 24.04+**, the kernel restricts unprivileged user namespaces via AppArmor (`apparmor_restrict_unprivileged_userns`). This breaks the Chromium namespace sandbox used by Electron applications such as the Antigravity IDE and Hub.
+## 📂 Linux Default Locations
 
-Without a fix, the IDE will crash on launch with:
-```text
-FATAL: Check failed: . : Invalid argument (22)
-```
+The updater places files in standard Linux locations so tools seamlessly show up in your application menu and shell:
 
-### Why This Only Affects Ubuntu
-
-| Distro | Sandbox Status | Reason |
+| Component | User Scope (Default / Recommended) | System Scope (`--system`) |
 | :--- | :--- | :--- |
-| **Ubuntu 24.04+** | ❌ Broken without fix | AppArmor blocks unprivileged user namespaces |
-| **Fedora** | ✅ Works out of the box | SELinux does not restrict user namespaces |
-| **Arch Linux** | ✅ Works out of the box | No namespace restrictions by default |
-| **Debian 12+** | ⚠ May need fix | AppArmor enabled by default (not yet in allowlist) |
+| **Permissions** | **No `sudo` needed** | Requires `sudo` |
+| **Antigravity IDE** | `~/opt/Antigravity-IDE` | `/opt/antigravity-ide` |
+| **Antigravity Hub** | `~/opt/Antigravity-x64` | `/opt/antigravity` |
+| **Antigravity CLI (`agy`)** | `~/.local/bin/agy` | `/usr/local/bin/agy` |
+| **Terminal Launchers** | `~/.local/bin/antigravity-ide`<br>`~/.local/bin/antigravity` | `/usr/local/bin/antigravity-ide`<br>`/usr/local/bin/antigravity` |
+| **Desktop Menu Icons** | `~/.local/share/applications/` | `/usr/share/applications/` |
 
-The updater **auto-detects your distro** via `/etc/os-release` and only applies sandbox fixes on Ubuntu (and Ubuntu-based derivatives like Linux Mint and Pop!_OS via `ID_LIKE`). On all other distros, `--apparmor-sandbox` is silently skipped.
+> [!NOTE]
+> Make sure `~/.local/bin` is in your `$PATH` (e.g. in `~/.bashrc` or `~/.zshrc`) so you can run `agy` and `antigravity-ide` directly from your terminal.
 
-### The Fix: `--apparmor-sandbox`
+---
 
-Pass the `--apparmor-sandbox` flag to configure the `chrome-sandbox` binary with SUID root permissions (`root:root 4755`), which allows Chromium to use the legacy setuid sandbox instead:
+## 🛠️ Common Linux Commands
 
+### Check for Updates (Dry Run)
+Check if newer versions of the IDE, Hub, or CLI exist upstream without changing anything:
 ```bash
-# During update:
-antigravity-updater --apparmor-sandbox
-
-# Or set it permanently in your config:
-# ~/.config/missing-ag-updater/config.toml
-apparmor_sandbox = true
+antigravity-updater --check
 ```
 
-This requires `sudo` access (or running as root). The updater will prompt for `sudo` if needed, or fail early with a clear error message if `sudo` is unavailable.
-
-### Manual Fix
-
-If you prefer to fix the sandbox manually without using the flag:
+### Inspect Installed Components & Versions (Diagnostics)
+Scan all existing installations, versions, `.desktop` files, and AppArmor status:
 ```bash
-sudo chown root:root "$HOME/opt/Antigravity-IDE/chrome-sandbox" && \
-sudo chmod 4755 "$HOME/opt/Antigravity-IDE/chrome-sandbox"
+antigravity-updater --diagnose
 ```
 
-## Development
+### Update Only a Specific Component
+```bash
+antigravity-updater --ide   # Update only IDE
+antigravity-updater --cli   # Update only CLI
+antigravity-updater --hub   # Update only Hub
+```
 
-The project includes a `Makefile` to simplify development tasks:
+### Clean Duplicate Desktop Launcher Icons
+If past installs or manual extractions left duplicate or broken icons in your app menu:
+```bash
+antigravity-updater --clean-duplicates
+```
 
-- **Run the updater (via module):**
-  ```bash
-  make run
-  # Pass options via the ARGS variable
-  make run ARGS="--check"
-  ```
-- **Lint check (Ruff):**
-  ```bash
-  make lint
-  ```
-- **Run unit tests (Pytest):**
-  ```bash
-  make test
-  ```
-- **Clean virtual environment & cache:**
-  ```bash
-  make clean
-  ```
+### Clean Uninstall
+Remove installed applications, launcher symlinks, desktop entries, and icons:
+```bash
+# Uninstall user-level installation:
+antigravity-updater --uninstall
 
-### Git Hooks
+# Uninstall system-wide installation:
+sudo env "PATH=$PATH" antigravity-updater --uninstall --system
+# (or from cloned repo: sudo ./.venv/bin/antigravity-updater --uninstall --system)
+```
 
-A local Git `pre-push` hook is configured to automatically run formatting, linting checks, and the unit test suite before code can be pushed to remote branches:
+---
 
-- To run the pre-push checks manually:
-  ```bash
-  .git/hooks/pre-push
-  ```
-## Other update antigravity projects
-[Opensnap Antigravity updater](https://github.com/opensnap/antigravity)
+## 📁 GNOME Nautilus Integration
 
-## License
+On GNOME desktops, the updater automatically installs a context-menu extension so you can right-click any folder and choose **"Open in Antigravity IDE"**.
+
+### Prerequisites:
+```bash
+# Ubuntu / Debian / Pop!_OS:
+sudo apt install python3-nautilus && nautilus -q
+
+# Fedora:
+sudo dnf install nautilus-python && nautilus -q
+
+# Arch Linux:
+sudo pacman -S python-nautilus && nautilus -q
+```
+
+---
+
+## 📚 Additional Documentation
+
+- 🐧 **[Linux Troubleshooting Guide](docs/troubleshooting-linux.md)**: Fix AppArmor / Chromium sandbox crashes (`--apparmor-sandbox`), PATH issues (`command not found: agy`), desktop duplicates, or sudo permission errors.
+- ⚙️ **[Advanced Usage & Other Platforms](docs/other-platforms-and-advanced.md)**: macOS & Windows installation instructions, custom path overrides (`--dir-ide`), persistent `config.toml` options, and environment variables.
+- 🤖 **[AI Agent Integration Guide](AGENTS.md)**: Diagnostic protocols, headless operation, troubleshooting recipes, and programmatic Python API.
+
+---
+
+## 💻 Development & Testing
+
+```bash
+# Clone repository
+git clone https://github.com/angrysky56/missing-ag-updater.git
+cd missing-ag-updater
+
+# Set up virtual environment
+uv venv && source .venv/bin/activate
+uv pip install -e ".[dev]"
+
+# Run tests
+uv run pytest
+
+# Lint and type check
+uv run ruff check src
+uv run mypy src
+```
+
+---
+
+## 📄 License
 
 This project is licensed under the [MIT License](LICENSE).

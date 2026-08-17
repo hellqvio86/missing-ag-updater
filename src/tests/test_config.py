@@ -85,8 +85,8 @@ def test_load_toml_config_valid(tmp_path) -> None:
 def test_cli_config_integration(tmp_path) -> None:
     config_file = tmp_path / "cli_config.toml"
     with open(config_file, "w") as fdesc:
-        # We can configure force = true, desktop = false, nautilus = false
-        fdesc.write("force = true\ndesktop = false\nnautilus = false\n")
+        # We can configure force = true, desktop = false, nautilus = false, apparmor_sandbox = false
+        fdesc.write("force = true\ndesktop = false\nnautilus = false\napparmor_sandbox = false\n")
 
     # Test that config file propagates to main updater logic
     with patch("sys.argv", ["antigravity-updater", "--ide", "--config", str(config_file)]):
@@ -103,6 +103,7 @@ def test_cli_config_integration(tmp_path) -> None:
                         install_desktop=False,  # loaded from TOML
                         install_nautilus=False,  # loaded from TOML
                         suid_sandbox=False,
+                        scope=None,
                     )
                     mock_exit.assert_called_once_with(0)
 

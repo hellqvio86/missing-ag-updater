@@ -11,6 +11,10 @@ cli = true
 force = false
 apparmor_sandbox = false  # Ubuntu only: set chrome-sandbox to root:root 4755
 
+# Installation Scope (Optional: set system = true for /opt, or user = true for ~/opt)
+# system = false
+# user = false
+
 # Desktop and Nautilus context menu integrations (Linux)
 desktop = true
 nautilus = true
@@ -18,4 +22,4 @@ nautilus = true
 # Path Overrides (Optional)
 # dir_ide = "/home/user/opt/Antigravity-IDE"
 # dir_hub = "/home/user/opt/Antigravity Hub"
-# path_cli = "/home/user/.local/bin/antigravity"
+# path_cli = "/home/user/.local/bin/agy"

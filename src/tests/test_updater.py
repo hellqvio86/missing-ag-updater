@@ -154,9 +154,11 @@ def test_update_ide_success_linux() -> None:
                                     res = update_ide(target_ide_dir, launcher, force=True)
                                     assert res is True
                                     assert os.path.exists(os.path.join(target_ide_dir, "bin", "antigravity-ide"))
-                                    mock_desktop.assert_called_once_with(ide_dir=target_ide_dir, launcher_path=launcher)
+                                    mock_desktop.assert_called_once_with(
+                                        ide_dir=target_ide_dir, launcher_path=launcher, scope="user"
+                                    )
                                     mock_nautilus.assert_called_once_with(
-                                        ide_dir=target_ide_dir, launcher_path=launcher
+                                        ide_dir=target_ide_dir, launcher_path=launcher, scope="user"
                                     )
 
 
@@ -283,7 +285,9 @@ def test_update_hub_success_linux() -> None:
                                 launcher = os.path.join(target_hub_dir, "bin_launcher", "hub-launch")
                                 res = update_hub(target_hub_dir, launcher)
                                 assert res is True
-                                mock_desktop.assert_called_once_with(hub_dir=target_hub_dir, launcher_path=launcher)
+                                mock_desktop.assert_called_once_with(
+                                    hub_dir=target_hub_dir, launcher_path=launcher, scope="user"
+                                )
 
 
 def test_update_hub_invalid_tarball() -> None:

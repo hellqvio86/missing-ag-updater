@@ -1,10 +1,11 @@
+"""Configuration file loading and path discovery for missing-ag-updater."""
+
 import os
+import tomllib
 from pathlib import Path
 from typing import Any, Dict
 
-# Use standard library tomllib (Python 3.11+)
-import tomllib
-
+from . import utils
 from .const import HOME, OS_NAME
 
 
@@ -49,10 +50,8 @@ def load_toml_config(path: str | Path, *, explicit: bool = False) -> Dict[str, A
     try:
         with config_file.open("rb") as fdesc:
             return tomllib.load(fdesc)
-    except Exception as err:
+    except (tomllib.TOMLDecodeError, OSError) as err:
         if explicit:
-            raise ValueError(f"Failed to parse TOML configuration file: {err}")
-        from .utils import print_warning
-
-        print_warning(f"Could not load configuration file {config_file}: {err}")
+            raise ValueError(f"Failed to parse TOML configuration file: {err}") from err
+        utils.print_warning(f"Could not load configuration file {config_file}: {err}")
         return {}
