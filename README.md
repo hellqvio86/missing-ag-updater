@@ -73,6 +73,14 @@ This leads to several developer pain points that this project solves:
 
 ---
 
+## 📚 Documentation Guides
+
+- [Linux Troubleshooting & Diagnostics Guide](docs/troubleshooting-linux.md)
+- [Advanced Usage, Configuration & Other Platforms (macOS, Windows, Python API)](docs/other-platforms-and-advanced.md)
+- [AI Assistant & Agent Instruction Guide](AGENTS.md)
+
+---
+
 ## ⚡ Quick Start
 
 ### For Users (Recommended)
@@ -294,7 +302,7 @@ Save persistent configuration settings in a TOML file. The updater searches for 
 - **macOS**: `~/Library/Application Support/missing-ag-updater/config.toml`
 - **Windows**: `%APPDATA%\missing-ag-updater\config.toml`
 
-A template is provided in [`config.example.toml`](file:///home/hellqvio/git/missing-ag-updater/config.example.toml).
+A template is provided in [`config.example.toml`](config.example.toml).
 
 ### Settings Resolution Hierarchy
 

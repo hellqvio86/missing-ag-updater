@@ -43,7 +43,7 @@ On Windows, `missing-ag-updater` handles `.exe` installers and sets up binary pa
 
 ```powershell
 # Using uvx:
-uvx --from git+https://github.com/angrysky56/missing-ag-updater.git antigravity-updater
+uvx --from git+https://github.com/hellqvio86/missing-ag-updater.git antigravity-updater
 
 # Or after installing via pip / uv tool:
 antigravity-updater

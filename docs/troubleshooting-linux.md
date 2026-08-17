@@ -111,48 +111,6 @@ Add `~/.local/bin` to your shell's configuration file:
 
 ---
 
-```bash
-sudo env "PATH=$PATH" antigravity-updater --apparmor-sandbox
-```
-
-This sets `root:root` ownership and `4755` permissions on the `chrome-sandbox` binary.
-
-#### Option B: Clean Existing Duplicate/Spaced Folders
-If an older installation used a folder name with spaces, migrate or clean duplicates:
-
-```bash
-antigravity-updater --clean-duplicates
-```
-
----
-
-## 4. Duplicate or Broken App Launcher Icons
-
-### Symptom
-Your application menu displays duplicate Antigravity IDE or Hub icons, or clicking an icon launches an older version or fails.
-
-### Cause
-Having multiple `.desktop` files in both user-level (`~/.local/share/applications/`) and system-level (`/usr/share/applications/`) directories, or leftover desktop entries from manual `.tar.gz` extractions.
-
-### Solution
-Run the built-in deduplicator:
-
-```bash
-# Clean user-level duplicates and point launchers to the correct binary:
-antigravity-updater --clean-duplicates
-
-# If you moved to a system-wide install and want to remove stale user directories:
-antigravity-updater --clean-duplicates --remove-user-dirs
-```
-
-After cleaning, force the desktop database to refresh:
-
-```bash
-update-desktop-database ~/.local/share/applications
-```
-
----
-
 ## 5. Permission Denied or `sudo: command not found` During System (`/opt`) Updates
 
 ### Symptom

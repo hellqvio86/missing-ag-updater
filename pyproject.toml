@@ -17,6 +17,12 @@ dependencies = ["pydantic>=2.0.0", "requests>=2.31.0"]
 [project.scripts]
 antigravity-updater = "missing_ag_updater:main"
 
+[project.urls]
+Homepage = "https://github.com/hellqvio86/missing-ag-updater"
+Documentation = "https://github.com/hellqvio86/missing-ag-updater#readme"
+Repository = "https://github.com/hellqvio86/missing-ag-updater.git"
+Issues = "https://github.com/hellqvio86/missing-ag-updater/issues"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
