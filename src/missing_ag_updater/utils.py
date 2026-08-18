@@ -19,6 +19,7 @@ from .const import (
     COLOR_GREEN,
     COLOR_WARNING,
     OS_NAME,
+    SYSTEM_APPLICATIONS_DIR,
     USER_AGENT,
     USER_APPLICATIONS_DIR,
     USER_ICONS_DIR,
@@ -512,18 +513,19 @@ def extract_asar_icon(asar_path: str, dest_icon_path: str) -> bool:
 
 
 def refresh_linux_desktop_caches() -> None:
-    """Refresh the user-level desktop database and icon cache on Linux."""
+    """Refresh the desktop database and icon caches on Linux."""
     if OS_NAME != "linux":
         return
-    try:
-        if os.path.exists(USER_APPLICATIONS_DIR):
-            subprocess.run(
-                ["update-desktop-database", USER_APPLICATIONS_DIR],
-                capture_output=True,
-                check=False,
-            )  # nosec B603, B607
-    except (subprocess.SubprocessError, OSError):
-        pass
+    for app_dir in (USER_APPLICATIONS_DIR, SYSTEM_APPLICATIONS_DIR):
+        try:
+            if os.path.exists(app_dir):
+                subprocess.run(
+                    ["update-desktop-database", app_dir],
+                    capture_output=True,
+                    check=False,
+                )  # nosec B603, B607
+        except (subprocess.SubprocessError, OSError):
+            pass
     try:
         icon_parent = os.path.dirname(os.path.dirname(USER_ICONS_DIR))
         if os.path.exists(icon_parent):

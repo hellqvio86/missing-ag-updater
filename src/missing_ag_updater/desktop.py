@@ -37,7 +37,7 @@ def install_ide_desktop(
 Name=Antigravity IDE
 Comment=Google Antigravity IDE
 Exec={exec_path} %F
-Icon=antigravity-ide
+Icon=antigravity
 Terminal=false
 Type=Application
 Categories=Development;IDE;
@@ -52,27 +52,51 @@ StartupWMClass=antigravity-ide
     except OSError as de:
         print_warning(f"Could not install desktop entry {desktop_file}: {de}")
 
-    # Copy icon
-    icon_source = os.path.join(ide_dir, "resources", "app", "resources", "linux", "code.png")
-    if not os.path.exists(icon_source):
-        # Check nested directory
-        icon_source = os.path.join(
-            ide_dir,
-            "Antigravity-IDE",
-            "resources",
-            "app",
-            "resources",
-            "linux",
-            "code.png",
-        )
+    # Copy icon: prefer official Antigravity branding icon if available, falling back to code.png
+    dest_icon = os.path.join(icons_dir, "antigravity.png")
+    dest_ide_icon = os.path.join(icons_dir, "antigravity-ide.png")
+    installed_official_icon = False
+    candidate_icons = [
+        os.path.join(icons_dir, "antigravity.png"),
+        os.path.join(USER_ICONS_DIR, "antigravity.png"),
+        os.path.join(SYSTEM_ICONS_DIR, "antigravity.png"),
+    ]
+    for cand in candidate_icons:
+        if os.path.exists(cand):
+            try:
+                os.makedirs(icons_dir, exist_ok=True)
+                if cand != dest_icon:
+                    shutil.copy2(cand, dest_icon)
+                if cand != dest_ide_icon:
+                    shutil.copy2(cand, dest_ide_icon)
+                installed_official_icon = True
+                print_success(f"Installed {'system' if scope == 'system' else 'local'} IDE icon.")
+                break
+            except (OSError, shutil.Error):
+                pass
 
-    if os.path.exists(icon_source):
-        os.makedirs(icons_dir, exist_ok=True)
-        try:
-            shutil.copy2(icon_source, os.path.join(icons_dir, "antigravity-ide.png"))
-            print_success(f"Installed {'system' if scope == 'system' else 'local'} IDE icon.")
-        except (OSError, shutil.Error) as ie:
-            print_warning(f"Could not install IDE icon: {ie}")
+    if not installed_official_icon:
+        icon_source = os.path.join(ide_dir, "resources", "app", "resources", "linux", "code.png")
+        if not os.path.exists(icon_source):
+            # Check nested directory
+            icon_source = os.path.join(
+                ide_dir,
+                "Antigravity-IDE",
+                "resources",
+                "app",
+                "resources",
+                "linux",
+                "code.png",
+            )
+
+        if os.path.exists(icon_source):
+            os.makedirs(icons_dir, exist_ok=True)
+            try:
+                shutil.copy2(icon_source, dest_icon)
+                shutil.copy2(icon_source, dest_ide_icon)
+                print_success(f"Installed {'system' if scope == 'system' else 'local'} IDE icon.")
+            except (OSError, shutil.Error) as ie:
+                print_warning(f"Could not install IDE icon: {ie}")
 
     # If installing to system, check and remove duplicate user desktop entry if present
     if scope == "system":
@@ -132,6 +156,12 @@ StartupWMClass=Antigravity
         dest_icon = os.path.join(icons_dir, "antigravity.png")
         if extract_asar_icon(asar_path, dest_icon):
             print_success(f"Extracted and installed {'system' if scope == 'system' else 'local'} Hub icon.")
+            # Also ensure IDE icon has official branding if IDE desktop is present
+            ide_dest_icon = os.path.join(icons_dir, "antigravity-ide.png")
+            try:
+                shutil.copy2(dest_icon, ide_dest_icon)
+            except (OSError, shutil.Error):
+                pass
         else:
             print_warning("Could not extract Hub icon.")
 
