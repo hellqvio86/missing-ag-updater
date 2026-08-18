@@ -181,6 +181,7 @@ def test_update_ide_skips_legacy_cleanup_on_non_sandbox_distro() -> None:
             raise AssertionError("legacy directory should not be removed")
         return original_rmtree(path, *args, **kwargs)
 
+    @patch("missing_ag_updater.updater.install_ide_desktop")
     @patch("missing_ag_updater.updater.shutil.rmtree", side_effect=record_rmtree)
     @patch("missing_ag_updater.updater.is_ubuntu_sandbox_distro", return_value=False)
     @patch("missing_ag_updater.updater.download_file", side_effect=mock_download_write_tar)
@@ -195,6 +196,7 @@ def test_update_ide_skips_legacy_cleanup_on_non_sandbox_distro() -> None:
         mock_dl: MagicMock,
         mock_distro: MagicMock,
         mock_rm: MagicMock,
+        mock_install_desktop: MagicMock,
     ) -> None:
         with tempfile.TemporaryDirectory() as root:
             target_ide_dir = os.path.join(root, "target-ide")
@@ -202,6 +204,7 @@ def test_update_ide_skips_legacy_cleanup_on_non_sandbox_distro() -> None:
             os.makedirs(legacy_ide_dir)
             res = update_ide(target_ide_dir, None, force=True)
             assert res is True
+            mock_install_desktop.assert_called_once()
 
     _run_test()
 

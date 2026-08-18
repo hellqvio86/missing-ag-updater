@@ -22,6 +22,7 @@ def test_install_ide_desktop(tmp_path: Any) -> None:
         fdesc.write("icon-data")
 
     @patch("missing_ag_updater.desktop.refresh_linux_desktop_caches")
+    @patch("missing_ag_updater.desktop.SYSTEM_ICONS_DIR", str(tmp_path / "sys_icons"))
     @patch("missing_ag_updater.desktop.USER_ICONS_DIR", user_icons_dir)
     @patch("missing_ag_updater.desktop.USER_APPLICATIONS_DIR", user_app_dir)
     def _run_test(mock_refresh: MagicMock) -> None:
@@ -32,7 +33,7 @@ def test_install_ide_desktop(tmp_path: Any) -> None:
         with open(desktop_file, "r", encoding="utf-8") as fdesc:
             content = fdesc.read()
             assert "Exec=" + launcher_path in content
-            assert "Icon=antigravity-ide" in content
+            assert "Icon=antigravity" in content
 
         dest_icon = os.path.join(user_icons_dir, "antigravity-ide.png")
         assert os.path.exists(dest_icon)
@@ -40,6 +41,30 @@ def test_install_ide_desktop(tmp_path: Any) -> None:
             assert fdesc.read() == "icon-data"
 
         mock_refresh.assert_called_once()
+
+    _run_test()
+
+
+def test_install_ide_desktop_prefers_official_branding(tmp_path: Any) -> None:
+    user_app_dir = str(tmp_path / "apps")
+    user_icons_dir = str(tmp_path / "icons")
+    ide_dir = str(tmp_path / "ide")
+    launcher_path = str(tmp_path / "launcher")
+
+    os.makedirs(user_icons_dir, exist_ok=True)
+    with open(os.path.join(user_icons_dir, "antigravity.png"), "w", encoding="utf-8") as fdesc:
+        fdesc.write("official-branding-data")
+
+    @patch("missing_ag_updater.desktop.refresh_linux_desktop_caches")
+    @patch("missing_ag_updater.desktop.SYSTEM_ICONS_DIR", str(tmp_path / "sys_icons"))
+    @patch("missing_ag_updater.desktop.USER_ICONS_DIR", user_icons_dir)
+    @patch("missing_ag_updater.desktop.USER_APPLICATIONS_DIR", user_app_dir)
+    def _run_test(mock_refresh: MagicMock) -> None:
+        install_ide_desktop(ide_dir=ide_dir, launcher_path=launcher_path)
+        dest_icon = os.path.join(user_icons_dir, "antigravity-ide.png")
+        assert os.path.exists(dest_icon)
+        with open(dest_icon, "r", encoding="utf-8") as fdesc:
+            assert fdesc.read() == "official-branding-data"
 
     _run_test()
 

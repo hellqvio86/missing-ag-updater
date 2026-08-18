@@ -83,22 +83,42 @@ This leads to several developer pain points that this project solves:
 
 ## ⚡ Quick Start
 
-### For Users (Recommended)
+### Quick Run & Installation (via `uv` or `pipx`)
 
-Install and run in an isolated environment via [`uv`](https://github.com/astral-sh/uv) or [`pipx`](https://github.com/pypa/pipx):
+#### Option 1: Run directly from Git repository with `uv` (No installation needed)
+
+Run on-demand without installing into your global environment:
 
 ```bash
-# Option A: Run immediately without installing (via uvx)
+# Directly from remote GitHub repository:
 uvx --from git+https://github.com/hellqvio86/missing-ag-updater.git antigravity-updater
 
-# Option B: Install globally using uv tool (Recommended)
+# Or pass any CLI arguments (e.g. diagnostic, force update):
+uvx --from git+https://github.com/hellqvio86/missing-ag-updater.git antigravity-updater --diagnostic
+
+# From a locally cloned git repository:
+git clone https://github.com/hellqvio86/missing-ag-updater.git
+cd missing-ag-updater
+uv run antigravity-updater
+```
+
+#### Option 2: Install globally with `uv tool` (Recommended)
+
+```bash
+# Install tool globally from GitHub:
 uv tool install git+https://github.com/hellqvio86/missing-ag-updater.git
 
-# Option C: Install via pipx from PyPI
+# Or install from local cloned repo directory:
+uv tool install .
+```
+
+#### Option 3: Install via `pipx`
+
+```bash
 pipx install missing-ag-updater
 ```
 
-Once installed, the `antigravity-updater` command is globally available.
+Once installed, the `antigravity-updater` command is globally available in your terminal.
 
 ---
 

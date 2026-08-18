@@ -187,18 +187,32 @@ def test_uninstall_ide_system_scope_and_error(tmp_path: Any) -> None:
     _run_test()
 
 
+@patch("missing_ag_updater.uninstall.detect_preferred_ide", return_value=("", None, "system"))
 @patch("missing_ag_updater.uninstall.is_path_writable", return_value=False)
 @patch("missing_ag_updater.uninstall.get_running_pids", return_value=[])
-def test_uninstall_ide_permission_denied(mock_pids: MagicMock, mock_writable: MagicMock, tmp_path: Any) -> None:
+def test_uninstall_ide_permission_denied(
+    mock_pids: MagicMock,
+    mock_writable: MagicMock,
+    mock_detect: MagicMock,
+    tmp_path: Any,
+) -> None:
     ide_dir = str(tmp_path / "opt" / "antigravity-ide")
     os.makedirs(ide_dir)
     res = uninstall_ide(ide_dir=ide_dir, launcher_path=None, scope="system")
     assert res is False
 
 
+@patch("missing_ag_updater.uninstall.detect_preferred_ide", return_value=("", None, "user"))
+@patch("missing_ag_updater.uninstall.USER_NAUTILUS_DIR", "/tmp/nonexistent_nautilus")
+@patch("missing_ag_updater.uninstall.USER_ICONS_DIR", "/tmp/nonexistent_icons")
+@patch("missing_ag_updater.uninstall.USER_APPLICATIONS_DIR", "/tmp/nonexistent_apps")
 @patch("missing_ag_updater.uninstall.resolve_existing_ide_dir", return_value="")
 @patch("missing_ag_updater.uninstall.get_running_pids", return_value=[])
-def test_uninstall_ide_empty_targets(mock_pids: MagicMock, mock_resolve: MagicMock) -> None:
+def test_uninstall_ide_empty_targets(
+    mock_pids: MagicMock,
+    mock_resolve: MagicMock,
+    mock_detect: MagicMock,
+) -> None:
     res = uninstall_ide(ide_dir="", launcher_path="", scope="user")
     assert res is True
 
@@ -237,9 +251,15 @@ def test_uninstall_hub_system_scope_and_dry_run(tmp_path: Any) -> None:
     _run_test()
 
 
+@patch("missing_ag_updater.uninstall.detect_preferred_hub", return_value=("", None, "system"))
 @patch("missing_ag_updater.uninstall.is_path_writable", return_value=False)
 @patch("missing_ag_updater.uninstall.get_running_pids", return_value=[])
-def test_uninstall_hub_permission_denied(mock_pids: MagicMock, mock_writable: MagicMock, tmp_path: Any) -> None:
+def test_uninstall_hub_permission_denied(
+    mock_pids: MagicMock,
+    mock_writable: MagicMock,
+    mock_detect: MagicMock,
+    tmp_path: Any,
+) -> None:
     hub_dir = str(tmp_path / "opt" / "antigravity")
     os.makedirs(hub_dir)
     res = uninstall_hub(hub_dir=hub_dir, launcher_path=None, scope="system")
