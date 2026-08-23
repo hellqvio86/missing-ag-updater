@@ -250,6 +250,8 @@ def update_ide(
                     print_error("Security Check Failure: Checksum mismatch on IDE download archive.")
                     return False
                 print_success("Checksum verified.")
+            else:
+                print_warning("No integrity checksum provided by release server — installing unverified archive.")
 
             if OS_NAME == "darwin":
                 # macOS dmg installation
@@ -298,7 +300,8 @@ def update_ide(
                 if launcher_path:
                     target_launcher = os.path.join(target_ide_dir, "bin", "antigravity-ide")
                     if os.path.exists(target_launcher):
-                        update_symlink(target_launcher, launcher_path)
+                        if not update_symlink(target_launcher, launcher_path):
+                            return False
 
                 if install_desktop and OS_NAME == "linux":
                     install_ide_desktop(
@@ -425,6 +428,8 @@ def update_hub(
                     print_error("Security Check Failure: Checksum mismatch on Hub download archive.")
                     return False
                 print_success("Checksum verified.")
+            else:
+                print_warning("No integrity checksum provided by release server — installing unverified archive.")
 
             if OS_NAME == "darwin":
                 # macOS dmg installation
@@ -457,7 +462,8 @@ def update_hub(
                 if launcher_path:
                     target_launcher = os.path.join(target_hub_dir, "antigravity")
                     if os.path.exists(target_launcher):
-                        update_symlink(target_launcher, launcher_path)
+                        if not update_symlink(target_launcher, launcher_path):
+                            return False
 
                 if install_desktop and OS_NAME == "linux":
                     install_hub_desktop(

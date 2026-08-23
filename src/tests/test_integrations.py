@@ -200,8 +200,8 @@ def test_install_hub_desktop_notice_when_system_exists(tmp_path: Any, capsys: An
 
 def test_install_ide_nautilus(tmp_path: Any) -> None:
     user_nautilus_dir = str(tmp_path / "nautilus")
-    ide_dir = str(tmp_path / "ide")
-    launcher_path = str(tmp_path / "launcher")
+    ide_dir = str(tmp_path / "ide with spaces")
+    launcher_path = str(tmp_path / "launcher with 'quotes'")
 
     @patch("missing_ag_updater.nautilus.refresh_linux_desktop_caches")
     @patch("missing_ag_updater.nautilus.USER_NAUTILUS_DIR", user_nautilus_dir)
@@ -213,7 +213,7 @@ def test_install_ide_nautilus(tmp_path: Any) -> None:
         with open(nautilus_file, "r", encoding="utf-8") as fdesc:
             content = fdesc.read()
             assert "class OpenInAntigravityIDE" in content
-            assert launcher_path in content
+            assert f'subprocess.Popen(["{launcher_path}", path])' in content or repr(launcher_path) in content
 
         mock_refresh.assert_called_once()
 
