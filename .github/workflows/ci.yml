@@ -62,7 +62,7 @@ jobs:
     name: Test (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
     if: |
       github.event_name != 'workflow_dispatch' ||
       inputs.job == 'all' ||
@@ -98,14 +98,12 @@ jobs:
         run: |
           uv run python src/generate_badge.py
 
-      - name: Commit and push coverage badge
-        if: matrix.python-version == '3.12' && github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add coverage.svg
-          git commit -m "Update coverage badge [skip ci]" || exit 0
-          git push origin HEAD:main
+      - name: Upload coverage report and badge
+        if: matrix.python-version == '3.12'
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-badge
+          path: coverage.svg
 
   all-checks:
     name: All Checks Passed

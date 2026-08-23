@@ -8,7 +8,9 @@ import stat as stat_mod
 import struct
 import subprocess  # nosec B404
 import sys
+import tarfile
 import time
+import zipfile
 from typing import Any
 
 import requests
@@ -432,8 +434,14 @@ def fetch_json(url: str) -> Any:
     raise RuntimeError(f"Failed to query {url}: {last_err}") from last_err
 
 
-def download_file(url: str, dest_path: str, *, label: str = "Downloading") -> None:
-    """Download a file with progress indication, retrying on transient failures with backoff and jitter."""
+def download_file(
+    url: str,
+    dest_path: str,
+    *,
+    label: str = "Downloading",
+    max_size_bytes: int = 2 * 1024 * 1024 * 1024,  # 2 GB default safety cap
+) -> None:
+    """Download a file with progress indication, size limit checking, and retrying on transient failures."""
     headers = {"User-Agent": USER_AGENT}
     max_retries = 3
     backoff_factor = 0.5
@@ -444,14 +452,23 @@ def download_file(url: str, dest_path: str, *, label: str = "Downloading") -> No
             with requests.get(url, headers=headers, stream=True, timeout=60) as response:
                 response.raise_for_status()
                 total_size = int(response.headers.get("content-length", 0))
+                if total_size > max_size_bytes:
+                    raise RuntimeError(
+                        f"Download content-length ({total_size} bytes) exceeds "
+                        f"maximum permitted limit ({max_size_bytes} bytes)."
+                    )
                 block_size = 1024 * 64
                 downloaded = 0
 
                 with open(dest_path, "wb") as fdesc:
                     for chunk in response.iter_content(chunk_size=block_size):
                         if chunk:
-                            fdesc.write(chunk)
                             downloaded += len(chunk)
+                            if downloaded > max_size_bytes:
+                                raise RuntimeError(
+                                    f"Download exceeded maximum permitted size limit ({max_size_bytes} bytes)."
+                                )
+                            fdesc.write(chunk)
                             if total_size:
                                 percent = int(downloaded * 100 / total_size)
                                 bar_len = 40
@@ -493,8 +510,35 @@ def download_file(url: str, dest_path: str, *, label: str = "Downloading") -> No
             sys.stdout.write("\n")
             raise RuntimeError(f"Download error from {url}: {err}") from err
 
-    sys.stdout.write("\n")
-    raise RuntimeError(f"Download error from {url}: {last_err}") from last_err
+    raise RuntimeError(f"Failed to download from {url} after {max_retries} retries: {last_err}") from last_err
+
+
+def safe_extract_tar(archive_path: str, target_dir: str) -> bool:
+    """Extract a tarball using data-filter semantics to prevent directory traversal and symlink escapes."""
+    try:
+        with tarfile.open(archive_path, "r:gz") as tar:
+            tar.extractall(path=target_dir, filter="data")  # nosec B202
+        return True
+    except Exception as err:
+        print_error(f"Failed to extract tar archive safely: {err}")
+        return False
+
+
+def safe_extract_zip(archive_path: str, target_dir: str) -> bool:
+    """Extract a zip archive safely validating against path traversal (Zip-Slip) vulnerabilities."""
+    try:
+        resolved_target = os.path.realpath(target_dir)
+        with zipfile.ZipFile(archive_path, "r") as zf:
+            for member in zf.infolist():
+                dest_file = os.path.realpath(os.path.join(target_dir, member.filename))
+                if not dest_file.startswith(resolved_target + os.sep) and dest_file != resolved_target:
+                    print_error(f"Security Error: Malicious path traversal in zip archive: {member.filename}")
+                    return False
+            zf.extractall(path=target_dir)
+        return True
+    except Exception as err:
+        print_error(f"Failed to extract zip archive safely: {err}")
+        return False
 
 
 def compute_sha256(file_path: str) -> str:

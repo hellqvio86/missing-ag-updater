@@ -120,11 +120,15 @@ def test_cli_config_nonexistent_fails(mock_print_err: MagicMock, mock_exit: Magi
 def test_get_env_bool(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("TEST_VAR_TRUE", "yes")
     monkeypatch.setenv("TEST_VAR_FALSE", "off")
+    monkeypatch.setenv("TEST_VAR_INVALID", "banana")
 
     assert get_env_bool(["TEST_VAR_TRUE"], False) is True
     assert get_env_bool(["TEST_VAR_FALSE"], True) is False
     assert get_env_bool(["NON_EXISTENT"], True) is True
     assert get_env_bool(["NON_EXISTENT"], False) is False
+    # Invalid value should warn and return default
+    assert get_env_bool(["TEST_VAR_INVALID"], False) is False
+    assert get_env_bool(["TEST_VAR_INVALID"], True) is True
 
 
 def test_get_env_str(monkeypatch: pytest.MonkeyPatch) -> None:

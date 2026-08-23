@@ -634,3 +634,35 @@ def test_update_hub_symlink_failure(tmp_path: Any) -> None:
         assert res is False
 
     _run_test()
+
+
+def test_update_ide_downgrade_protection() -> None:
+    @patch(
+        "missing_ag_updater.updater.fetch_json",
+        return_value=[{"version": "2.0.3", "execution_id": "1234"}],
+    )
+    @patch("missing_ag_updater.updater.get_ide_version", return_value="2.0.4")
+    def _run_test(mock_ver: MagicMock, mock_fetch: MagicMock) -> None:
+        # Local version 2.0.4 is newer than server version 2.0.3 -> skip update
+        res = update_ide("/dummy/ide", None, force=False)
+        assert res is True
+
+    _run_test()
+
+
+def test_update_ide_selects_highest_version_when_out_of_order() -> None:
+    @patch(
+        "missing_ag_updater.updater.fetch_json",
+        return_value=[
+            {"version": "2.0.3", "execution_id": "old"},
+            {"version": "2.10.0", "execution_id": "newest"},
+            {"version": "2.9.5", "execution_id": "middle"},
+        ],
+    )
+    @patch("missing_ag_updater.updater.get_ide_version", return_value="2.9.0")
+    def _run_test(mock_ver: MagicMock, mock_fetch: MagicMock) -> None:
+        # Should detect available update to 2.10.0 in dry-run
+        res = update_ide("/dummy/ide", None, dry_run=True)
+        assert res is True
+
+    _run_test()

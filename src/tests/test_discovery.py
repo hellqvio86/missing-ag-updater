@@ -22,16 +22,20 @@ def test_is_system_path(monkeypatch: Any) -> None:
     with patch("missing_ag_updater.discovery.OS_NAME", "linux"):
         assert _is_system_path("/opt/antigravity-ide") is True
         assert _is_system_path("/usr/local/bin/antigravity") is True
+        assert _is_system_path("/optfoo/bar") is False
+        assert _is_system_path("/usrbar/bin") is False
         assert _is_system_path("/home/user/opt/Antigravity-IDE") is False
         assert _is_system_path("") is False
 
     with patch("missing_ag_updater.discovery.OS_NAME", "darwin"):
         assert _is_system_path("/Applications/Antigravity.app") is True
+        assert _is_system_path("/ApplicationsFoo") is False
         assert _is_system_path("/Users/test/Applications/Antigravity.app") is False
 
     with patch("missing_ag_updater.discovery.OS_NAME", "windows"):
         monkeypatch.setenv("ProgramFiles", "C:\\Program Files")
         assert _is_system_path("C:\\Program Files\\Antigravity") is True
+        assert _is_system_path("C:\\Program FilesFoo\\Antigravity") is False
         assert _is_system_path("C:\\Users\\Test\\AppData\\Local\\Programs") is False
 
 

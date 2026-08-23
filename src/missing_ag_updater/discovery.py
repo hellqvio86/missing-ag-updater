@@ -63,12 +63,19 @@ def _is_system_path(path: str) -> bool:
         return False
     norm = os.path.normpath(path)
     if OS_NAME == "linux":
-        return norm.startswith("/opt") or norm.startswith("/usr") or norm.startswith("/etc")
+        return any(norm == root or norm.startswith(root + "/") for root in ("/opt", "/usr", "/etc", "/var"))
     if OS_NAME == "darwin":
-        return norm.startswith("/Applications") or norm.startswith("/Library") or norm.startswith("/usr")
+        return any(
+            norm == root or norm.startswith(root + "/") for root in ("/Applications", "/Library", "/usr", "/System")
+        )
     if OS_NAME == "windows":
-        prog_files = os.environ.get("ProgramFiles", "C:\\Program Files")
-        return norm.lower().startswith(prog_files.lower())
+        prog_files = os.environ.get("ProgramFiles", "C:\\Program Files").lower()
+        prog_files_x86 = os.environ.get("ProgramFiles(x86)", "C:\\Program Files (x86)").lower()
+        norm_lower = norm.lower()
+        return any(
+            norm_lower == root or norm_lower.startswith(root + "\\")
+            for root in (prog_files, prog_files_x86, "c:\\windows")
+        )
     return False
 
 

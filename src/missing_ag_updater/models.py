@@ -96,3 +96,27 @@ class CliManifest(BaseModel):
                 raise ValueError("sha512 checksum must be a 128-character hexadecimal string")
             return cleaned.lower()
         return None
+
+
+def parse_version_tuple(version_str: str) -> tuple[int, ...]:
+    """Parse a semantic or numerical version string into a comparable integer tuple.
+
+    Examples:
+        '2.0.4' -> (2, 0, 4)
+        'v1.0.8-preview' -> (1, 0, 8)
+        'unknown' -> (0, 0, 0)
+    """
+    if not version_str:
+        return (0, 0, 0)
+    cleaned = version_str.strip().lstrip("v")
+    numbers = re.findall(r"\d+", cleaned)
+    if not numbers:
+        return (0, 0, 0)
+    return tuple(int(num) for num in numbers)
+
+
+def select_latest_release(releases: list[Release]) -> Optional[Release]:
+    """Select the release with the highest valid semantic version from a release list."""
+    if not releases:
+        return None
+    return max(releases, key=lambda release: parse_version_tuple(release.version))

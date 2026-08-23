@@ -92,3 +92,31 @@ def test_cli_manifest_validation_invalid_sha512_rejected() -> None:
                 "sha512": "not_a_valid_128_hex_string",
             }
         )
+
+
+def test_parse_version_tuple() -> None:
+    from missing_ag_updater.models import parse_version_tuple
+
+    assert parse_version_tuple("2.0.4") == (2, 0, 4)
+    assert parse_version_tuple("v2.10.1") == (2, 10, 1)
+    assert parse_version_tuple("1.0.0-alpha") == (1, 0, 0)
+    assert parse_version_tuple("") == (0, 0, 0)
+    assert parse_version_tuple("invalid") == (0, 0, 0)
+    assert parse_version_tuple("2.10.0") > parse_version_tuple("2.9.0")
+    assert parse_version_tuple("2.9.10") > parse_version_tuple("2.9.9")
+
+
+def test_select_latest_release() -> None:
+    from missing_ag_updater.models import Release, select_latest_release
+
+    releases = [
+        Release(version="2.0.3", execution_id="1"),
+        Release(version="2.10.0", execution_id="2"),
+        Release(version="2.9.5", execution_id="3"),
+    ]
+    latest = select_latest_release(releases)
+    assert latest is not None
+    assert latest.version == "2.10.0"
+    assert latest.execution_id == "2"
+
+    assert select_latest_release([]) is None
