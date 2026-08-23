@@ -572,3 +572,65 @@ def test_update_hub_running_process_aborts(
 ) -> None:
     res = update_hub("/dummy/hub", None)
     assert res is False
+
+
+def test_update_ide_symlink_failure(tmp_path: Any) -> None:
+    def mock_download_write_tar(url: str, dest_path: str, **kwargs: Any) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            bin_dir = os.path.join(td, "Antigravity IDE", "bin")
+            os.makedirs(bin_dir)
+            with open(os.path.join(bin_dir, "antigravity-ide"), "w", encoding="utf-8") as fdesc:
+                fdesc.write("launcher content")
+            with tarfile.open(dest_path, "w:gz") as tar:
+                tar.add(os.path.join(td, "Antigravity IDE"), arcname="Antigravity IDE")
+
+    @patch("missing_ag_updater.updater.update_symlink", return_value=False)
+    @patch("missing_ag_updater.updater.download_file", side_effect=mock_download_write_tar)
+    @patch("missing_ag_updater.updater.get_running_pids", return_value=[])
+    @patch("missing_ag_updater.updater.fetch_json", return_value=[{"version": "2.0.4", "execution_id": "1234"}])
+    @patch("missing_ag_updater.updater.get_ide_version", return_value="2.0.3")
+    @patch("missing_ag_updater.updater.OS_NAME", "linux")
+    def _run_test(
+        mock_ver: MagicMock,
+        mock_fetch: MagicMock,
+        mock_pids: MagicMock,
+        mock_dl: MagicMock,
+        mock_symlink: MagicMock,
+    ) -> None:
+        target_ide = str(tmp_path / "ide")
+        launcher = str(tmp_path / "bin" / "antigravity-ide")
+        res = update_ide(target_ide, launcher, force=True)
+        assert res is False
+
+    _run_test()
+
+
+def test_update_hub_symlink_failure(tmp_path: Any) -> None:
+    def mock_download_write_tar_hub(url: str, dest_path: str, **kwargs: Any) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            hub_dir = os.path.join(td, "Antigravity-x64")
+            os.makedirs(hub_dir)
+            with open(os.path.join(hub_dir, "antigravity"), "w", encoding="utf-8") as fdesc:
+                fdesc.write("hub launcher")
+            with tarfile.open(dest_path, "w:gz") as tar:
+                tar.add(hub_dir, arcname="Antigravity-x64")
+
+    @patch("missing_ag_updater.updater.update_symlink", return_value=False)
+    @patch("missing_ag_updater.updater.download_file", side_effect=mock_download_write_tar_hub)
+    @patch("missing_ag_updater.updater.get_running_pids", return_value=[])
+    @patch("missing_ag_updater.updater.fetch_json", return_value=[{"version": "2.1.4", "execution_id": "1234"}])
+    @patch("missing_ag_updater.updater.get_hub_version", return_value="2.1.3")
+    @patch("missing_ag_updater.updater.OS_NAME", "linux")
+    def _run_test(
+        mock_ver: MagicMock,
+        mock_fetch: MagicMock,
+        mock_pids: MagicMock,
+        mock_dl: MagicMock,
+        mock_symlink: MagicMock,
+    ) -> None:
+        target_hub = str(tmp_path / "hub")
+        launcher = str(tmp_path / "bin" / "antigravity")
+        res = update_hub(target_hub, launcher, force=True)
+        assert res is False
+
+    _run_test()
