@@ -23,6 +23,7 @@ from .models import CliManifest, Release
 from .nautilus import install_ide_nautilus
 from .utils import (
     can_fix_suid_sandbox,
+    compute_sha256,
     compute_sha512,
     configure_suid_sandbox,
     download_file,
@@ -48,7 +49,7 @@ def install_macos_dmg(dmg_path: str, dest_app_path: str) -> bool:
     """Mount a DMG file, copy the .app bundle to destination, and unmount on macOS."""
     mountpoint = tempfile.mkdtemp(prefix="antigravity_mount_")
     try:
-        # Attach DMG
+        # Attach DMG with fixed argv and readonly flag (no shell interpretation)
         cmd = [
             "hdiutil",
             "attach",
@@ -96,9 +97,10 @@ def install_macos_dmg(dmg_path: str, dest_app_path: str) -> bool:
 
 
 def install_windows_exe(exe_path: str) -> bool:
-    """Launch standard Windows installer silently."""
+    """Launch standard Windows installer silently using static arguments without shell expansion."""
     try:
         print_status("Running silent installer (/S)...")
+        # Fixed argument list with explicit /S switch, no shell invocation (shell=False)
         subprocess.run([exe_path, "/S"], check=True)  # nosec B603
         return True
     except Exception as err:
@@ -232,6 +234,22 @@ def update_ide(
 
         try:
             download_file(download_url, archive_path, label="Downloading Antigravity IDE")
+
+            # Checksum integrity verification when provided by release server
+            if latest.sha512:
+                print_status("Verifying SHA-512 checksum...")
+                actual_sha512 = compute_sha512(archive_path)
+                if actual_sha512.lower() != latest.sha512.lower():
+                    print_error("Security Check Failure: Checksum mismatch on IDE download archive.")
+                    return False
+                print_success("Checksum verified.")
+            elif latest.sha256:
+                print_status("Verifying SHA-256 checksum...")
+                actual_sha256 = compute_sha256(archive_path)
+                if actual_sha256.lower() != latest.sha256.lower():
+                    print_error("Security Check Failure: Checksum mismatch on IDE download archive.")
+                    return False
+                print_success("Checksum verified.")
 
             if OS_NAME == "darwin":
                 # macOS dmg installation
@@ -392,6 +410,22 @@ def update_hub(
         try:
             download_file(download_url, archive_path, label="Downloading Antigravity Hub")
 
+            # Checksum integrity verification when provided by release server
+            if latest.sha512:
+                print_status("Verifying SHA-512 checksum...")
+                actual_sha512 = compute_sha512(archive_path)
+                if actual_sha512.lower() != latest.sha512.lower():
+                    print_error("Security Check Failure: Checksum mismatch on Hub download archive.")
+                    return False
+                print_success("Checksum verified.")
+            elif latest.sha256:
+                print_status("Verifying SHA-256 checksum...")
+                actual_sha256 = compute_sha256(archive_path)
+                if actual_sha256.lower() != latest.sha256.lower():
+                    print_error("Security Check Failure: Checksum mismatch on Hub download archive.")
+                    return False
+                print_success("Checksum verified.")
+
             if OS_NAME == "darwin":
                 # macOS dmg installation
                 res = install_macos_dmg(archive_path, target_hub_dir)
@@ -488,19 +522,22 @@ def update_cli(
         )
         return False
 
+    if not expected_sha512:
+        print_error("Security Check Failure: CLI manifest does not provide an integrity checksum (sha512).")
+        return False
+
     with tempfile.TemporaryDirectory() as tmpdir:
         archive_path = os.path.join(tmpdir, "cli_archive")
         try:
             download_file(download_url, archive_path, label="Downloading Antigravity CLI")
 
             # Checksum Verification
-            if expected_sha512:
-                print_status("Verifying checksum...")
-                actual_sha512 = compute_sha512(archive_path)
-                if actual_sha512 != expected_sha512:
-                    print_error("Security Check Failure: Checksum mismatch on CLI download archive.")
-                    return False
-                print_success("Checksum verified.")
+            print_status("Verifying checksum...")
+            actual_sha512 = compute_sha512(archive_path)
+            if actual_sha512.lower() != expected_sha512.lower():
+                print_error("Security Check Failure: Checksum mismatch on CLI download archive.")
+                return False
+            print_success("Checksum verified.")
 
             print_status("Extracting archive...")
 

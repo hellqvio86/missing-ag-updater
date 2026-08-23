@@ -3,6 +3,7 @@
 import hashlib
 import json
 import os
+import random
 import stat as stat_mod
 import struct
 import subprocess  # nosec B404
@@ -125,6 +126,8 @@ def get_running_pids(keyword: str) -> list[str]:
     pids: list[str] = []
     my_pid = str(os.getpid())
     my_ppid = str(os.getppid()) if hasattr(os, "getppid") else ""
+    keyword_clean = keyword.strip().lower()
+
     if OS_NAME == "windows":
         try:
             res = subprocess.run(
@@ -137,9 +140,9 @@ def get_running_pids(keyword: str) -> list[str]:
                 if not line.strip():
                     continue
                 parts = [part.strip('"') for part in line.split(",")]
-                if len(parts) >= 2 and keyword.lower() in parts[0].lower():
+                if len(parts) >= 2 and keyword_clean in parts[0].lower():
                     image_name = parts[0].lower()
-                    if keyword.lower() == "antigravity" and "antigravity-ide" in image_name:
+                    if keyword_clean == "antigravity" and "antigravity-ide" in image_name:
                         continue
                     if "updater" in image_name:
                         continue
@@ -149,7 +152,7 @@ def get_running_pids(keyword: str) -> list[str]:
     else:
         try:
             res = subprocess.run(
-                ["pgrep", "-f", keyword],
+                ["pgrep", "-f", keyword_clean],
                 capture_output=True,
                 text=True,
                 check=False,
@@ -178,13 +181,35 @@ def get_running_pids(keyword: str) -> list[str]:
         if OS_NAME == "linux" and os.path.exists(f"/proc/{pid}/cmdline"):
             try:
                 with open(f"/proc/{pid}/cmdline", "rb") as fdesc:
-                    cmdline = fdesc.read().decode("utf-8", errors="ignore").replace("\x00", " ")
-                    if any(ignored in cmdline for ignored in ignored_substrings):
+                    cmdline_raw = fdesc.read()
+                    if not cmdline_raw:
                         continue
-                    if keyword.lower() == "antigravity" and (
-                        "antigravity-ide" in cmdline or "Antigravity IDE" in cmdline or "Antigravity-IDE" in cmdline
-                    ):
+                    tokens = [tok.decode("utf-8", errors="ignore") for tok in cmdline_raw.split(b"\x00") if tok]
+                    cmdline_str = " ".join(tokens)
+                    if any(ignored in cmdline_str for ignored in ignored_substrings):
                         continue
+
+                    # Determine binary basename from first argument
+                    exe_basename = os.path.basename(tokens[0]).lower() if tokens else ""
+
+                    if keyword_clean == "antigravity":
+                        # Hub executable should match 'antigravity' or 'antigravity-hub', not 'antigravity-ide'
+                        if "antigravity-ide" in exe_basename or "antigravity ide" in exe_basename:
+                            continue
+                        if not any(name in exe_basename for name in ("antigravity", "antigravity-hub", "electron")):
+                            if not any(tok.lower() == "antigravity" for tok in tokens):
+                                continue
+                    elif keyword_clean in ("antigravity-ide", "antigravity ide"):
+                        if not any(
+                            name in exe_basename for name in ("antigravity-ide", "antigravity ide", "code", "electron")
+                        ):
+                            if not any(
+                                "antigravity-ide" in tok.lower() or "antigravity ide" in tok.lower() for tok in tokens
+                            ):
+                                continue
+                    elif keyword_clean == "agy":
+                        if exe_basename != "agy" and not any(tok == "agy" for tok in tokens):
+                            continue
             except OSError:
                 pass
         filtered.append(pid)
@@ -286,11 +311,14 @@ def _read_asar_header(asar_path: str) -> tuple[dict[str, Any], int] | None:
 
     Reads exact `json_size` (bytes 12..15) to prevent 0-3 alignment null bytes
     (\\x00) from breaking json.loads. Falls back to `header_size - 8` if `json_size`
-    is invalid.
+    is invalid, bounded strictly by actual file size.
     """
     if not os.path.exists(asar_path):
         return None
     try:
+        file_size = os.path.getsize(asar_path)
+        if file_size < 16:
+            return None
         with open(asar_path, "rb") as fdesc:
             prefix = fdesc.read(16)
             if len(prefix) < 16:
@@ -298,9 +326,12 @@ def _read_asar_header(asar_path: str) -> tuple[dict[str, Any], int] | None:
             header_size = struct.unpack("<I", prefix[4:8])[0]
             # Read exact json_size from Chromium Pickle payload length (bytes 12..15)
             json_size = struct.unpack("<I", prefix[12:16])[0]
+            max_json_len = min(header_size, max(0, file_size - 16))
             # Fall back to header_size - 8 if json_size is non-standard or corrupt
-            if json_size <= 0 or json_size > header_size:
-                json_size = header_size - 8
+            if json_size <= 0 or json_size > max_json_len:
+                json_size = min(max(0, header_size - 8), max_json_len)
+            if json_size <= 0:
+                return None
             fdesc.seek(16)
             header_json = json.loads(fdesc.read(json_size).decode("utf-8"))
             return header_json, 8 + header_size
@@ -362,7 +393,7 @@ def get_cli_version(cli_binary: str) -> str:
 
 
 def fetch_json(url: str) -> Any:
-    """Fetch JSON from a URL with custom user agent headers, retrying on transient failures."""
+    """Fetch JSON from a URL with custom user agent headers, retrying on transient failures with backoff and jitter."""
     headers = {"User-Agent": USER_AGENT}
     max_retries = 3
     backoff_factor = 0.5
@@ -379,7 +410,8 @@ def fetch_json(url: str) -> Any:
         ) as err:
             last_err = err
             if attempt < max_retries:
-                time.sleep(backoff_factor * (2**attempt))
+                sleep_delay = min(backoff_factor * (2**attempt) + random.uniform(0.05, 0.25), 5.0)
+                time.sleep(sleep_delay)
             continue
         except requests.exceptions.HTTPError as err:
             last_err = err
@@ -390,7 +422,8 @@ def fetch_json(url: str) -> Any:
                 504,
             ]:
                 if attempt < max_retries:
-                    time.sleep(backoff_factor * (2**attempt))
+                    sleep_delay = min(backoff_factor * (2**attempt) + random.uniform(0.05, 0.25), 5.0)
+                    time.sleep(sleep_delay)
                     continue
             raise RuntimeError(f"Failed to query {url}: {err}") from err
         except (requests.exceptions.RequestException, json.JSONDecodeError) as err:
@@ -400,7 +433,7 @@ def fetch_json(url: str) -> Any:
 
 
 def download_file(url: str, dest_path: str, *, label: str = "Downloading") -> None:
-    """Download a file with a visually appealing progress bar, retrying on transient failures."""
+    """Download a file with progress indication, retrying on transient failures with backoff and jitter."""
     headers = {"User-Agent": USER_AGENT}
     max_retries = 3
     backoff_factor = 0.5
@@ -439,7 +472,8 @@ def download_file(url: str, dest_path: str, *, label: str = "Downloading") -> No
         ) as err:
             last_err = err
             if attempt < max_retries:
-                time.sleep(backoff_factor * (2**attempt))
+                sleep_delay = min(backoff_factor * (2**attempt) + random.uniform(0.05, 0.25), 5.0)
+                time.sleep(sleep_delay)
             continue
         except requests.exceptions.HTTPError as err:
             last_err = err
@@ -450,7 +484,8 @@ def download_file(url: str, dest_path: str, *, label: str = "Downloading") -> No
                 504,
             ]:
                 if attempt < max_retries:
-                    time.sleep(backoff_factor * (2**attempt))
+                    sleep_delay = min(backoff_factor * (2**attempt) + random.uniform(0.05, 0.25), 5.0)
+                    time.sleep(sleep_delay)
                     continue
             sys.stdout.write("\n")
             raise RuntimeError(f"Download error from {url}: {err}") from err
@@ -460,6 +495,18 @@ def download_file(url: str, dest_path: str, *, label: str = "Downloading") -> No
 
     sys.stdout.write("\n")
     raise RuntimeError(f"Download error from {url}: {last_err}") from last_err
+
+
+def compute_sha256(file_path: str) -> str:
+    """Compute the SHA256 hash of a file."""
+    hasher = hashlib.sha256()
+    with open(file_path, "rb") as fdesc:
+        while True:
+            chunk = fdesc.read(8192)
+            if not chunk:
+                break
+            hasher.update(chunk)
+    return hasher.hexdigest()
 
 
 def compute_sha512(file_path: str) -> str:
@@ -474,18 +521,20 @@ def compute_sha512(file_path: str) -> str:
     return hasher.hexdigest()
 
 
-def update_symlink(target: str, link_name: str) -> None:
-    """Safely create or update a symbolic link (Linux/macOS only)."""
+def update_symlink(target: str, link_name: str) -> bool:
+    """Safely create or update a symbolic link (Linux/macOS only). Returns True on success."""
     if OS_NAME == "windows":
-        return
+        return True
     try:
         if os.path.exists(link_name) or os.path.islink(link_name):
             os.remove(link_name)
         os.makedirs(os.path.dirname(link_name), exist_ok=True)
         os.symlink(target, link_name)
         print_success(f"Linked command: {link_name} -> {target}")
+        return True
     except Exception as err:
         print_warning(f"Could not update symbolic link {link_name}: {err}")
+        return False
 
 
 def extract_asar_icon(asar_path: str, dest_icon_path: str) -> bool:

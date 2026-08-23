@@ -14,6 +14,7 @@ import responses
 from missing_ag_updater.utils import (
     _get_linux_distro_id_like,
     can_fix_suid_sandbox,
+    compute_sha256,
     compute_sha512,
     configure_suid_sandbox,
     extract_asar_icon,
@@ -158,6 +159,17 @@ def test_compute_sha512() -> None:
     try:
         expected = hashlib.sha512(b"hello world").hexdigest()
         assert compute_sha512(tmp_name) == expected
+    finally:
+        os.remove(tmp_name)
+
+
+def test_compute_sha256() -> None:
+    with tempfile.NamedTemporaryFile(delete=False) as tmp:
+        tmp.write(b"hello world")
+        tmp_name = tmp.name
+    try:
+        expected = hashlib.sha256(b"hello world").hexdigest()
+        assert compute_sha256(tmp_name) == expected
     finally:
         os.remove(tmp_name)
 
@@ -326,6 +338,15 @@ def test_get_hub_version_exceptions() -> None:
             fdesc.write(struct.pack("<I", 96))
             fdesc.write(struct.pack("<I", 10))
             fdesc.write(b"invalidjson")
+        assert get_hub_version(tmpdir) == "0.0.0"
+
+        # 4. Out-of-bounds json_size / corrupt offset
+        with open(asar_path, "wb") as fdesc:
+            fdesc.write(struct.pack("<I", 4))
+            fdesc.write(struct.pack("<I", 100000))
+            fdesc.write(struct.pack("<I", 100000))
+            fdesc.write(struct.pack("<I", 999999))
+            fdesc.write(b"corrupt")
         assert get_hub_version(tmpdir) == "0.0.0"
 
 
