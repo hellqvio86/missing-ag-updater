@@ -1,5 +1,6 @@
 """GNOME Nautilus file manager integration for Antigravity IDE."""
 
+import json
 import os
 from typing import Optional
 
@@ -17,6 +18,7 @@ def install_ide_nautilus(
     target_dir = SYSTEM_NAUTILUS_DIR if scope == "system" else USER_NAUTILUS_DIR
     nautilus_file = os.path.join(target_dir, "open-in-antigravity-ide.py")
     exec_path = launcher_path or os.path.join(ide_dir, "bin", "antigravity-ide")
+    exec_path_escaped = json.dumps(exec_path)
     nautilus_content = f"""import subprocess
 from urllib.parse import unquote, urlparse
 import gi
@@ -48,7 +50,7 @@ class OpenInAntigravityIDE(GObject.GObject, Nautilus.MenuProvider):
         return unquote(parsed.path)
 
     def _activate(self, menu_item, path):
-        subprocess.Popen(['{exec_path}', path])
+        subprocess.Popen([{exec_path_escaped}, path])
 
     def get_file_items(self, files):
         if not files or len(files) != 1:
