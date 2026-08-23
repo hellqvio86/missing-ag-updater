@@ -89,8 +89,14 @@ def test_constants_unknown_os_fallback(mock_machine: MagicMock) -> None:
 
 
 def test_truthy_values_tuple() -> None:
-    """Truthy constants should include standard representations."""
+    """Truthy and falsy constants should include standard representations."""
     assert constants.TRUTHY_VALUES == ("1", "true", "yes", "on")
+    assert constants.FALSY_VALUES == ("0", "false", "no", "off")
+
+
+def test_version_constant() -> None:
+    """Version constant should match 0.5.0."""
+    assert constants.__version__ == "0.5.0"
 
 
 def test_user_agent_header() -> None:

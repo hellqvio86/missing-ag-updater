@@ -34,6 +34,8 @@ from missing_ag_updater.utils import (
     print_warning,
     resolve_existing_hub_dir,
     resolve_existing_ide_dir,
+    safe_extract_tar,
+    safe_extract_zip,
     update_symlink,
 )
 
@@ -316,6 +318,49 @@ def test_download_file_retry_success(mock_sleep) -> None:
         with open(dest, "rb") as fdesc:
             assert fdesc.read() == b"retry-success"
         assert mock_sleep.call_count == 1
+
+
+@responses.activate
+def test_download_file_max_size_exceeded() -> None:
+    responses.add(
+        responses.GET,
+        "http://example.com/huge-file",
+        body=b"x" * 200,
+        headers={"content-length": "200"},
+        status=200,
+    )
+    with tempfile.TemporaryDirectory() as tmpdir:
+        dest = os.path.join(tmpdir, "huge.txt")
+        from missing_ag_updater.utils import download_file
+
+        with pytest.raises(RuntimeError) as exc_info:
+            download_file("http://example.com/huge-file", dest, max_size_bytes=100)
+        assert "exceeds maximum permitted limit" in str(exc_info.value)
+
+
+def test_safe_extract_tar_and_zip(tmp_path: Any) -> None:
+    import tarfile
+    import zipfile
+
+    # Create dummy tar and zip
+    tar_path = str(tmp_path / "test.tar.gz")
+    zip_path = str(tmp_path / "test.zip")
+    extract_target = str(tmp_path / "extracted")
+    os.makedirs(extract_target, exist_ok=True)
+
+    dummy_file = str(tmp_path / "content.txt")
+    with open(dummy_file, "w", encoding="utf-8") as fdesc:
+        fdesc.write("sample content")
+
+    with tarfile.open(tar_path, "w:gz") as tar:
+        tar.add(dummy_file, arcname="content.txt")
+
+    with zipfile.ZipFile(zip_path, "w") as zf:
+        zf.write(dummy_file, arcname="content.txt")
+
+    assert safe_extract_tar(tar_path, extract_target) is True
+    assert safe_extract_zip(zip_path, extract_target) is True
+    assert os.path.exists(os.path.join(extract_target, "content.txt"))
 
 
 def test_get_hub_version_exceptions() -> None:

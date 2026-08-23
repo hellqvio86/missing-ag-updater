@@ -11,6 +11,7 @@ from . import utils
 from .const import (
     DEFAULT_HUB_LAUNCHER,
     DEFAULT_IDE_LAUNCHER,
+    FALSY_VALUES,
     HOME,
     OS_NAME,
     TRUTHY_VALUES,
@@ -100,7 +101,16 @@ def get_env_bool(names: List[str], default: bool) -> bool:
     for name in names:
         val = os.environ.get(name)
         if val is not None:
-            return val.lower() in TRUTHY_VALUES
+            cleaned = val.strip().lower()
+            if cleaned in TRUTHY_VALUES:
+                return True
+            if cleaned in FALSY_VALUES:
+                return False
+            utils.print_warning(
+                f"Invalid boolean value '{val}' for environment variable '{name}'. "
+                f"Expected truthy ({', '.join(TRUTHY_VALUES)}) or falsy ({', '.join(FALSY_VALUES)}). "
+                f"Defaulting to {default}."
+            )
     return default
 
 
