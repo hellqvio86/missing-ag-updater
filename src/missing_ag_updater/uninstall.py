@@ -63,8 +63,17 @@ def uninstall_ide(
     if resolved_ide_dir and os.path.exists(resolved_ide_dir):
         targets_to_remove.append(resolved_ide_dir)
         parent_dir = os.path.dirname(os.path.abspath(resolved_ide_dir))
-        if os.path.basename(parent_dir) in ("antigravity-ide", "Antigravity-IDE") and parent_dir != resolved_ide_dir:
-            targets_to_remove.append(parent_dir)
+        if (
+            os.path.basename(parent_dir) in ("antigravity-ide", "Antigravity-IDE")
+            and parent_dir != resolved_ide_dir
+            and os.path.exists(parent_dir)
+        ):
+            try:
+                parent_entries = os.listdir(parent_dir)
+                if not parent_entries or parent_entries == [os.path.basename(resolved_ide_dir)]:
+                    targets_to_remove.append(parent_dir)
+            except OSError:
+                pass
 
     # 2. Launcher Symlink
     if launcher_path and (os.path.islink(launcher_path) or os.path.exists(launcher_path)):
@@ -166,8 +175,17 @@ def uninstall_hub(
     if resolved_hub_dir and os.path.exists(resolved_hub_dir):
         targets_to_remove.append(resolved_hub_dir)
         parent_dir = os.path.dirname(os.path.abspath(resolved_hub_dir))
-        if os.path.basename(parent_dir) in ("antigravity", "Antigravity") and parent_dir != resolved_hub_dir:
-            targets_to_remove.append(parent_dir)
+        if (
+            os.path.basename(parent_dir) in ("antigravity", "Antigravity")
+            and parent_dir != resolved_hub_dir
+            and os.path.exists(parent_dir)
+        ):
+            try:
+                parent_entries = os.listdir(parent_dir)
+                if not parent_entries or parent_entries == [os.path.basename(resolved_hub_dir)]:
+                    targets_to_remove.append(parent_dir)
+            except OSError:
+                pass
 
     # 2. Launcher Symlink
     if launcher_path and (os.path.islink(launcher_path) or os.path.exists(launcher_path)):

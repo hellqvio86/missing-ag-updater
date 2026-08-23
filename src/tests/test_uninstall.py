@@ -284,3 +284,26 @@ def test_uninstall_cli_permission_denied_and_dry_run(mock_pids: MagicMock, tmp_p
     with patch("os.remove", side_effect=OSError("Cannot delete")):
         fail_res = uninstall_cli(cli_path=cli_bin)
         assert fail_res is False
+
+
+def test_uninstall_preserves_parent_with_sibling_files(tmp_path: Any) -> None:
+    # Setup parent folder with ide_dir and an unrelated sibling file
+    parent_dir = str(tmp_path / "antigravity-ide")
+    ide_dir = os.path.join(parent_dir, "Antigravity-IDE")
+    sibling_file = os.path.join(parent_dir, "my_custom_script.sh")
+
+    os.makedirs(ide_dir)
+    with open(sibling_file, "w", encoding="utf-8") as fdesc:
+        fdesc.write("#!/bin/sh\necho custom")
+
+    @patch("missing_ag_updater.uninstall.refresh_linux_desktop_caches")
+    @patch("missing_ag_updater.uninstall.get_running_pids", return_value=[])
+    def _run_test(mock_pids: MagicMock, mock_refresh: MagicMock) -> None:
+        res = uninstall_ide(ide_dir=ide_dir, launcher_path=None, force=True)
+        assert res is True
+        assert not os.path.exists(ide_dir)
+        # Parent directory and sibling file must remain untouched
+        assert os.path.exists(parent_dir)
+        assert os.path.exists(sibling_file)
+
+    _run_test()

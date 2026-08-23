@@ -25,7 +25,7 @@ def _is_ubuntu_style_distro() -> bool:
     return False
 
 
-__version__ = "0.3.1"
+__version__ = "0.4.0"
 
 # Truthy string values for environment variables and config parsing
 TRUTHY_VALUES: tuple[str, ...] = ("1", "true", "yes", "on")
@@ -161,7 +161,7 @@ else:
     DEFAULT_CLI_BINARY = ""
 
 # API URLs & User Agent
-USER_AGENT = "Mozilla/5.0 (AntigravityUpdater)"
+USER_AGENT = f"missing-ag-updater/{__version__}"
 IDE_RELEASES_URL = "https://antigravity-ide-auto-updater-974169037036.us-central1.run.app/releases"
 HUB_RELEASES_URL = "https://antigravity-hub-auto-updater-974169037036.us-central1.run.app/releases"
 CLI_MANIFEST_URL = (

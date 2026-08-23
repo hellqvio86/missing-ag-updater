@@ -426,4 +426,4 @@ def test_cli_version_flag(capsys: Any) -> None:
         main()
     assert excinfo.value.code == 0
     captured = capsys.readouterr().out
-    assert "0.3.1" in captured
+    assert "0.4.0" in captured

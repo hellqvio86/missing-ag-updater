@@ -94,5 +94,5 @@ def test_truthy_values_tuple() -> None:
 
 
 def test_user_agent_header() -> None:
-    """User agent constant should identify the updater."""
-    assert constants.USER_AGENT == "Mozilla/5.0 (AntigravityUpdater)"
+    """User agent constant should identify the updater honestly."""
+    assert constants.USER_AGENT == f"missing-ag-updater/{constants.__version__}"

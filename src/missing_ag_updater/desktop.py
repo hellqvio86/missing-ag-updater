@@ -29,14 +29,13 @@ def install_ide_desktop(
     app_dir = SYSTEM_APPLICATIONS_DIR if scope == "system" else USER_APPLICATIONS_DIR
     icons_dir = SYSTEM_ICONS_DIR if scope == "system" else USER_ICONS_DIR
 
-    os.makedirs(app_dir, exist_ok=True)
     desktop_file = os.path.join(app_dir, "antigravity-ide.desktop")
     exec_path = launcher_path or os.path.join(ide_dir, "bin", "antigravity-ide")
 
     desktop_content = f"""[Desktop Entry]
 Name=Antigravity IDE
 Comment=Google Antigravity IDE
-Exec={exec_path} %F
+Exec="{exec_path}" %F
 Icon=antigravity
 Terminal=false
 Type=Application
@@ -46,6 +45,7 @@ StartupNotify=true
 StartupWMClass=antigravity-ide
 """
     try:
+        os.makedirs(app_dir, exist_ok=True)
         with open(desktop_file, "w", encoding="utf-8") as df:
             df.write(desktop_content)
         print_success(f"Installed desktop entry: {desktop_file}")
@@ -90,8 +90,8 @@ StartupWMClass=antigravity-ide
             )
 
         if os.path.exists(icon_source):
-            os.makedirs(icons_dir, exist_ok=True)
             try:
+                os.makedirs(icons_dir, exist_ok=True)
                 shutil.copy2(icon_source, dest_icon)
                 shutil.copy2(icon_source, dest_ide_icon)
                 print_success(f"Installed {'system' if scope == 'system' else 'local'} IDE icon.")
@@ -125,14 +125,13 @@ def install_hub_desktop(
     app_dir = SYSTEM_APPLICATIONS_DIR if scope == "system" else USER_APPLICATIONS_DIR
     icons_dir = SYSTEM_ICONS_DIR if scope == "system" else USER_ICONS_DIR
 
-    os.makedirs(app_dir, exist_ok=True)
     desktop_file = os.path.join(app_dir, "antigravity.desktop")
     exec_path = launcher_path or os.path.join(hub_dir, "antigravity")
 
     desktop_content = f"""[Desktop Entry]
 Name=Antigravity
 Comment=Google Antigravity 2.0 agent platform
-Exec={exec_path} %U
+Exec="{exec_path}" %U
 Icon=antigravity
 Terminal=false
 Type=Application
@@ -141,6 +140,7 @@ StartupNotify=true
 StartupWMClass=Antigravity
 """
     try:
+        os.makedirs(app_dir, exist_ok=True)
         with open(desktop_file, "w", encoding="utf-8") as df:
             df.write(desktop_content)
         print_success(f"Installed desktop entry: {desktop_file}")

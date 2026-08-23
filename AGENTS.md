@@ -134,6 +134,27 @@ sudo pacman -S python-nautilus && nautilus -q
 
 ---
 
+## 🔒 Security Model & Verification
+
+Because `missing-ag-updater` downloads binaries, extracts archives, and can mutate system paths or escalate privileges via `sudo`, it follows strict security practices:
+
+1. **Integrity Verification**:
+   - **CLI**: Mandatory SHA-512 checksum validation against the manifest before extraction.
+   - **IDE & Hub**: SHA-512 and SHA-256 checksum verification when hashes are supplied by release endpoints.
+2. **Strict Domain Allowlists**:
+   - Downloads are restricted exclusively to official Google HTTPS distribution endpoints (`dl.google.com`, `edgedl.me.gvt1.com`, `storage.googleapis.com`, and `*.google.com` / `*.googleapis.com` / `*.gvt1.com` / `*.googleusercontent.com`).
+3. **Subprocess & Execution Safety**:
+   - **Zero `shell=True` usage**: All subprocess operations use literal, structured argv lists (`hdiutil`, `sudo`, `tasklist`, `pgrep`, etc.) preventing shell injection attacks.
+   - Windows silent installers are executed strictly with fixed arguments `[exe_path, "/S"]`.
+4. **Filesystem & Extraction Guardrails**:
+   - **Zip-Slip Protection**: Zip extraction explicitly guards against directory traversal attacks via path verification.
+   - **Tarball Data Filter**: Tar archive extraction uses Python 3.12+ safe `filter="data"` semantics.
+   - **Uninstall Scope Isolation**: Uninstallation safeguards parent directories to avoid removing non-empty custom sibling directories.
+5. **AppArmor & SUID Sandbox Security**:
+   - `chrome-sandbox` configuration strictly allowlists Ubuntu-style distributions and verifies AppArmor status before applying `root:root 4755` permissions.
+
+---
+
 ## 🐍 Programmatic Python API for Custom Automation
 
 You can import functions directly in Python scripts or subagents:

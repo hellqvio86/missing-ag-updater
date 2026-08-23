@@ -27,12 +27,11 @@ def test_install_ide_desktop(tmp_path: Any) -> None:
     @patch("missing_ag_updater.desktop.USER_APPLICATIONS_DIR", user_app_dir)
     def _run_test(mock_refresh: MagicMock) -> None:
         install_ide_desktop(ide_dir=ide_dir, launcher_path=launcher_path)
-
         desktop_file = os.path.join(user_app_dir, "antigravity-ide.desktop")
         assert os.path.exists(desktop_file)
         with open(desktop_file, "r", encoding="utf-8") as fdesc:
             content = fdesc.read()
-            assert "Exec=" + launcher_path in content
+            assert f'Exec="{launcher_path}" %F' in content
             assert "Icon=antigravity" in content
 
         dest_icon = os.path.join(user_icons_dir, "antigravity-ide.png")
@@ -141,7 +140,7 @@ def test_install_hub_desktop(tmp_path: Any) -> None:
         assert os.path.exists(desktop_file)
         with open(desktop_file, "r", encoding="utf-8") as fdesc:
             content = fdesc.read()
-            assert "Exec=" + launcher_path in content
+            assert f'Exec="{launcher_path}" %U' in content
             assert "Icon=antigravity" in content
 
         mock_extract.assert_called_once_with(asar_path, os.path.join(user_icons_dir, "antigravity.png"))

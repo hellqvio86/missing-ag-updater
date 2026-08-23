@@ -1,3 +1,5 @@
+"""GNOME Nautilus file manager integration for Antigravity IDE."""
+
 import os
 from typing import Optional
 
@@ -13,7 +15,6 @@ def install_ide_nautilus(
 ) -> None:
     """Install Nautilus context-menu integration script for user or system."""
     target_dir = SYSTEM_NAUTILUS_DIR if scope == "system" else USER_NAUTILUS_DIR
-    os.makedirs(target_dir, exist_ok=True)
     nautilus_file = os.path.join(target_dir, "open-in-antigravity-ide.py")
     exec_path = launcher_path or os.path.join(ide_dir, "bin", "antigravity-ide")
     nautilus_content = f"""import subprocess
@@ -76,10 +77,11 @@ class OpenInAntigravityIDE(GObject.GObject, Nautilus.MenuProvider):
         return [item]
 """
     try:
+        os.makedirs(target_dir, exist_ok=True)
         with open(nautilus_file, "w", encoding="utf-8") as nf:
             nf.write(nautilus_content)
         print_success(f"Installed Nautilus context-menu: {nautilus_file}")
-    except Exception as ne:
+    except (OSError, Exception) as ne:
         print_warning(f"Could not install Nautilus context-menu: {ne}")
 
     refresh_linux_desktop_caches()
