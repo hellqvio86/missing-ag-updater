@@ -25,7 +25,7 @@ def _is_ubuntu_style_distro() -> bool:
     return False
 
 
-__version__ = "0.5.0"
+__version__ = "0.5.1"
 
 # Truthy and falsy string values for environment variables and config parsing
 TRUTHY_VALUES: tuple[str, ...] = ("1", "true", "yes", "on")

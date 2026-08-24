@@ -95,8 +95,8 @@ def test_truthy_values_tuple() -> None:
 
 
 def test_version_constant() -> None:
-    """Version constant should match 0.5.0."""
-    assert constants.__version__ == "0.5.0"
+    """Version constant should match 0.5.1."""
+    assert constants.__version__ == "0.5.1"
 
 
 def test_user_agent_header() -> None:

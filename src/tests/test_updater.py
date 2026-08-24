@@ -22,28 +22,128 @@ SAMPLE_CLI_URL = "https://dl.google.com/release2/agy.tar.gz"
 SAMPLE_CLI_ZIP_URL = "https://dl.google.com/release2/agy.zip"
 
 
-def test_get_download_url() -> None:
-    # Test IDE Linux
-    with patch("missing_ag_updater.updater.OS_NAME", "linux"):
-        url = get_download_url("ide", "2.0.4", "12345")
-        assert "linux-x64/Antigravity%20IDE.tar.gz" in url
+@patch("missing_ag_updater.updater.ARCH_NAME", "x64")
+@patch("missing_ag_updater.updater.OS_NAME", "linux")
+def test_get_download_url_ide_linux_x64() -> None:
+    url = get_download_url("ide", "2.5.5", "4923483625488384")
+    assert url == (
+        "https://edgedl.me.gvt1.com/edgedl/release2/j0qc3/antigravity/stable/"
+        "2.5.5-4923483625488384/linux-x64/Antigravity%20IDE.tar.gz"
+    )
 
-    # Test Hub macOS ARM64
-    with patch("missing_ag_updater.updater.OS_NAME", "darwin"):
-        with patch("missing_ag_updater.updater.ARCH_NAME", "arm64"):
-            url = get_download_url("hub", "2.1.4", "67890")
-            assert "darwin-arm/Antigravity.dmg" in url
 
-    # Test Hub macOS X64
-    with patch("missing_ag_updater.updater.OS_NAME", "darwin"):
-        with patch("missing_ag_updater.updater.ARCH_NAME", "x64"):
-            url = get_download_url("hub", "2.1.4", "67890")
-            assert "darwin-x64/Antigravity.dmg" in url
+@patch("missing_ag_updater.updater.ARCH_NAME", "arm64")
+@patch("missing_ag_updater.updater.OS_NAME", "linux")
+def test_get_download_url_ide_linux_arm64() -> None:
+    url = get_download_url("ide", "2.5.5", "4923483625488384")
+    assert url == (
+        "https://edgedl.me.gvt1.com/edgedl/release2/j0qc3/antigravity/stable/"
+        "2.5.5-4923483625488384/linux-arm/Antigravity%20IDE.tar.gz"
+    )
 
-    # Test IDE Windows
-    with patch("missing_ag_updater.updater.OS_NAME", "windows"):
-        url = get_download_url("ide", "2.0.4", "12345")
-        assert "windows-x64/Antigravity%20IDE.exe" in url
+
+@patch("missing_ag_updater.updater.ARCH_NAME", "x64")
+@patch("missing_ag_updater.updater.OS_NAME", "darwin")
+def test_get_download_url_ide_darwin_x64() -> None:
+    url = get_download_url("ide", "2.5.5", "4923483625488384")
+    assert url == (
+        "https://edgedl.me.gvt1.com/edgedl/release2/j0qc3/antigravity/stable/"
+        "2.5.5-4923483625488384/darwin-x64/Antigravity%20IDE.dmg"
+    )
+
+
+@patch("missing_ag_updater.updater.ARCH_NAME", "arm64")
+@patch("missing_ag_updater.updater.OS_NAME", "darwin")
+def test_get_download_url_ide_darwin_arm64() -> None:
+    url = get_download_url("ide", "2.5.5", "4923483625488384")
+    assert url == (
+        "https://edgedl.me.gvt1.com/edgedl/release2/j0qc3/antigravity/stable/"
+        "2.5.5-4923483625488384/darwin-arm/Antigravity%20IDE.dmg"
+    )
+
+
+@patch("missing_ag_updater.updater.ARCH_NAME", "x64")
+@patch("missing_ag_updater.updater.OS_NAME", "windows")
+def test_get_download_url_ide_windows_x64() -> None:
+    url = get_download_url("ide", "2.5.5", "4923483625488384")
+    assert url == (
+        "https://edgedl.me.gvt1.com/edgedl/release2/j0qc3/antigravity/stable/"
+        "2.5.5-4923483625488384/windows-x64/Antigravity%20IDE.exe"
+    )
+
+
+@patch("missing_ag_updater.updater.ARCH_NAME", "arm64")
+@patch("missing_ag_updater.updater.OS_NAME", "windows")
+def test_get_download_url_ide_windows_arm64() -> None:
+    url = get_download_url("ide", "2.5.5", "4923483625488384")
+    assert url == (
+        "https://edgedl.me.gvt1.com/edgedl/release2/j0qc3/antigravity/stable/"
+        "2.5.5-4923483625488384/windows-arm64/Antigravity%20IDE.exe"
+    )
+
+
+@patch("missing_ag_updater.updater.ARCH_NAME", "x64")
+@patch("missing_ag_updater.updater.OS_NAME", "linux")
+def test_get_download_url_hub_linux_x64() -> None:
+    url = get_download_url("hub", "2.9.1", "4871453687021568")
+    assert url == (
+        "https://storage.googleapis.com/antigravity-public/antigravity-hub/"
+        "2.9.1-4871453687021568/linux-x64/Antigravity.tar.gz"
+    )
+
+
+@patch("missing_ag_updater.updater.ARCH_NAME", "arm64")
+@patch("missing_ag_updater.updater.OS_NAME", "linux")
+def test_get_download_url_hub_linux_arm64() -> None:
+    url = get_download_url("hub", "2.9.1", "4871453687021568")
+    assert url == (
+        "https://storage.googleapis.com/antigravity-public/antigravity-hub/"
+        "2.9.1-4871453687021568/linux-arm/Antigravity.tar.gz"
+    )
+
+
+@patch("missing_ag_updater.updater.ARCH_NAME", "x64")
+@patch("missing_ag_updater.updater.OS_NAME", "darwin")
+def test_get_download_url_hub_darwin_x64() -> None:
+    url = get_download_url("hub", "2.9.1", "4871453687021568")
+    assert url == (
+        "https://storage.googleapis.com/antigravity-public/antigravity-hub/"
+        "2.9.1-4871453687021568/darwin-x64/Antigravity.dmg"
+    )
+
+
+@patch("missing_ag_updater.updater.ARCH_NAME", "arm64")
+@patch("missing_ag_updater.updater.OS_NAME", "darwin")
+def test_get_download_url_hub_darwin_arm64() -> None:
+    url = get_download_url("hub", "2.9.1", "4871453687021568")
+    assert url == (
+        "https://storage.googleapis.com/antigravity-public/antigravity-hub/"
+        "2.9.1-4871453687021568/darwin-arm/Antigravity.dmg"
+    )
+
+
+@patch("missing_ag_updater.updater.ARCH_NAME", "x64")
+@patch("missing_ag_updater.updater.OS_NAME", "windows")
+def test_get_download_url_hub_windows_x64() -> None:
+    url = get_download_url("hub", "2.9.1", "4871453687021568")
+    assert url == (
+        "https://storage.googleapis.com/antigravity-public/antigravity-hub/"
+        "2.9.1-4871453687021568/windows-x64/Antigravity-x64.exe"
+    )
+
+
+@patch("missing_ag_updater.updater.ARCH_NAME", "arm64")
+@patch("missing_ag_updater.updater.OS_NAME", "windows")
+def test_get_download_url_hub_windows_arm64() -> None:
+    url = get_download_url("hub", "2.9.1", "4871453687021568")
+    assert url == (
+        "https://storage.googleapis.com/antigravity-public/antigravity-hub/"
+        "2.9.1-4871453687021568/windows-arm/Antigravity-arm64.exe"
+    )
+
+
+def test_get_download_url_unknown_component() -> None:
+    assert get_download_url("unknown", "1.0.0", "123") == ""
 
 
 @patch("subprocess.run")
