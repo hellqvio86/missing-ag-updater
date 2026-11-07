@@ -1,0 +1,36 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    "helpers:pinGitHubActionDigests"
+  ],
+  "labels": [
+    "dependencies"
+  ],
+  "automerge": false,
+  "gitAuthor": "Olof Hellqvist <olof.hellqvist@gmail.com>",
+  "github-actions": {
+    "enabled": true
+  },
+  "packageRules": [
+    {
+      "description": "Group Python dependencies",
+      "matchManagers": [
+        "pep621",
+        "pip_requirements",
+        "pip_setup"
+      ],
+      "groupName": "python-dependencies",
+      "groupSlug": "python-deps"
+    },
+    {
+      "description": "Group and pin GitHub Actions",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "groupName": "github-actions",
+      "groupSlug": "github-actions",
+      "pinDigests": true
+    }
+  ]
+}

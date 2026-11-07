@@ -1,4 +1,4 @@
-.PHONY: venv lint test clean format build publish run install version
+.PHONY: venv lint test clean format build publish run install version renovate renovate-summary
 
 .venv: pyproject.toml
 	if [ ! -d .venv ]; then uv venv; fi
@@ -35,4 +35,11 @@ publish: build
 
 clean:
 	rm -rf .venv __pycache__ .pytest_cache .ruff_cache dist
+
+renovate:
+	@./bin/renovate/run.sh
+
+renovate-summary:
+	@./bin/renovate/run.sh --summary
+
 
