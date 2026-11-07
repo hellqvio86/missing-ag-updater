@@ -1,4 +1,4 @@
-.PHONY: venv lint test clean format build publish run install
+.PHONY: venv lint test clean format build publish run install version
 
 .venv: pyproject.toml
 	if [ ! -d .venv ]; then uv venv; fi
@@ -23,6 +23,9 @@ run: .venv
 
 install:
 	uv tool install --force .
+
+version:
+	uv version --bump patch
 
 build: .venv
 	uv build
