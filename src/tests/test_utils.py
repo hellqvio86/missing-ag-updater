@@ -198,13 +198,14 @@ def test_get_running_pids() -> None:
     # Test on Unix with a mock subprocess.run
     with patch("missing_ag_updater.utils.OS_NAME", "linux"):
         with patch("subprocess.run") as mock_run:
-            mock_res = subprocess.CompletedProcess(args=[], returncode=0, stdout="1234\n5678\n")
+            current_pid = str(os.getpid())
+            other_pid = str(int(current_pid) + 1)
+            mock_res = subprocess.CompletedProcess(args=[], returncode=0, stdout=f"{current_pid}\n{other_pid}\n")
             mock_run.return_value = mock_res
 
-            pids = get_running_pids("test")
-            current_pid = str(os.getpid())
-            expected = [pid for pid in ["1234", "5678"] if pid != current_pid]
-            assert pids == expected
+            with patch("missing_ag_updater.utils._read_linux_cmdline", return_value=None):
+                pids = get_running_pids("test")
+            assert pids == [other_pid]
 
     # Test on Windows with tasklist mock
     with patch("missing_ag_updater.utils.OS_NAME", "windows"):
