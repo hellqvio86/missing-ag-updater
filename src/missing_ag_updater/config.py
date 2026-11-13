@@ -48,6 +48,8 @@ class ResolvedConfig:
     install_desktop: bool = True
     install_nautilus: bool = True
     update_all: bool = True
+    wsl: bool = False
+    wsl_cli_only: bool = False
     config_path: Optional[str] = None
 
 
@@ -331,6 +333,14 @@ def resolve_config(
 
     update_all = not (ide or hub or cli)
 
+    # WSL: nobody wants GUI apps there, so default to the terminal CLI only.
+    # Explicit --ide/--hub/--cli (or env/TOML equivalents) always win.
+    wsl = utils.is_wsl()
+    wsl_cli_only = wsl and update_all
+    if wsl_cli_only:
+        cli = True
+        update_all = False
+
     return ResolvedConfig(
         check=check,
         ide=ide,
@@ -352,6 +362,8 @@ def resolve_config(
         install_desktop=install_desktop,
         install_nautilus=install_nautilus,
         update_all=update_all,
+        wsl=wsl,
+        wsl_cli_only=wsl_cli_only,
         config_path=config_path_str
         if (cli_config or os.environ.get("ANTIGRAVITY_CONFIG") or os.environ.get("AG_CONFIG"))
         else None,

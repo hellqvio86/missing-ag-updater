@@ -491,7 +491,7 @@ def test_cli_version_flag(capsys: Any) -> None:
         main()
     assert excinfo.value.code == 0
     captured = capsys.readouterr().out
-    assert "0.6.0" in captured
+    assert "0.7.0" in captured
 
 
 @patch("sys.exit", side_effect=SystemExit)

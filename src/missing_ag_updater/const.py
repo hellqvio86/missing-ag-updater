@@ -2,6 +2,7 @@
 
 import os
 import platform
+import re
 import sys
 from typing import Optional
 
@@ -27,7 +28,7 @@ def _is_ubuntu_style_distro() -> bool:
 
 # Single source of truth for the package version. `pyproject.toml` reads this
 # value dynamically via Hatchling (`[tool.hatch.version]`), so bump only here.
-__version__ = "0.6.0"
+__version__ = "0.7.0"
 
 # Truthy and falsy string values for environment variables and config parsing
 TRUTHY_VALUES: tuple[str, ...] = ("1", "true", "yes", "on")
@@ -195,3 +196,41 @@ RELEASE_ENDPOINT_ENV_VARS: dict[str, tuple[str, ...]] = {
     "hub": ("ANTIGRAVITY_HUB_RELEASES_URL", "AG_HUB_RELEASES_URL"),
     "cli": ("ANTIGRAVITY_CLI_MANIFEST_URL", "AG_CLI_MANIFEST_URL"),
 }
+
+# Download domain allowlist (HTTPS only), enforced by models.is_trusted_download_url()
+ALLOWED_HOSTS: frozenset[str] = frozenset(
+    {
+        "dl.google.com",
+        "edgedl.me.gvt1.com",
+        "storage.googleapis.com",
+    }
+)
+
+ALLOWED_HOST_SUFFIXES: tuple[str, ...] = (
+    ".google.com",
+    ".googleapis.com",
+    ".gvt1.com",
+    ".googleusercontent.com",
+)
+
+HEX_64_PATTERN = re.compile(r"^[0-9a-fA-F]{64}$")
+HEX_128_PATTERN = re.compile(r"^[0-9a-fA-F]{128}$")
+
+# Distro allowlist for sandbox features (opt-in per distro)
+SANDBOX_DISTROS: frozenset[str] = frozenset({"ubuntu"})
+
+# WSL detection: environment markers and kernel release files containing "microsoft"
+WSL_ENV_MARKERS: tuple[str, ...] = ("WSL_DISTRO_NAME", "WSL_INTEROP")
+WSL_KERNEL_RELEASE_FILES: tuple[str, ...] = ("/proc/sys/kernel/osrelease", "/proc/version")
+
+# Command lines that belong to the updater itself, test runners, or agent
+# daemons. These are never the user-facing application we are about to replace.
+IGNORED_PROCESS_SUBSTRINGS: tuple[str, ...] = (
+    "missing_ag_updater",
+    "missing-ag-updater",
+    "antigravity-updater",
+    "antigravity-cli",
+    "antigravity_daemon",
+    ".gemini/antigravity",
+    "pytest",
+)

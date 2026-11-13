@@ -4,6 +4,16 @@ All notable changes to `missing-ag-updater` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [0.7.0] - 2026-11-13
+
+### Added
+
+- WSL auto-detection (`is_wsl()`): inside Windows Subsystem for Linux only the CLI is installed/updated by default. Explicit `--ide` / `--hub` / `--cli` (or env/TOML equivalents) override this; `--uninstall` still targets all components.
+- `wsl` key in `--json` / `diagnose_all()` output, and a WSL line in `--diagnose`.
+- `ResolvedConfig.wsl` and `ResolvedConfig.wsl_cli_only` fields.
+
 ## [0.6.0] - 2026-11-13
 
 ### Added
@@ -45,4 +55,6 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 See the GitHub releases page for changes before 0.6.0.
 
+[Unreleased]: https://github.com/hellqvio86/missing-ag-updater/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/hellqvio86/missing-ag-updater/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/hellqvio86/missing-ag-updater/compare/v0.5.3...v0.6.0
