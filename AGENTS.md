@@ -41,6 +41,7 @@ When assisting a user with setup, unexpected duplicate icons, hanging processes,
    - **Release endpoint failure**: Read the `ReleaseEndpointError` output, which lists every attempted URL and HTTP status. Re-run with `--debug`, then override endpoints with the `ANTIGRAVITY_*_URL` variables if Google moved them.
    - **Checksum refusal (`Refusing to install an unverified archive`)**: The release endpoint supplied no SHA-512/SHA-256. Prefer waiting for metadata to recover; use `--allow-unverified` only when the endpoint is explicitly trusted.
    - **CLI shows `Self-update: managed by official updater`**: The CLI update is skipped on purpose. Follow [Recipe 7](#recipe-7-official-cli-self-update-conflicts) instead of forcing it.
+   - **Running inside WSL** (`"wsl": true` in `--json`): Only the CLI is managed by default. Pass `--ide` / `--hub` explicitly only if the user actually wants GUI apps under WSLg. `--uninstall` still covers all components.
 
 ---
 
@@ -217,7 +218,7 @@ export ANTIGRAVITY_CLI_MANIFEST_URL="https://primary.example/manifests/linux_amd
 antigravity-updater --check
 ```
 
-`--json` prints diagnostics only and exits; it does not update anything. The payload includes `updater_version`, `os`, `arch`, `ide_installations`, `hub_installations`, `cli_installations`, `running_processes`, `desktop_files`, and `sandbox_status`.
+`--json` prints diagnostics only and exits; it does not update anything. The payload includes `updater_version`, `os`, `arch`, `wsl`, `ide_installations`, `hub_installations`, `cli_installations`, `running_processes`, `desktop_files`, and `sandbox_status`.
 
 If the updater refuses an IDE/Hub archive because no checksum was supplied, do **not** immediately reach for `--allow-unverified`. First confirm the endpoint is the expected Google URL. Only opt out when the user explicitly trusts that source:
 ```bash
@@ -382,6 +383,7 @@ The full release sequence (version bump, changelog, tag, GitHub release, PyPI pu
 - Never remove the download domain allowlist or introduce `shell=True`.
 - Tests must be hermetic: never depend on host state such as `~/.gemini/antigravity-cli`. The autouse fixture in `src/tests/conftest.py` already isolates the official CLI updater state folder.
 - Keep the version in `src/missing_ag_updater/const.py` only; `pyproject.toml` reads it dynamically. Use `make version BUMP=minor`.
+- All module-level constants (paths, allowlists, patterns, env var names, marker tuples) belong in `src/missing_ag_updater/const.py`, never in other modules. Import them from `.const`.
 
 All contributions must maintain:
 - **100% type safety** (`mypy` strict mode with full annotations).

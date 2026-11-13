@@ -6,23 +6,7 @@ from urllib.parse import urlparse
 
 from pydantic import BaseModel, field_validator
 
-ALLOWED_HOSTS: frozenset[str] = frozenset(
-    {
-        "dl.google.com",
-        "edgedl.me.gvt1.com",
-        "storage.googleapis.com",
-    }
-)
-
-ALLOWED_HOST_SUFFIXES: tuple[str, ...] = (
-    ".google.com",
-    ".googleapis.com",
-    ".gvt1.com",
-    ".googleusercontent.com",
-)
-
-HEX_64_PATTERN = re.compile(r"^[0-9a-fA-F]{64}$")
-HEX_128_PATTERN = re.compile(r"^[0-9a-fA-F]{128}$")
+from .const import ALLOWED_HOST_SUFFIXES, ALLOWED_HOSTS, HEX_64_PATTERN, HEX_128_PATTERN
 
 
 def is_trusted_download_url(url: str) -> bool:

@@ -21,13 +21,17 @@ from .const import (
     COLOR_FAIL,
     COLOR_GREEN,
     COLOR_WARNING,
+    IGNORED_PROCESS_SUBSTRINGS,
     OS_NAME,
+    SANDBOX_DISTROS,
     SYSTEM_APPLICATIONS_DIR,
     SYSTEM_OPT_DIR,
     USER_AGENT,
     USER_APPLICATIONS_DIR,
     USER_ICONS_DIR,
     USER_OPT_DIR,
+    WSL_ENV_MARKERS,
+    WSL_KERNEL_RELEASE_FILES,
 )
 
 _DEBUG_ENABLED = False
@@ -75,10 +79,6 @@ def print_info(msg: str) -> None:
     print(f"  {msg}")
 
 
-# Distro allowlist for sandbox features (opt-in per distro)
-_SANDBOX_DISTROS = frozenset({"ubuntu"})
-
-
 def get_linux_distro_id() -> str:
     """Return the lowercase distro ID from /etc/os-release (e.g. 'ubuntu', 'fedora').
 
@@ -123,11 +123,32 @@ def is_ubuntu_sandbox_distro() -> bool:
     Linux Mint with ID_LIKE='ubuntu debian'.
     """
     distro_id = get_linux_distro_id()
-    if distro_id in _SANDBOX_DISTROS:
+    if distro_id in SANDBOX_DISTROS:
         return True
     for like_id in _get_linux_distro_id_like():
-        if like_id in _SANDBOX_DISTROS:
+        if like_id in SANDBOX_DISTROS:
             return True
+    return False
+
+
+def is_wsl() -> bool:
+    """Return True when running inside Windows Subsystem for Linux (WSL1 or WSL2).
+
+    Checks the WSL environment variables first, then falls back to the kernel
+    release string (which contains "microsoft" on WSL). The kernel check also
+    works under ``sudo``, which strips the WSL environment variables.
+    """
+    if OS_NAME != "linux":
+        return False
+    if any(os.environ.get(marker) for marker in WSL_ENV_MARKERS):
+        return True
+    for release_file in WSL_KERNEL_RELEASE_FILES:
+        try:
+            with open(release_file, "r", encoding="utf-8") as fdesc:
+                if "microsoft" in fdesc.read().lower():
+                    return True
+        except OSError:
+            continue
     return False
 
 
@@ -142,19 +163,6 @@ def is_path_writable(path: str) -> bool:
             break
         target = parent
     return os.access(target, os.W_OK)
-
-
-# Command lines that belong to the updater itself, test runners, or agent
-# daemons. These are never the user-facing application we are about to replace.
-IGNORED_PROCESS_SUBSTRINGS: tuple[str, ...] = (
-    "missing_ag_updater",
-    "missing-ag-updater",
-    "antigravity-updater",
-    "antigravity-cli",
-    "antigravity_daemon",
-    ".gemini/antigravity",
-    "pytest",
-)
 
 
 def _read_linux_cmdline(pid: str) -> list[str] | None:

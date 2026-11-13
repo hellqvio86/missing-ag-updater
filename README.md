@@ -283,6 +283,8 @@ antigravity-updater --cli   # Update only CLI
 antigravity-updater --hub   # Update only Hub
 ```
 
+> **WSL:** Inside Windows Subsystem for Linux the updater auto-detects WSL and manages **only the CLI** by default — no GUI apps. Pass `--ide` / `--hub` explicitly (or set `ide = true` / `hub = true` in `config.toml`) if you really want them under WSLg. `--uninstall` still removes all components.
+
 ### 4. Install / Update System-Wide (`/opt`) with `sudo`
 ```bash
 # When installed via uv tool or pipx:
@@ -451,6 +453,7 @@ Before writing files the updater scans for running IDE/Hub/CLI processes. Detect
 | Platform | Things to know |
 | :--- | :--- |
 | **Linux** | System scope needs `sudo` with a forwarded `PATH`. Ubuntu 24.04+ may additionally need `--apparmor-sandbox`. Hyphenated IDE paths are used on Ubuntu-style distros to avoid the Chromium space bug. |
+| **WSL** | Detected via `WSL_DISTRO_NAME` / `WSL_INTEROP` or a `microsoft` kernel release string (works under `sudo` too). Only the CLI is installed/updated by default; request GUI apps explicitly with `--ide` / `--hub`. |
 | **macOS** | Writing to `/Applications` needs `sudo` unless you use `--user` (`~/Applications`). The updater mounts the DMG via `hdiutil`, copies the `.app`, and detaches it; a busy volume usually means another installer is still mounted. |
 | **Windows** | Installers run silently with `/S`. Close running Antigravity windows first because the installer cannot replace locked files. PATH updates may require a new terminal session. |
 | **Mixed scopes** | Do not keep both user (`~/opt`) and system (`/opt`) copies unless you intend to; run `--clean-duplicates --system` to remove duplicate launchers. |

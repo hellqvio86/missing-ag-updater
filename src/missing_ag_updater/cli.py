@@ -32,6 +32,8 @@ def run_diagnose() -> None:
     data = diagnose_all()
     print(f"\n{COLOR_HEADER}{COLOR_BOLD}=== Antigravity System Diagnostics ==={COLOR_ENDC}\n")
     print(f"  Operating System: {COLOR_BOLD}{data['os']}{COLOR_ENDC}")
+    if data.get("wsl"):
+        print(f"  Environment:      {COLOR_BOLD}WSL (CLI-only by default){COLOR_ENDC}")
 
     print(f"\n{COLOR_BOLD}--- IDE Installations ---{COLOR_ENDC}")
     if not data["ide_installations"]:
@@ -303,8 +305,12 @@ def main() -> None:
         )
         print_info(f"Uninstall Mode - Target Platform: {COLOR_BOLD}{OS_NAME} ({ARCH_NAME}){COLOR_ENDC}\n")
 
+        # The WSL CLI-only default applies to installs/updates; uninstall still removes
+        # every component so leftover GUI installs can be cleaned up.
+        uninstall_all = cfg.update_all or cfg.wsl_cli_only
+
         success = True
-        if cfg.ide or cfg.update_all:
+        if cfg.ide or uninstall_all:
             res = uninstall_ide(
                 ide_dir=cfg.dir_ide if args.dir_ide else None,
                 launcher_path=cfg.ide_launcher if args.dir_ide else None,
@@ -315,7 +321,7 @@ def main() -> None:
             success = success and res
             print()
 
-        if cfg.hub or cfg.update_all:
+        if cfg.hub or uninstall_all:
             res = uninstall_hub(
                 hub_dir=cfg.dir_hub if args.dir_hub else None,
                 launcher_path=cfg.hub_launcher if args.dir_hub else None,
@@ -326,7 +332,7 @@ def main() -> None:
             success = success and res
             print()
 
-        if cfg.cli or cfg.update_all:
+        if cfg.cli or uninstall_all:
             res = uninstall_cli(
                 cli_path=cfg.path_cli if args.path_cli else None,
                 scope=cfg.scope,
@@ -350,6 +356,12 @@ def main() -> None:
     )
     print_warning("This project is a community tool and is NOT affiliated with, sponsored by, or supported by Google.")
     print_info(f"Target Platform: {COLOR_BOLD}{OS_NAME} ({ARCH_NAME}){COLOR_ENDC}\n")
+
+    if cfg.wsl_cli_only:
+        print_info(
+            "WSL detected: only the Antigravity CLI is managed by default. "
+            "Pass --ide and/or --hub explicitly to manage GUI apps.\n"
+        )
 
     success = True
 
