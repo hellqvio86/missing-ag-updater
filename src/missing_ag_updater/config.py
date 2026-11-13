@@ -33,6 +33,9 @@ class ResolvedConfig:
     hub: bool = False
     cli: bool = False
     force: bool = False
+    ignore_self_update: bool = False
+    allow_unverified: bool = False
+    debug: bool = False
     system: bool = False
     user: bool = False
     scope: Optional[str] = None
@@ -197,6 +200,24 @@ def resolve_config(
     force = _resolve_bool(
         getattr(args, "force", None) if args else None, ["ANTIGRAVITY_FORCE", "AG_FORCE"], "force", False
     )
+    ignore_self_update = _resolve_bool(
+        getattr(args, "ignore_self_update", None) if args else None,
+        ["ANTIGRAVITY_IGNORE_SELF_UPDATE", "AG_IGNORE_SELF_UPDATE"],
+        "ignore_self_update",
+        False,
+    )
+    allow_unverified = _resolve_bool(
+        getattr(args, "allow_unverified", None) if args else None,
+        ["ANTIGRAVITY_ALLOW_UNVERIFIED", "AG_ALLOW_UNVERIFIED"],
+        "allow_unverified",
+        False,
+    )
+    debug = _resolve_bool(
+        getattr(args, "debug", None) if args else None,
+        ["ANTIGRAVITY_DEBUG", "AG_DEBUG"],
+        "debug",
+        False,
+    )
 
     # AppArmor sandbox: CLI flag > env var > TOML config > auto-detect
     arg_apparmor = getattr(args, "apparmor_sandbox", None) if args else None
@@ -316,6 +337,9 @@ def resolve_config(
         hub=hub,
         cli=cli,
         force=force,
+        ignore_self_update=ignore_self_update,
+        allow_unverified=allow_unverified,
+        debug=debug,
         system=is_system,
         user=is_user,
         scope=scope,

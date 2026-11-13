@@ -44,6 +44,33 @@ def test_release_validation_failure() -> None:
         Release.model_validate({"version": "2.0.4", "execution_id": "123", "sha256": "not_64_chars"})
 
 
+def test_release_explicit_download_urls() -> None:
+    """Release metadata may supply full trusted download URLs or a platform map."""
+    release = Release.model_validate(
+        {
+            "version": "2.0.4",
+            "execution_id": "exec-123",
+            "download_url": "https://dl.google.com/release2/ide.tar.gz",
+            "downloads": {"linux-x64": "https://storage.googleapis.com/antigravity-public/ide.tar.gz"},
+        }
+    )
+    assert release.download_url == "https://dl.google.com/release2/ide.tar.gz"
+    assert release.downloads == {"linux-x64": "https://storage.googleapis.com/antigravity-public/ide.tar.gz"}
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"download_url": "https://example.com/ide.tar.gz"},
+        {"url": "http://dl.google.com/insecure.tar.gz"},
+        {"downloads": {"linux-x64": "https://evil.example/ide.tar.gz"}},
+    ],
+)
+def test_release_untrusted_download_urls_rejected(payload: dict[str, str]) -> None:
+    with pytest.raises(ValidationError):
+        Release.model_validate({"version": "2.0.4", "execution_id": "exec-123", **payload})
+
+
 def test_cli_manifest_validation_success() -> None:
     # Valid CLI manifest from trusted Google domains
     trusted_urls = [

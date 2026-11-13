@@ -10,6 +10,12 @@ If you run into issues with versions, multiple icons, or missing commands, run t
 
 ```bash
 antigravity-updater --diagnose
+
+# Machine-readable JSON for scripts/agents:
+antigravity-updater --json
+
+# Include endpoint URLs, checksum results, and process decisions on stderr:
+antigravity-updater --diagnose --debug
 ```
 
 This will print a complete system report detailing:
@@ -18,6 +24,8 @@ This will print a complete system report detailing:
 - Active `.desktop` launcher files and their registered `Exec=` commands.
 - Currently running Antigravity processes (PIDs).
 - AppArmor / sandbox status.
+
+The `--json` payload is stable for automation: `updater_version`, `os`, `arch`, `ide_installations`, `hub_installations`, `cli_installations`, `running_processes`, `desktop_files`, and `sandbox_status`.
 
 ---
 
@@ -70,11 +78,15 @@ sudo env "PATH=$PATH" antigravity-updater --apparmor-sandbox
 This sets `root:root` ownership and `4755` permissions on the `chrome-sandbox` binary.
 
 #### Option B: Clean Existing Duplicate/Spaced Folders
-If an older installation used a folder name with spaces, migrate or clean duplicates:
+If an older installation used a folder name with spaces, the updater resolves the legacy path and migrates it to the hyphenated name automatically, but only when it lives under the default `~/opt` or `/opt` parent. Custom `--dir-ide` paths are never moved automatically.
+
+To inspect or clean duplicate launchers left behind by mixed scopes:
 
 ```bash
 antigravity-updater --clean-duplicates
 ```
+
+The hyphenated `~/opt/Antigravity-IDE` name exists because Chromium truncates paths containing spaces when launching `chrome-sandbox`, producing `FATAL: Check failed: . : Invalid argument (22)`. The updater uses the hyphenated name on Ubuntu-style distributions; other distributions may still use the spaced name unless overridden.
 
 ---
 
@@ -171,10 +183,47 @@ Updating files while an Electron application or VS Code instance is actively run
 
 ### Solution
 1. **Standard:** Save your work and close all open Antigravity IDE or Hub windows, then rerun `antigravity-updater`.
-2. **Force Update:** If you are running in a CI/CD environment or headless terminal where you know it is safe to proceed:
+2. **Verify the detected process:** Run `antigravity-updater --json | jq '.running_processes'` or `antigravity-updater --diagnose --debug` to see which PIDs matched and why.
+3. **Force Update:** If you are running in a CI/CD environment or headless terminal where you know it is safe to proceed:
    ```bash
    antigravity-updater --force
    ```
+
+> [!NOTE]
+> Process detection is a safety net, not a guarantee. It matches executable names plus install-path hints from `/proc/<pid>/cmdline` (Linux), `pgrep` (macOS), or `tasklist` (Windows). Wrapper scripts, renamed binaries, containerized processes, and some IDE child processes may not be detected. The updater filters out its own process and shell commands that merely mention a path. If a false positive still blocks you, confirm with `--debug` before using `--force`.
+
+---
+
+## 8. Release Endpoint Failures or Checksum Refusals
+
+### Symptom
+
+```text
+Failed to check IDE updates: Could not fetch release metadata for 'ide' from any endpoint ...
+```
+
+or
+
+```text
+Refusing to install an unverified archive. Re-run with --allow-unverified ...
+```
+
+### Cause
+
+Release metadata comes from unofficial Cloud Run endpoints that Google may move or retire. IDE/Hub installs also fail closed when the endpoint supplies no SHA checksum.
+
+### Solution
+
+1. **Inspect every attempted URL** (the error lists each one with its HTTP status), or re-run with `--debug` for the exact requests.
+2. **Override the endpoint** with a comma-separated fallback list:
+   ```bash
+   export ANTIGRAVITY_IDE_RELEASES_URL="https://primary.example/releases,https://backup.example/releases"
+   export ANTIGRAVITY_HUB_RELEASES_URL="https://primary.example/releases"
+   export ANTIGRAVITY_CLI_MANIFEST_URL="https://primary.example/manifests/linux_amd64.json"
+   antigravity-updater --check
+   ```
+3. **Checksum refusal:** prefer waiting for metadata to recover. Use `--allow-unverified` (or `allow_unverified = true`) only if you explicitly trust the endpoint.
+4. **Report the outage** on GitHub with the failed URLs and status codes so the defaults can be updated.
 
 ---
 

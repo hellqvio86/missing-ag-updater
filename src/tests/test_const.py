@@ -1,6 +1,7 @@
 """Unit tests for platform detection, path resolution, and global constants."""
 
 import importlib
+from pathlib import Path
 from typing import Generator
 from unittest.mock import MagicMock, mock_open, patch
 
@@ -95,8 +96,17 @@ def test_truthy_values_tuple() -> None:
 
 
 def test_version_constant() -> None:
-    """Version constant should match 0.5.2."""
-    assert constants.__version__ == "0.5.2"
+    """Version constant is the single source of truth for the package version."""
+    assert constants.__version__ == "0.6.0"
+
+
+def test_version_is_read_by_hatch() -> None:
+    """pyproject.toml must declare a dynamic version sourced from const.py."""
+    pyproject = Path(__file__).resolve().parents[2] / "pyproject.toml"
+    content = pyproject.read_text(encoding="utf-8")
+    assert 'dynamic = ["version"]' in content
+    assert 'path = "src/missing_ag_updater/const.py"' in content
+    assert 'version = "0.' not in content
 
 
 def test_user_agent_header() -> None:

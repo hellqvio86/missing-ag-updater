@@ -23,10 +23,31 @@ from .const import (
     COLOR_WARNING,
     OS_NAME,
     SYSTEM_APPLICATIONS_DIR,
+    SYSTEM_OPT_DIR,
     USER_AGENT,
     USER_APPLICATIONS_DIR,
     USER_ICONS_DIR,
+    USER_OPT_DIR,
 )
+
+_DEBUG_ENABLED = False
+
+
+def set_debug_enabled(enabled: bool) -> None:
+    """Enable or disable verbose diagnostic logging (writes to stderr, never secrets)."""
+    global _DEBUG_ENABLED
+    _DEBUG_ENABLED = enabled
+
+
+def is_debug_enabled() -> bool:
+    """Return True when verbose diagnostic logging is active."""
+    return _DEBUG_ENABLED
+
+
+def debug_log(msg: str) -> None:
+    """Emit a verbose diagnostic message to stderr when --debug is active."""
+    if _DEBUG_ENABLED:
+        print(f"[debug] {msg}", file=sys.stderr)
 
 
 def print_status(msg: str) -> None:
@@ -123,8 +144,87 @@ def is_path_writable(path: str) -> bool:
     return os.access(target, os.W_OK)
 
 
+# Command lines that belong to the updater itself, test runners, or agent
+# daemons. These are never the user-facing application we are about to replace.
+IGNORED_PROCESS_SUBSTRINGS: tuple[str, ...] = (
+    "missing_ag_updater",
+    "missing-ag-updater",
+    "antigravity-updater",
+    "antigravity-cli",
+    "antigravity_daemon",
+    ".gemini/antigravity",
+    "pytest",
+)
+
+
+def _read_linux_cmdline(pid: str) -> list[str] | None:
+    """Read a process command line from /proc, returning None when unavailable."""
+    cmdline_path = f"/proc/{pid}/cmdline"
+    if not os.path.exists(cmdline_path):
+        return None
+    try:
+        with open(cmdline_path, "rb") as fdesc:
+            raw = fdesc.read()
+    except OSError:
+        return None
+    if not raw:
+        return None
+    return [token.decode("utf-8", errors="ignore") for token in raw.split(b"\x00") if token]
+
+
+def _is_ignored_process(tokens: list[str]) -> bool:
+    """Return True if the command line clearly belongs to the updater/tests/agents."""
+    cmdline_str = " ".join(tokens).lower()
+    return any(marker in cmdline_str for marker in IGNORED_PROCESS_SUBSTRINGS)
+
+
+def _matches_component_process(keyword: str, tokens: list[str]) -> bool:
+    """Pure, testable process filter for the IDE, Hub, and CLI.
+
+    ``keyword`` must already be lowercase and stripped. Unknown keywords fall
+    back to a simple substring match, matching the historical pgrep behavior.
+    """
+    if not tokens:
+        return False
+    exe_basename = os.path.basename(tokens[0]).lower()
+    lowered_tokens = [token.lower() for token in tokens]
+
+    if keyword == "antigravity":
+        # Hub executable should match 'antigravity' / 'antigravity-hub', not the IDE.
+        if "antigravity-ide" in exe_basename or "antigravity ide" in exe_basename:
+            return False
+        if any(name in exe_basename for name in ("antigravity", "antigravity-hub")):
+            return True
+        if "electron" in exe_basename:
+            # Generic Electron shell: require an Antigravity Hub path/token, not just any Electron app.
+            return any(
+                "antigravity" in token and "antigravity-ide" not in token and "antigravity ide" not in token
+                for token in lowered_tokens
+            )
+        return any(token == "antigravity" for token in lowered_tokens)
+
+    if keyword in ("antigravity-ide", "antigravity ide"):
+        if any(name in exe_basename for name in ("antigravity-ide", "antigravity ide", "code")):
+            return True
+        return any("antigravity-ide" in token or "antigravity ide" in token for token in lowered_tokens)
+
+    if keyword == "agy":
+        return exe_basename == "agy" or any(token == "agy" for token in lowered_tokens)
+
+    return keyword in " ".join(lowered_tokens)
+
+
 def get_running_pids(keyword: str) -> list[str]:
-    """Get running PIDs matching keyword, excluding updater and agent processes."""
+    """Get running PIDs matching keyword, excluding updater and agent processes.
+
+    Platform notes / known limitations:
+      - Linux uses ``pgrep -f`` plus ``/proc/<pid>/cmdline`` inspection. Processes
+        whose ``/proc`` entry disappears between the two calls are skipped.
+      - macOS/BSD fall back to ``pgrep -f`` output without cmdline filtering.
+      - Windows uses ``tasklist`` image names only, so Electron processes may
+        appear as ``Antigravity.exe`` rather than their product name.
+      - Containers without ``pgrep``/``/proc`` silently return no PIDs.
+    """
     pids: list[str] = []
     my_pid = str(os.getpid())
     my_ppid = str(os.getppid()) if hasattr(os, "getppid") else ""
@@ -145,8 +245,10 @@ def get_running_pids(keyword: str) -> list[str]:
                 if len(parts) >= 2 and keyword_clean in parts[0].lower():
                     image_name = parts[0].lower()
                     if keyword_clean == "antigravity" and "antigravity-ide" in image_name:
+                        debug_log(f"process {parts[1]} ignored: IDE image matched Hub keyword")
                         continue
                     if "updater" in image_name:
+                        debug_log(f"process {parts[1]} ignored: updater image")
                         continue
                     pids.append(parts[1])
         except Exception:  # nosec B110
@@ -166,54 +268,22 @@ def get_running_pids(keyword: str) -> list[str]:
 
     # Exclude our own process PID and parent process to avoid false positives
     filtered: list[str] = []
-    ignored_substrings = [
-        "missing_ag_updater",
-        "missing-ag-updater",
-        "antigravity-updater",
-        "antigravity-cli",
-        "antigravity_daemon",
-        ".gemini/antigravity",
-        "pytest",
-        "/bin/agy",
-        " agy",
-    ]
     for pid in pids:
         if pid in (my_pid, my_ppid):
+            debug_log(f"process {pid} ignored: current or parent process")
             continue
-        if OS_NAME == "linux" and os.path.exists(f"/proc/{pid}/cmdline"):
-            try:
-                with open(f"/proc/{pid}/cmdline", "rb") as fdesc:
-                    cmdline_raw = fdesc.read()
-                    if not cmdline_raw:
-                        continue
-                    tokens = [tok.decode("utf-8", errors="ignore") for tok in cmdline_raw.split(b"\x00") if tok]
-                    cmdline_str = " ".join(tokens)
-                    if any(ignored in cmdline_str for ignored in ignored_substrings):
-                        continue
-
-                    # Determine binary basename from first argument
-                    exe_basename = os.path.basename(tokens[0]).lower() if tokens else ""
-
-                    if keyword_clean == "antigravity":
-                        # Hub executable should match 'antigravity' or 'antigravity-hub', not 'antigravity-ide'
-                        if "antigravity-ide" in exe_basename or "antigravity ide" in exe_basename:
-                            continue
-                        if not any(name in exe_basename for name in ("antigravity", "antigravity-hub", "electron")):
-                            if not any(tok.lower() == "antigravity" for tok in tokens):
-                                continue
-                    elif keyword_clean in ("antigravity-ide", "antigravity ide"):
-                        if not any(
-                            name in exe_basename for name in ("antigravity-ide", "antigravity ide", "code", "electron")
-                        ):
-                            if not any(
-                                "antigravity-ide" in tok.lower() or "antigravity ide" in tok.lower() for tok in tokens
-                            ):
-                                continue
-                    elif keyword_clean == "agy":
-                        if exe_basename != "agy" and not any(tok == "agy" for tok in tokens):
-                            continue
-            except OSError:
-                pass
+        if OS_NAME == "linux":
+            tokens = _read_linux_cmdline(pid)
+            if tokens is None:
+                debug_log(f"process {pid} kept: cmdline unavailable")
+            elif _is_ignored_process(tokens):
+                debug_log(f"process {pid} ignored: updater/test/agent command line")
+                continue
+            elif not _matches_component_process(keyword_clean, tokens):
+                debug_log(f"process {pid} ignored: does not match '{keyword_clean}'")
+                continue
+            else:
+                debug_log(f"process {pid} matched '{keyword_clean}': {' '.join(tokens)}")
         filtered.append(pid)
     return filtered
 
@@ -282,6 +352,51 @@ def resolve_existing_hub_dir(hub_dir: str) -> str:
             return cand
 
     return hub_dir
+
+
+def migrate_legacy_ide_dir(ide_dir: str) -> str:
+    """Migrate Ubuntu's legacy spaced ``Antigravity IDE`` directory to the hyphenated path.
+
+    Chromium's zygote/sandbox code truncates executable paths containing spaces,
+    so Ubuntu installs use ``Antigravity-IDE``. Older releases used
+    ``Antigravity IDE``. Only the two default parent directories (``~/opt`` and
+    ``/opt``) are migrated automatically; custom paths are left untouched.
+
+    Returns the directory that should be used for the update. If migration is
+    not possible (permissions, both directories exist, non-Ubuntu distro), the
+    original or canonical path is returned with a clear diagnostic.
+    """
+    if OS_NAME != "linux" or not is_ubuntu_sandbox_distro():
+        return ide_dir
+
+    normalized = os.path.normpath(ide_dir)
+    if os.path.basename(normalized) != "Antigravity IDE":
+        return ide_dir
+
+    parent = os.path.dirname(normalized)
+    allowed_parents = {os.path.normpath(USER_OPT_DIR), os.path.normpath(SYSTEM_OPT_DIR)}
+    if parent not in allowed_parents:
+        debug_log(f"legacy IDE path migration skipped for custom parent: {parent}")
+        return ide_dir
+
+    canonical = os.path.join(parent, "Antigravity-IDE")
+    if not os.path.isdir(normalized):
+        return ide_dir
+    if os.path.exists(canonical):
+        print_info(
+            f"Both legacy '{normalized}' and canonical '{canonical}' IDE directories exist; "
+            "using the canonical path. Run --clean-duplicates to remove the stale copy."
+        )
+        return canonical
+
+    try:
+        os.rename(normalized, canonical)
+    except OSError as err:
+        print_warning(f"Could not migrate legacy IDE directory '{normalized}' to '{canonical}': {err}")
+        return ide_dir
+
+    print_success(f"Migrated legacy IDE directory: {normalized} -> {canonical}")
+    return canonical
 
 
 def get_ide_version(ide_dir: str) -> str:
@@ -403,31 +518,36 @@ def fetch_json(url: str) -> Any:
 
     for attempt in range(max_retries + 1):
         try:
+            debug_log(f"GET {url} (attempt {attempt + 1}/{max_retries + 1})")
             response = requests.get(url, headers=headers, timeout=10)
             response.raise_for_status()
+            debug_log(f"GET {url} -> HTTP {response.status_code}")
             return response.json()
         except (
             requests.exceptions.ConnectionError,
             requests.exceptions.Timeout,
         ) as err:
             last_err = err
+            debug_log(f"GET {url} transient failure: {err}")
             if attempt < max_retries:
                 sleep_delay = min(backoff_factor * (2**attempt) + random.uniform(0.05, 0.25), 5.0)
                 time.sleep(sleep_delay)
             continue
         except requests.exceptions.HTTPError as err:
             last_err = err
-            if err.response is not None and err.response.status_code in [
-                500,
-                502,
-                503,
-                504,
-            ]:
+            status_code = err.response.status_code if err.response is not None else None
+            debug_log(f"GET {url} -> HTTP {status_code}")
+            if status_code in (500, 502, 503, 504):
                 if attempt < max_retries:
                     sleep_delay = min(backoff_factor * (2**attempt) + random.uniform(0.05, 0.25), 5.0)
                     time.sleep(sleep_delay)
                     continue
-            raise RuntimeError(f"Failed to query {url}: {err}") from err
+            if status_code == 404:
+                raise RuntimeError(
+                    f"Failed to query {url}: HTTP 404 (endpoint not found). "
+                    "These release endpoints are unofficial and reverse-engineered, so they may have moved."
+                ) from err
+            raise RuntimeError(f"Failed to query {url}: HTTP {status_code}") from err
         except (requests.exceptions.RequestException, json.JSONDecodeError) as err:
             raise RuntimeError(f"Failed to query {url}: {err}") from err
 
@@ -449,6 +569,7 @@ def download_file(
 
     for attempt in range(max_retries + 1):
         try:
+            debug_log(f"DOWNLOAD {url} -> {dest_path} (attempt {attempt + 1}/{max_retries + 1})")
             with requests.get(url, headers=headers, stream=True, timeout=60) as response:
                 response.raise_for_status()
                 total_size = int(response.headers.get("content-length", 0))

@@ -6,6 +6,9 @@ from dataclasses import asdict, dataclass
 from typing import Any, Optional
 
 from .const import (
+    ARCH_NAME,
+    CLI_SELF_UPDATER_MARKERS,
+    CLI_SELF_UPDATER_STATE_DIR,
     HOME,
     OS_NAME,
     SYSTEM_APPLICATIONS_DIR,
@@ -23,6 +26,7 @@ from .const import (
     USER_IDE_DIR,
     USER_IDE_LAUNCHER,
     USER_OPT_DIR,
+    __version__,
 )
 from .utils import (
     get_cli_version,
@@ -51,6 +55,7 @@ class InstallationInfo:
     desktop_entry: Optional[str] = None
     icon_path: Optional[str] = None
     is_active_path: bool = False
+    self_update: Optional[str] = None  # CLI only: reason if the official `agy` self-updater manages this binary
 
     def to_dict(self) -> dict[str, Any]:
         """Convert installation info dataclass to dictionary."""
@@ -77,6 +82,43 @@ def _is_system_path(path: str) -> bool:
             for root in (prog_files, prog_files_x86, "c:\\windows")
         )
     return False
+
+
+def detect_cli_self_update(cli_binary: str) -> Optional[str]:
+    """Detect whether the official `agy` self-updater is managing the given CLI binary.
+
+    Returns a human-readable reason when self-update evidence is found, otherwise None.
+
+    Signals (checked in order):
+      1. Backup files left by the official updater next to the binary (e.g. `agy.1794543464486432375.old`).
+      2. The official updater state directory (`~/.gemini/antigravity-cli/updater`) for user-scope binaries.
+    """
+    if not cli_binary:
+        return None
+
+    binary_dir = os.path.dirname(cli_binary) or "."
+    binary_name = os.path.basename(cli_binary)
+    backup_prefix = f"{binary_name}."
+    try:
+        sibling_names = os.listdir(binary_dir)
+    except OSError:
+        sibling_names = []
+    for sibling_name in sorted(sibling_names):
+        if not (sibling_name.startswith(backup_prefix) and sibling_name.endswith(".old")):
+            continue
+        backup_token = sibling_name[len(backup_prefix) : -len(".old")]
+        if backup_token.isdigit():
+            return f"official self-update backup found: {os.path.join(binary_dir, sibling_name)}"
+
+    if _is_system_path(cli_binary):
+        return None
+
+    for marker_name in CLI_SELF_UPDATER_MARKERS:
+        marker_path = os.path.join(CLI_SELF_UPDATER_STATE_DIR, marker_name)
+        if os.path.isfile(marker_path):
+            return f"official self-updater state found: {marker_path}"
+
+    return None
 
 
 def _find_exec_from_desktop(desktop_path: str) -> Optional[str]:
@@ -390,6 +432,7 @@ def find_all_cli_installations() -> list[InstallationInfo]:
                     version=ver,
                     scope=scope,
                     is_writable=writable,
+                    self_update=detect_cli_self_update(cand_bin),
                 )
             )
 
@@ -584,7 +627,9 @@ def diagnose_all() -> dict[str, Any]:
         }
 
     return {
+        "updater_version": __version__,
         "os": OS_NAME,
+        "arch": ARCH_NAME,
         "ide_installations": [inst.to_dict() for inst in ide_installs],
         "hub_installations": [inst.to_dict() for inst in hub_installs],
         "cli_installations": [inst.to_dict() for inst in cli_installs],

@@ -25,7 +25,9 @@ def _is_ubuntu_style_distro() -> bool:
     return False
 
 
-__version__ = "0.5.2"
+# Single source of truth for the package version. `pyproject.toml` reads this
+# value dynamically via Hatchling (`[tool.hatch.version]`), so bump only here.
+__version__ = "0.6.0"
 
 # Truthy and falsy string values for environment variables and config parsing
 TRUTHY_VALUES: tuple[str, ...] = ("1", "true", "yes", "on")
@@ -161,10 +163,35 @@ else:
     DEFAULT_HUB_DIR = ""
     DEFAULT_CLI_BINARY = ""
 
+# State directory written by the official `agy` self-updater (contains update.lock / update_status.json)
+CLI_SELF_UPDATER_STATE_DIR = os.path.join(HOME, ".gemini", "antigravity-cli", "updater")
+CLI_SELF_UPDATER_MARKERS = ("update_status.json", "update.lock")
+
 # API URLs & User Agent
+#
+# WARNING: These are unofficial, reverse-engineered Google Cloud Run endpoints
+# used by the Antigravity desktop clients. They are not documented or supported
+# by Google and may move or disappear without notice. Each endpoint can be
+# overridden with an environment variable (comma-separated for fallbacks); see
+# RELEASE_ENDPOINT_ENV_VARS. The updater reports the attempted URLs and HTTP
+# status codes when every endpoint fails.
 USER_AGENT = f"missing-ag-updater/{__version__}"
 IDE_RELEASES_URL = "https://antigravity-ide-auto-updater-974169037036.us-central1.run.app/releases"
 HUB_RELEASES_URL = "https://antigravity-hub-auto-updater-974169037036.us-central1.run.app/releases"
 CLI_MANIFEST_URL = (
     f"https://antigravity-cli-auto-updater-974169037036.us-central1.run.app/manifests/{OS_NAME}_{CLI_ARCH}.json"
 )
+
+# Ordered release metadata endpoints per component. Environment overrides are
+# prepended at runtime by `updater.get_release_endpoints()`.
+RELEASE_ENDPOINTS: dict[str, tuple[str, ...]] = {
+    "ide": (IDE_RELEASES_URL,),
+    "hub": (HUB_RELEASES_URL,),
+    "cli": (CLI_MANIFEST_URL,),
+}
+
+RELEASE_ENDPOINT_ENV_VARS: dict[str, tuple[str, ...]] = {
+    "ide": ("ANTIGRAVITY_IDE_RELEASES_URL", "AG_IDE_RELEASES_URL"),
+    "hub": ("ANTIGRAVITY_HUB_RELEASES_URL", "AG_HUB_RELEASES_URL"),
+    "cli": ("ANTIGRAVITY_CLI_MANIFEST_URL", "AG_CLI_MANIFEST_URL"),
+}

@@ -44,12 +44,41 @@ def is_trusted_download_url(url: str) -> bool:
 
 
 class Release(BaseModel):
-    """Release metadata for Antigravity IDE and Hub."""
+    """Release metadata for Antigravity IDE and Hub.
+
+    Newer manifests can supply complete download URLs. Those are preferred over
+    the historical hard-coded CDN paths, which remain a fallback.
+    """
 
     version: str
     execution_id: str
     sha512: Optional[str] = None
     sha256: Optional[str] = None
+    download_url: Optional[str] = None
+    url: Optional[str] = None
+    downloads: Optional[dict[str, str]] = None
+
+    @field_validator("download_url", "url")
+    @classmethod
+    def validate_download_url(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        cleaned = value.strip()
+        if not is_trusted_download_url(cleaned):
+            raise ValueError(f"Download URL '{cleaned}' is not an authorized HTTPS Google download source.")
+        return cleaned
+
+    @field_validator("downloads")
+    @classmethod
+    def validate_downloads(cls, value: Optional[dict[str, str]]) -> Optional[dict[str, str]]:
+        if value is None:
+            return None
+        cleaned: dict[str, str] = {}
+        for key, url in value.items():
+            if not is_trusted_download_url(url):
+                raise ValueError(f"Download URL for '{key}' is not an authorized HTTPS Google download source.")
+            cleaned[key] = url
+        return cleaned
 
     @field_validator("sha512")
     @classmethod

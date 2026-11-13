@@ -1,5 +1,8 @@
 # Missing-AG-Updater
 
+> [!NOTE]
+> **Community project, not an official Google tool.** This project is not affiliated with, sponsored by, or supported by Google LLC. It uses the same Cloud endpoints as the Antigravity clients; those endpoints are not a public API and Google may change them at any time.
+
 [![CI/CD](https://github.com/hellqvio86/missing-ag-updater/actions/workflows/ci.yml/badge.svg)](https://github.com/hellqvio86/missing-ag-updater/actions/workflows/ci.yml)
 [![Coverage](coverage.svg)](https://github.com/hellqvio86/missing-ag-updater/actions)
 [![PyPI Version](https://img.shields.io/pypi/v/missing-ag-updater.svg)](https://pypi.org/project/missing-ag-updater/)
@@ -29,13 +32,24 @@
                              Missing-AG-Updater
 ```
 
-> [!IMPORTANT]
-> **Disclaimer:** This project is an unofficial, community-maintained utility. It is **NOT** affiliated with, sponsored by, or supported by Google LLC.
-
 > [!NOTE]
 > **Beta Release:** This utility is currently in **beta** stage with extensive cross-platform test coverage. If you discover any edge cases, please report them on GitHub.
 
 This repository contains a fast, reliable installer and auto-updater for the **Google Antigravity** developer suite on Linux, macOS, and Windows.
+
+---
+
+## Official vs. Community Tooling
+
+| | Google's official channels | This project (`missing-ag-updater`) |
+| :--- | :--- | :--- |
+| **Supported by Google** | Yes | **No** |
+| **Supported components** | Each component's own installer/updater | IDE + Hub + CLI under one command |
+| **Release metadata** | Google product endpoints | Unofficial, reverse-engineered Cloud Run endpoints (overrideable) |
+| **CLI updates** | Official `agy` self-updater / install script | Skipped when official self-update is detected (use `agy update`) |
+| **Best for** | Supported production installs | Developer convenience, cross-platform automation, headless agents |
+
+If you only need the CLI, prefer Google's official installation script and `agy update`. Use this project when you want one command that checks and updates all three components, manages duplicate launcher entries, and repairs Linux sandbox permissions.
 
 ---
 
@@ -64,7 +78,11 @@ This leads to several developer pain points that this project solves:
 - **Duplicate Entry Cleanup:** Automated cleanup tool (`--clean-duplicates`) for resolving duplicate launcher icons.
 - **Clean Uninstallation:** One-command removal (`--uninstall`) of components, launcher symlinks, desktop entries, and Nautilus extensions.
 - **Safe Installation:** Warns if target applications are actively running before attempting file operations (override with `--force`).
-- **Checksum Verification:** Verifies SHA-512 hashes for CLI binaries prior to extraction.
+- **Official CLI Self-Update Awareness:** Detects when the official `agy` self-updater manages the CLI binary and skips updating it to avoid conflicts (override with `--ignore-self-update` or `--force`).
+- **Checksum Verification:** Verifies SHA-512/SHA-256 hashes and **fails closed** when IDE/Hub metadata supplies no checksum (opt out explicitly with `--allow-unverified`). CLI archives always require SHA-512.
+- **Machine-Readable Diagnostics:** `--json` prints structured diagnostics for agents and scripts.
+- **Verbose Debugging:** `--debug` logs exact URLs, checksum results, and process-detection decisions to stderr (stdout stays machine-readable).
+- **Resilient Endpoints:** Release endpoints can be overridden with environment variables and comma-separated fallbacks; failures list every attempted URL and HTTP status.
 - **Desktop & File Manager Integrations:** Automatically installs `.desktop` shortcuts, icon assets, and GNOME Nautilus context-menu extensions ("Open in Antigravity IDE").
 - **AppArmor Compatibility:** Built-in SUID root sandbox setup (`--apparmor-sandbox`) for Ubuntu 24.04+.
 - **Rich Terminal UI:** Displays progress bars and clear color status feedback.
@@ -77,6 +95,9 @@ This leads to several developer pain points that this project solves:
 
 - [Linux Troubleshooting & Diagnostics Guide](docs/troubleshooting-linux.md)
 - [Advanced Usage, Configuration & Other Platforms (macOS, Windows, Python API)](docs/other-platforms-and-advanced.md)
+- [Platform Test Matrix (Manual Checklist)](docs/platform-test-matrix.md)
+- [Release Process Checklist](docs/release-process.md)
+- [Changelog](CHANGELOG.md)
 - [AI Assistant & Agent Instruction Guide](AGENTS.md)
 
 ---
@@ -199,8 +220,9 @@ $ antigravity-updater
 
 ```text
 usage: antigravity-updater [-h] [--check] [--ide] [--hub] [--cli] [--force]
-                           [--system] [--user] [--diagnose] [--clean-duplicates]
-                           [--remove-user-dirs] [--uninstall]
+                           [--ignore-self-update] [--allow-unverified] [--debug]
+                           [--system] [--user] [--diagnose] [--json]
+                           [--clean-duplicates] [--remove-user-dirs] [--uninstall]
                            [--dir-ide DIR_IDE] [--dir-hub DIR_HUB] [--path-cli PATH_CLI]
                            [--no-desktop] [--no-nautilus]
                            [--apparmor-sandbox] [--no-apparmor-sandbox]
@@ -215,10 +237,14 @@ options:
   --hub                 Update/operate only on the Antigravity Hub
   --cli                 Update/operate only on the Antigravity CLI
   --force               Bypass version checks and active process warnings
+  --ignore-self-update  Update the CLI even if the official 'agy' self-updater is detected
+  --allow-unverified    Install IDE/Hub archives without a checksum (fails closed by default)
+  --debug               Log exact URLs, checksum results, and process decisions to stderr
   --system              Install/manage system-wide (/opt and /usr/local/bin)
   --user                Install/manage for current user (~/opt and ~/.local/bin)
   --diagnose, --diagnostic, --diagnostics, --doctor
                         Run complete system diagnostics on installed components
+  --json                Print diagnostics as JSON and exit (implies --diagnose)
   --clean-duplicates    Clean duplicate desktop launcher entries
   --remove-user-dirs    Also remove local user opt directories during duplicate cleanup
   --uninstall           Uninstall specified components, desktop entries, and symlinks
@@ -245,6 +271,9 @@ antigravity-updater --check
 ```bash
 antigravity-updater --diagnostic
 # (Aliases: --diagnose, --diagnostics, --doctor)
+
+# Machine-readable output for agents / CI:
+antigravity-updater --json | jq '.ide_installations'
 ```
 
 ### 3. Update Only a Specific Component
@@ -298,13 +327,18 @@ You can configure the behavior of the auto-updater using environment variables. 
 | `--hub` | `ANTIGRAVITY_HUB` or `AG_HUB` | Boolean | Update only the Antigravity Hub |
 | `--cli` | `ANTIGRAVITY_CLI` or `AG_CLI` | Boolean | Update only the Antigravity CLI |
 | `--force` | `ANTIGRAVITY_FORCE` or `AG_FORCE` | Boolean | Bypass version checks and active process warnings |
+| `--ignore-self-update` | `ANTIGRAVITY_IGNORE_SELF_UPDATE` or `AG_IGNORE_SELF_UPDATE` | Boolean | Update the CLI even when the official `agy` self-updater is detected |
+| `--allow-unverified` | `ANTIGRAVITY_ALLOW_UNVERIFIED` or `AG_ALLOW_UNVERIFIED` | Boolean | Install IDE/Hub archives even if the server supplies no checksum |
+| `--debug` | `ANTIGRAVITY_DEBUG` or `AG_DEBUG` | Boolean | Log URLs, checksums, and process-detection decisions to stderr |
 | `--system` | `ANTIGRAVITY_SYSTEM` or `AG_SYSTEM` | Boolean | Target system-wide installation scope (`/opt`) |
 | `--user` | `ANTIGRAVITY_USER` or `AG_USER` | Boolean | Target user installation scope (`~/opt`) |
-| `--diagnose` / `--diagnostic` | `ANTIGRAVITY_DIAGNOSE` or `AG_DIAGNOSE` | Boolean | Scan system and display all installed Antigravity components, versions, and desktop files |
 | `--dir-ide` | `ANTIGRAVITY_DIR_IDE` or `AG_DIR_IDE` | String | Override path to Antigravity IDE folder/bundle |
 | `--dir-hub` | `ANTIGRAVITY_DIR_HUB` or `AG_DIR_HUB` | String | Override path to Antigravity Hub folder/bundle |
 | `--path-cli` | `ANTIGRAVITY_PATH_CLI` or `AG_PATH_CLI` | String | Override path to Antigravity CLI binary |
 | `--config` | `ANTIGRAVITY_CONFIG` or `AG_CONFIG` | String | Path to custom TOML configuration file |
+| *(none)* | `ANTIGRAVITY_IDE_RELEASES_URL` / `AG_IDE_RELEASES_URL` | String | Override the IDE release endpoint (comma-separated fallbacks) |
+| *(none)* | `ANTIGRAVITY_HUB_RELEASES_URL` / `AG_HUB_RELEASES_URL` | String | Override the Hub release endpoint (comma-separated fallbacks) |
+| *(none)* | `ANTIGRAVITY_CLI_MANIFEST_URL` / `AG_CLI_MANIFEST_URL` | String | Override the CLI manifest endpoint (comma-separated fallbacks) |
 | `--no-desktop` | `ANTIGRAVITY_DESKTOP` / `AG_DESKTOP` (`true`) or `ANTIGRAVITY_NO_DESKTOP` / `AG_NO_DESKTOP` (`false`) | Boolean | Set to `false` or `1` (for `NO_DESKTOP`) to skip installing `.desktop` launchers and icons |
 | `--no-nautilus` | `ANTIGRAVITY_NAUTILUS` / `AG_NAUTILUS` (`true`) or `ANTIGRAVITY_NO_NAUTILUS` / `AG_NO_NAUTILUS` (`false`) | Boolean | Set to `false` or `1` (for `NO_NAUTILUS`) to skip installing the Nautilus context-menu extension |
 | `--apparmor-sandbox` | `ANTIGRAVITY_APPARMOR_SANDBOX` or `AG_APPARMOR_SANDBOX` | Boolean | **(Ubuntu only)** Configure `root:root 4755` permissions on `chrome-sandbox` |
@@ -340,6 +374,9 @@ ide = true
 hub = true
 cli = true
 force = false
+ignore_self_update = false
+allow_unverified = false   # fail closed on missing IDE/Hub checksums (default)
+debug = false              # log URLs, checksums, and process decisions to stderr
 system = false
 user = true
 apparmor_sandbox = false  # Ubuntu only
@@ -365,17 +402,22 @@ When running an update, the tool first downloads packages to a temporary system 
 > **Linux Path & Chromium SUID Sandbox Bug:**
 > On Linux, the IDE default directory is `~/opt/Antigravity-IDE` (hyphenated without spaces). This avoids an upstream Chromium bug in [`zygote_host_impl_linux.cc`](https://chromium.googlesource.com/chromium/src/+/refs/heads/main/content/browser/zygote_host/zygote_host_impl_linux.cc), where binary paths containing spaces (e.g. `~/opt/Antigravity IDE`) are truncated at space boundaries when executing `chrome-sandbox` via `execvp`, crashing with `FATAL: Check failed: . : Invalid argument (22)`.
 > 
-> The updater automatically checks both `~/opt/Antigravity-IDE` and legacy `~/opt/Antigravity IDE` paths to resolve existing installations.
+> The updater automatically checks both `~/opt/Antigravity-IDE` and legacy `~/opt/Antigravity IDE` paths to resolve existing installations, and migrates a legacy folder only when it lives under the default `~/opt` / `/opt` parents. Custom `--dir-ide` paths are never moved automatically.
 
 ---
 
 ## 🌐 Upstream Sources (Where Google Stores the Binaries)
 
-All application packages are fetched directly from official Google distribution servers:
+> [!WARNING]
+> Release **metadata** comes from unofficial, reverse-engineered Google Cloud Run endpoints that the Antigravity clients themselves use. These are not documented or supported by Google and may change or disappear without notice. Override them with `ANTIGRAVITY_IDE_RELEASES_URL`, `ANTIGRAVITY_HUB_RELEASES_URL`, or `ANTIGRAVITY_CLI_MANIFEST_URL` (comma-separated fallbacks are supported). When every endpoint fails, the updater prints each attempted URL and HTTP status instead of failing silently.
+
+The **application packages** themselves are fetched from official Google distribution servers:
 
 * **Antigravity IDE**: Downloaded from Google's stable release CDN domains (`dl.google.com` and `edgedl.me.gvt1.com`).
 * **Antigravity Hub**: Downloaded from Google's public Google Cloud Storage bucket (`storage.googleapis.com/antigravity-public`).
 * **Antigravity CLI**: Downloaded from URLs specified in official update manifests hosted on Google Cloud.
+
+When release metadata supplies a full download URL (`download_url`, `url`, or a `downloads` map), the updater uses it directly after validating the host against the Google domain allowlist. The hard-coded CDN paths remain only as a fallback for older manifests.
 
 ---
 
@@ -383,14 +425,35 @@ All application packages are fetched directly from official Google distribution 
 
 1. **Update Resolution**:
    Queries release endpoints to parse the latest version information and official Google release manifests.
-2. **Process Integrity Check**:
+2. **Official CLI Self-Update Detection**:
+   If an official `agy` self-update backup (`agy.<id>.old`) sits next to the binary, or the official updater state directory (`~/.gemini/antigravity-cli/updater`) exists for a user-scope binary, CLI updates are skipped so the two updaters don't fight. Use `agy update`, or force with `--ignore-self-update` (or `--force`).
+3. **Process Integrity Check**:
    Before modifying files, inspects whether the IDE, Hub, or CLI is actively running. If active PIDs are detected, the update safely aborts (unless overridden with `--force`).
-3. **Secure CLI Checksum Verification**:
-   Validates the SHA-512 cryptographic hash of downloaded CLI archives prior to extraction.
-4. **Platform-Specific Installation**:
+4. **Integrity Verification**:
+   - **CLI**: mandates a SHA-512 checksum from the manifest before extraction.
+   - **IDE & Hub**: verifies SHA-512/SHA-256 when supplied by release metadata and **fails closed** when neither is present. Use `--allow-unverified` only when you explicitly trust the endpoint.
+5. **Platform-Specific Installation**:
    - **Linux**: Extracts tarballs to temporary directories, replaces target installation directories under `~/opt` or `/opt`, and creates/updates symlinks in `~/.local/bin` or `/usr/local/bin`.
    - **macOS**: Mounts `.dmg` disk images securely via `hdiutil attach`, syncs `.app` bundles under `/Applications`, and unmounts the volume.
    - **Windows**: Executes installer binaries with silent installation flags (`/S`) for seamless background upgrades.
+
+### Process Detection Limitations
+
+Before writing files the updater scans for running IDE/Hub/CLI processes. Detection is intentionally conservative but imperfect:
+
+- Linux uses `/proc/<pid>/cmdline` (falling back to `pgrep`); macOS uses `pgrep`; Windows uses `tasklist`.
+- Processes are matched by executable name and install path. Wrapper scripts, renamed binaries, containerized processes, and IDE child processes may not be detected.
+- The updater itself, shell commands that merely mention a path, and unrelated `agy` binaries are filtered out. If a false positive still blocks you, inspect it with `--debug` and re-run with `--force` only when you are sure no Antigravity window is open.
+- `--diagnose` / `--json` reports detected PIDs so you can verify the decision before forcing an update.
+
+### Platform Gotchas
+
+| Platform | Things to know |
+| :--- | :--- |
+| **Linux** | System scope needs `sudo` with a forwarded `PATH`. Ubuntu 24.04+ may additionally need `--apparmor-sandbox`. Hyphenated IDE paths are used on Ubuntu-style distros to avoid the Chromium space bug. |
+| **macOS** | Writing to `/Applications` needs `sudo` unless you use `--user` (`~/Applications`). The updater mounts the DMG via `hdiutil`, copies the `.app`, and detaches it; a busy volume usually means another installer is still mounted. |
+| **Windows** | Installers run silently with `/S`. Close running Antigravity windows first because the installer cannot replace locked files. PATH updates may require a new terminal session. |
+| **Mixed scopes** | Do not keep both user (`~/opt`) and system (`/opt`) copies unless you intend to; run `--clean-duplicates --system` to remove duplicate launchers. |
 
 ---
 
@@ -489,6 +552,18 @@ A local Git `pre-push` hook is configured to automatically run formatting, linti
 ```bash
 .git/hooks/pre-push
 ```
+
+### Versioning & Releases
+
+The package version lives in exactly one place: `__version__` in [`src/missing_ag_updater/const.py`](src/missing_ag_updater/const.py). `pyproject.toml` reads it dynamically through Hatchling, so do not edit a second copy.
+
+```bash
+make version BUMP=minor   # bump the version in const.py
+make release-check        # lint + tests + secrets + trivy
+make build                # build sdist/wheel
+```
+
+See the [release process checklist](docs/release-process.md) and [CHANGELOG.md](CHANGELOG.md) for the full flow.
 
 ---
 

@@ -91,7 +91,7 @@ jobs:
 
       - name: Run tests
         run: |
-          uv run pytest --cov=src/missing_ag_updater --cov-report=term-missing
+          uv run pytest --cov=src/missing_ag_updater --cov-report=term-missing --cov-fail-under=85
 
       - name: Generate coverage badge
         if: matrix.python-version == '3.12'
@@ -174,8 +174,8 @@ jobs:
         id: check_version
         shell: bash
         run: |
-          CURRENT_VERSION=$(grep -m 1 '^version =' pyproject.toml | cut -d '"' -f 2)
-          PREVIOUS_VERSION=$(git show HEAD~1:pyproject.toml 2>/dev/null | grep -m 1 '^version =' | cut -d '"' -f 2 || echo "")
+          CURRENT_VERSION=$(grep -m 1 '^__version__ = ' src/missing_ag_updater/const.py | cut -d '"' -f 2)
+          PREVIOUS_VERSION=$(git show HEAD~1:src/missing_ag_updater/const.py 2>/dev/null | grep -m 1 '^__version__ = ' | cut -d '"' -f 2 || echo "")
 
           if [ -n "$PREVIOUS_VERSION" ] && [ "$CURRENT_VERSION" != "$PREVIOUS_VERSION" ]; then
             echo "changed=true" >> $GITHUB_OUTPUT

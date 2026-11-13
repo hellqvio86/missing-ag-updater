@@ -99,6 +99,7 @@ def test_cli_config_integration(tmp_path: Any) -> None:
             install_desktop=False,
             install_nautilus=False,
             suid_sandbox=False,
+            allow_unverified=False,
             scope=None,
         )
         mock_exit.assert_called_once_with(0)
@@ -248,3 +249,71 @@ def test_load_example_config_file() -> None:
         data = load_toml_config(str(example_toml), explicit=True)
         assert isinstance(data, dict)
         assert "check" in data or "ide" in data or len(data) > 0
+
+
+@patch("missing_ag_updater.config.load_toml_config", return_value={})
+@patch("missing_ag_updater.config.is_apparmor_enabled", return_value=False)
+def test_resolve_config_ignore_self_update_default(mock_apparmor: MagicMock, mock_toml: MagicMock) -> None:
+    assert resolve_config(argparse.Namespace(config=None)).ignore_self_update is False
+
+
+@patch("missing_ag_updater.config.load_toml_config", return_value={"ignore_self_update": True})
+@patch("missing_ag_updater.config.is_apparmor_enabled", return_value=False)
+def test_resolve_config_ignore_self_update_toml(mock_apparmor: MagicMock, mock_toml: MagicMock) -> None:
+    assert resolve_config(argparse.Namespace(config=None)).ignore_self_update is True
+
+
+@pytest.mark.parametrize("env_name", ["ANTIGRAVITY_IGNORE_SELF_UPDATE", "AG_IGNORE_SELF_UPDATE"])
+@patch("missing_ag_updater.config.load_toml_config", return_value={"ignore_self_update": False})
+@patch("missing_ag_updater.config.is_apparmor_enabled", return_value=False)
+def test_resolve_config_ignore_self_update_env_overrides_toml(
+    mock_apparmor: MagicMock,
+    mock_toml: MagicMock,
+    env_name: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(env_name, "1")
+    assert resolve_config(argparse.Namespace(config=None)).ignore_self_update is True
+
+
+@pytest.mark.parametrize(
+    ("cli_value", "env_value", "toml_value", "expected"),
+    [
+        (None, None, None, False),  # default
+        (None, None, True, True),  # TOML only
+        (None, "0", True, False),  # env beats TOML
+        (None, "yes", False, True),  # env beats TOML
+        (False, "1", True, False),  # CLI beats env + TOML
+        (True, "0", False, True),  # CLI beats env + TOML
+    ],
+    ids=["default", "toml", "env-false-over-toml", "env-true-over-toml", "cli-false-wins", "cli-true-wins"],
+)
+@pytest.mark.parametrize(
+    ("setting", "env_name"),
+    [
+        ("force", "ANTIGRAVITY_FORCE"),
+        ("check", "ANTIGRAVITY_CHECK"),
+        ("ignore_self_update", "ANTIGRAVITY_IGNORE_SELF_UPDATE"),
+        ("allow_unverified", "ANTIGRAVITY_ALLOW_UNVERIFIED"),
+        ("debug", "ANTIGRAVITY_DEBUG"),
+    ],
+)
+@patch("missing_ag_updater.config.is_apparmor_enabled", return_value=False)
+def test_resolve_config_precedence_matrix(
+    mock_apparmor: MagicMock,
+    setting: str,
+    env_name: str,
+    cli_value: bool | None,
+    env_value: str | None,
+    toml_value: bool | None,
+    expected: bool,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    toml_data = {} if toml_value is None else {setting: toml_value}
+    monkeypatch.setattr("missing_ag_updater.config.load_toml_config", lambda *args, **kwargs: toml_data)
+    if env_value is not None:
+        monkeypatch.setenv(env_name, env_value)
+    else:
+        monkeypatch.delenv(env_name, raising=False)
+    args = argparse.Namespace(config=None, **{setting: cli_value})
+    assert getattr(resolve_config(args), setting) is expected

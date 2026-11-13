@@ -13,6 +13,8 @@ import responses
 
 from missing_ag_updater.utils import (
     _get_linux_distro_id_like,
+    _is_ignored_process,
+    _matches_component_process,
     can_fix_suid_sandbox,
     compute_sha256,
     compute_sha512,
@@ -27,6 +29,7 @@ from missing_ag_updater.utils import (
     is_apparmor_enabled,
     is_suid_sandbox_configured,
     is_ubuntu_sandbox_distro,
+    migrate_legacy_ide_dir,
     print_error,
     print_info,
     print_status,
@@ -38,6 +41,21 @@ from missing_ag_updater.utils import (
     safe_extract_zip,
     update_symlink,
 )
+
+
+def test_debug_logging(capsys: pytest.CaptureFixture[str]) -> None:
+    from missing_ag_updater.utils import debug_log, is_debug_enabled, set_debug_enabled
+
+    set_debug_enabled(False)
+    debug_log("hidden")
+    assert capsys.readouterr().err == ""
+    assert is_debug_enabled() is False
+
+    set_debug_enabled(True)
+    debug_log("visible-url https://dl.google.com/example")
+    captured = capsys.readouterr()
+    assert "[debug] visible-url" in captured.err
+    set_debug_enabled(False)
 
 
 def test_print_helpers() -> None:
@@ -199,6 +217,98 @@ def test_get_running_pids() -> None:
             current_pid = str(os.getpid())
             expected = [pid for pid in ["4321"] if pid != current_pid]
             assert pids == expected
+
+
+@pytest.mark.parametrize(
+    "tokens",
+    [
+        ["python", "-m", "missing_ag_updater"],
+        ["/home/user/.local/bin/antigravity-updater", "--check"],
+        ["/usr/bin/python", "-m", "pytest", "src/tests"],
+        ["/home/user/.gemini/antigravity/bin/agent", "--serve"],
+        ["/opt/antigravity-cli/bin/antigravity", "--version"],
+    ],
+)
+def test_is_ignored_process_false_positives(tokens: list[str]) -> None:
+    assert _is_ignored_process(tokens) is True
+
+
+@pytest.mark.parametrize(
+    ("keyword", "tokens", "expected"),
+    [
+        # Real IDE Electron/helper processes
+        ("antigravity-ide", ["/home/user/opt/Antigravity-IDE/antigravity-ide", "--no-sandbox"], True),
+        ("antigravity-ide", ["/home/user/opt/Antigravity-IDE/antigravity-ide", "--type=zygote"], True),
+        # Hub Electron process must not match the IDE keyword and vice versa
+        ("antigravity", ["/home/user/opt/Antigravity-x64/antigravity", "--type=renderer"], True),
+        ("antigravity", ["/home/user/opt/Antigravity-IDE/antigravity-ide", "--no-sandbox"], False),
+        ("antigravity-ide", ["/home/user/opt/Antigravity-x64/antigravity", "--type=renderer"], False),
+        # A random Electron app is not Antigravity
+        ("antigravity", ["/usr/lib/electron/electron", "/tmp/other-app"], False),
+        # CLI detection is exact, not a substring of antigravity
+        ("agy", ["/home/user/.local/bin/agy", "--version"], True),
+        ("agy", ["/home/user/opt/Antigravity-x64/antigravity", "--type=renderer"], False),
+        # Generic keywords fall back to substring matching
+        ("custom-app", ["/usr/bin/custom-app", "--flag"], True),
+    ],
+)
+def test_matches_component_process(keyword: str, tokens: list[str], expected: bool) -> None:
+    assert _matches_component_process(keyword, tokens) is expected
+
+
+@pytest.mark.parametrize(
+    ("distro", "expected_name"),
+    [("ubuntu", "Antigravity-IDE"), ("fedora", "Antigravity IDE")],
+)
+def test_migrate_legacy_ide_dir(
+    distro: str,
+    expected_name: str,
+    tmp_path: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    legacy_dir = tmp_path / "Antigravity IDE"
+    legacy_dir.mkdir()
+    if distro == "ubuntu":
+        monkeypatch.setattr("missing_ag_updater.utils.USER_OPT_DIR", str(tmp_path))
+    monkeypatch.setattr("missing_ag_updater.utils.is_ubuntu_sandbox_distro", lambda: distro == "ubuntu")
+
+    result = migrate_legacy_ide_dir(str(legacy_dir))
+    assert result == str(tmp_path / expected_name)
+    assert os.path.exists(result)
+    assert os.path.exists(legacy_dir) is (distro != "ubuntu")
+
+
+def test_migrate_legacy_ide_dir_prefers_existing_canonical(tmp_path: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+    legacy_dir = tmp_path / "Antigravity IDE"
+    canonical_dir = tmp_path / "Antigravity-IDE"
+    legacy_dir.mkdir()
+    canonical_dir.mkdir()
+    monkeypatch.setattr("missing_ag_updater.utils.USER_OPT_DIR", str(tmp_path))
+    monkeypatch.setattr("missing_ag_updater.utils.is_ubuntu_sandbox_distro", lambda: True)
+
+    assert migrate_legacy_ide_dir(str(legacy_dir)) == str(canonical_dir)
+    assert legacy_dir.exists()
+
+
+def test_migrate_legacy_ide_dir_leaves_custom_paths_alone(tmp_path: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+    custom_dir = tmp_path / "custom" / "Antigravity IDE"
+    custom_dir.mkdir(parents=True)
+    monkeypatch.setattr("missing_ag_updater.utils.USER_OPT_DIR", str(tmp_path / "opt"))
+    monkeypatch.setattr("missing_ag_updater.utils.is_ubuntu_sandbox_distro", lambda: True)
+
+    assert migrate_legacy_ide_dir(str(custom_dir)) == str(custom_dir)
+    assert custom_dir.exists()
+
+
+def test_migrate_legacy_ide_dir_handles_rename_failure(tmp_path: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+    legacy_dir = tmp_path / "Antigravity IDE"
+    legacy_dir.mkdir()
+    monkeypatch.setattr("missing_ag_updater.utils.USER_OPT_DIR", str(tmp_path))
+    monkeypatch.setattr("missing_ag_updater.utils.is_ubuntu_sandbox_distro", lambda: True)
+    monkeypatch.setattr("missing_ag_updater.utils.os.rename", lambda *args: (_ for _ in ()).throw(OSError("denied")))
+
+    assert migrate_legacy_ide_dir(str(legacy_dir)) == str(legacy_dir)
+    assert legacy_dir.exists()
 
 
 @responses.activate

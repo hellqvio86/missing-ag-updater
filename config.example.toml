@@ -3,13 +3,30 @@
 #   Linux:   ~/.config/missing-ag-updater/config.toml
 #   macOS:   ~/Library/Application Support/missing-ag-updater/config.toml
 #   Windows: %APPDATA%\missing-ag-updater\config.toml
+#
+# Precedence: CLI flags > environment variables > this file > auto-detection.
 
 check = false
 ide = true
 hub = true
 cli = true
 force = false
-apparmor_sandbox = false  # Ubuntu only: set chrome-sandbox to root:root 4755
+
+# CLI updates: skip when the official `agy` self-updater is detected.
+# Set true only if you intentionally want this tool to own the CLI.
+ignore_self_update = false
+
+# Integrity: IDE/Hub installs fail closed when the release endpoint supplies no
+# checksum. Set this to true only if you explicitly trust the endpoint.
+allow_unverified = false
+
+# Verbose diagnostics: log exact URLs, checksum results, and process decisions
+# to stderr. Equivalent to --debug.
+debug = false
+
+# Ubuntu only: set chrome-sandbox to root:root 4755. On Ubuntu 24.04+ this is
+# enabled automatically when AppArmor restrictions are active.
+apparmor_sandbox = false
 
 # Installation Scope (Optional: set system = true for /opt, or user = true for ~/opt)
 # system = false
@@ -18,6 +35,10 @@ apparmor_sandbox = false  # Ubuntu only: set chrome-sandbox to root:root 4755
 # Desktop and Nautilus context menu integrations (Linux)
 desktop = true
 nautilus = true
+
+# Release endpoints are configured with environment variables (not TOML):
+#   ANTIGRAVITY_IDE_RELEASES_URL, ANTIGRAVITY_HUB_RELEASES_URL,
+#   ANTIGRAVITY_CLI_MANIFEST_URL (comma-separated fallbacks supported).
 
 # Path Overrides (Optional)
 # dir_ide = "/home/user/opt/Antigravity-IDE"

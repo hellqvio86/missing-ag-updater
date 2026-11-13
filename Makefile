@@ -1,4 +1,4 @@
-.PHONY: venv lint test clean format build publish run install version renovate renovate-summary
+.PHONY: venv lint test clean format build publish run install version release-check renovate renovate-summary
 
 .venv: pyproject.toml
 	if [ ! -d .venv ]; then uv venv; fi
@@ -15,7 +15,7 @@ format: .venv
 
 test: .venv
 	.venv/bin/mypy src
-	.venv/bin/pytest --cov=src/missing_ag_updater --cov-report=term-missing
+	.venv/bin/pytest --cov=src/missing_ag_updater --cov-report=term-missing --cov-fail-under=85
 	.venv/bin/python3 src/generate_badge.py
 
 run: .venv
@@ -24,8 +24,10 @@ run: .venv
 install:
 	uv tool install --force .
 
-version:
-	uv version --bump patch
+version: ## Bump the version: make version BUMP=minor
+	.venv/bin/python3 bin/bump_version.py $(or $(BUMP),patch)
+
+release-check: lint test secrets trivy ## Full pre-release quality gate
 
 build: .venv
 	uv build
