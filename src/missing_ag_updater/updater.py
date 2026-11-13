@@ -4,26 +4,27 @@ import os
 import shutil
 import subprocess  # nosec B404
 import tempfile
-from typing import Optional
+from typing import Any, Optional
 
 from .const import (
     ARCH_NAME,
-    CLI_MANIFEST_URL,
     COLOR_BOLD,
     COLOR_ENDC,
-    HUB_RELEASES_URL,
-    IDE_RELEASES_URL,
     OS_NAME,
+    RELEASE_ENDPOINT_ENV_VARS,
+    RELEASE_ENDPOINTS,
 )
 from .desktop import install_hub_desktop, install_ide_desktop
-from .discovery import _is_system_path
-from .models import CliManifest, Release, parse_version_tuple, select_latest_release
+from .discovery import _is_system_path, detect_cli_self_update
+from .exceptions import ReleaseEndpointError
+from .models import CliManifest, Release, is_trusted_download_url, parse_version_tuple, select_latest_release
 from .nautilus import install_ide_nautilus
 from .utils import (
     can_fix_suid_sandbox,
     compute_sha256,
     compute_sha512,
     configure_suid_sandbox,
+    debug_log,
     download_file,
     fetch_json,
     get_cli_version,
@@ -31,7 +32,7 @@ from .utils import (
     get_ide_version,
     get_running_pids,
     is_path_writable,
-    is_ubuntu_sandbox_distro,
+    migrate_legacy_ide_dir,
     print_error,
     print_info,
     print_status,
@@ -45,8 +46,76 @@ from .utils import (
 )
 
 
-def get_download_url(component: str, version: str, exec_id: str) -> str:
-    """Generate official HTTPS Google download URL for an Antigravity artifact."""
+def get_release_endpoints(component: str) -> list[str]:
+    """Return ordered release metadata URLs for a component.
+
+    Environment variables (comma-separated) are prepended so operators can
+    point at a mirror or a replacement endpoint without a code change. The
+    built-in endpoint remains as a fallback.
+    """
+    endpoints: list[str] = []
+    for env_name in RELEASE_ENDPOINT_ENV_VARS.get(component, ()):
+        raw_value = os.environ.get(env_name)
+        if not raw_value:
+            continue
+        for candidate in raw_value.split(","):
+            cleaned = candidate.strip()
+            if cleaned and cleaned not in endpoints:
+                endpoints.append(cleaned)
+    for default_url in RELEASE_ENDPOINTS.get(component, ()):
+        if default_url not in endpoints:
+            endpoints.append(default_url)
+    return endpoints
+
+
+def fetch_release_payload(component: str) -> Any:
+    """Fetch release metadata, trying every configured endpoint with clear errors."""
+    attempts: list[tuple[str, str]] = []
+    for url in get_release_endpoints(component):
+        debug_log(f"release endpoint for {component}: {url}")
+        try:
+            return fetch_json(url)
+        except Exception as err:
+            attempts.append((url, str(err)))
+            debug_log(f"release endpoint failed for {component}: {url}: {err}")
+    raise ReleaseEndpointError(component, attempts)
+
+
+def _select_release_download_url(release: Release) -> str:
+    """Return an explicit, trusted download URL supplied by release metadata, if any."""
+    for candidate in (release.download_url, release.url):
+        if candidate and is_trusted_download_url(candidate):
+            debug_log(f"using explicit release download URL: {candidate}")
+            return candidate
+
+    if release.downloads:
+        platform_arch = "arm" if ARCH_NAME == "arm64" and OS_NAME == "linux" else ARCH_NAME
+        keys = (
+            f"{OS_NAME}-{ARCH_NAME}",
+            f"{OS_NAME}-{platform_arch}",
+            OS_NAME,
+            "default",
+        )
+        for key in keys:
+            candidate = release.downloads.get(key)
+            if candidate and is_trusted_download_url(candidate):
+                debug_log(f"using release download URL for '{key}': {candidate}")
+                return candidate
+
+    return ""
+
+
+def get_download_url(component: str, version: str, exec_id: str, release: Optional[Release] = None) -> str:
+    """Resolve the official HTTPS Google download URL for an Antigravity artifact.
+
+    Full URLs supplied by the release JSON are preferred; the historical
+    hard-coded CDN paths remain as a fallback for older manifests.
+    """
+    if release is not None:
+        explicit_url = _select_release_download_url(release)
+        if explicit_url:
+            return explicit_url
+
     arch = "arm" if ARCH_NAME == "arm64" else "x64"
 
     if component == "ide":
@@ -157,16 +226,18 @@ def update_ide(
     install_desktop: bool = True,
     install_nautilus: bool = True,
     suid_sandbox: bool = False,
+    allow_unverified: bool = False,
     scope: Optional[str] = None,
 ) -> bool:
     """Check and execute updates for Antigravity IDE."""
     print_status("Checking for Antigravity IDE updates...")
-    target_ide_dir = resolve_existing_ide_dir(ide_dir)
+    target_ide_dir = migrate_legacy_ide_dir(resolve_existing_ide_dir(ide_dir))
     current_ver = get_ide_version(target_ide_dir)
     effective_scope = scope or ("system" if _is_system_path(target_ide_dir) else "user")
+    debug_log(f"IDE target={target_ide_dir} current={current_ver} scope={effective_scope}")
 
     try:
-        releases_json = fetch_json(IDE_RELEASES_URL)
+        releases_json = fetch_release_payload("ide")
         if not releases_json:
             print_error("No IDE releases found from update server.")
             return False
@@ -228,7 +299,7 @@ def update_ide(
             print_error(f"Cannot proceed with --suid-sandbox: {reason}")
             return False
 
-    download_url = get_download_url("ide", latest_ver, exec_id)
+    download_url = get_download_url("ide", latest_ver, exec_id, latest)
     if not download_url:
         print_error(f"No IDE download URL resolved for current platform ({OS_NAME}).")
         return False
@@ -240,10 +311,11 @@ def update_ide(
         try:
             download_file(download_url, archive_path, label="Downloading Antigravity IDE")
 
-            # Checksum integrity verification when provided by release server
+            # Checksum integrity verification: fail closed unless explicitly overridden.
             if latest.sha512:
                 print_status("Verifying SHA-512 checksum...")
                 actual_sha512 = compute_sha512(archive_path)
+                debug_log(f"IDE SHA-512 expected={latest.sha512} actual={actual_sha512}")
                 if actual_sha512.lower() != latest.sha512.lower():
                     print_error("Security Check Failure: Checksum mismatch on IDE download archive.")
                     return False
@@ -251,12 +323,23 @@ def update_ide(
             elif latest.sha256:
                 print_status("Verifying SHA-256 checksum...")
                 actual_sha256 = compute_sha256(archive_path)
+                debug_log(f"IDE SHA-256 expected={latest.sha256} actual={actual_sha256}")
                 if actual_sha256.lower() != latest.sha256.lower():
                     print_error("Security Check Failure: Checksum mismatch on IDE download archive.")
                     return False
                 print_success("Checksum verified.")
+            elif not allow_unverified:
+                print_error(
+                    "Security Check Failure: the IDE release server supplied no SHA-512 or SHA-256 checksum.\n"
+                    "  Refusing to install an unverified archive. Re-run with --allow-unverified only if you\n"
+                    "  understand and accept the risk."
+                )
+                return False
             else:
-                print_warning("No integrity checksum provided by release server — installing unverified archive.")
+                print_warning(
+                    "No integrity checksum provided by release server — installing unverified archive "
+                    "because --allow-unverified was set."
+                )
 
             if OS_NAME == "darwin":
                 # macOS dmg installation
@@ -294,6 +377,7 @@ def update_ide(
                     backup_dir = f"{target_ide_dir}.backup.{os.getpid()}"
                     if os.path.exists(backup_dir):
                         shutil.rmtree(backup_dir)
+                    debug_log(f"IDE install: moving existing install to backup {backup_dir}")
                     os.rename(target_ide_dir, backup_dir)
 
                 try:
@@ -301,24 +385,16 @@ def update_ide(
                     if not os.path.exists(target_ide_dir):
                         raise RuntimeError("Failed to commit new IDE installation directory.")
                     if backup_dir and os.path.exists(backup_dir):
+                        debug_log(f"IDE install: commit succeeded, removing backup {backup_dir}")
                         shutil.rmtree(backup_dir)
                 except Exception as install_err:
                     if backup_dir and os.path.exists(backup_dir):
                         print_warning(f"Installation failed ({install_err}); rolling back previous installation...")
+                        debug_log(f"IDE install: rollback from {backup_dir}")
                         if os.path.exists(target_ide_dir):
                             shutil.rmtree(target_ide_dir)
                         os.rename(backup_dir, target_ide_dir)
                     raise install_err
-
-                # Migrate: remove legacy spaced directory only on Ubuntu-style
-                # distros, where the Chromium zygote / SUID sandbox can be
-                # affected by stale paths.
-                if OS_NAME == "linux" and is_ubuntu_sandbox_distro():
-                    legacy_ide_dir = os.path.join(os.path.dirname(target_ide_dir), "Antigravity IDE")
-                    if legacy_ide_dir != target_ide_dir and os.path.exists(legacy_ide_dir):
-                        print_status("Removing legacy 'Antigravity IDE' directory (migrating to hyphenated path)...")
-                        shutil.rmtree(legacy_ide_dir)
-                        print_success("Removed legacy directory: " + legacy_ide_dir)
 
                 # Update launchers
                 if launcher_path:
@@ -360,6 +436,7 @@ def update_hub(
     force: bool = False,
     install_desktop: bool = True,
     suid_sandbox: bool = False,
+    allow_unverified: bool = False,
     scope: Optional[str] = None,
 ) -> bool:
     """Check and execute updates for Antigravity Hub."""
@@ -367,9 +444,10 @@ def update_hub(
     target_hub_dir = resolve_existing_hub_dir(hub_dir)
     current_ver = get_hub_version(target_hub_dir)
     effective_scope = scope or ("system" if _is_system_path(target_hub_dir) else "user")
+    debug_log(f"Hub target={target_hub_dir} current={current_ver} scope={effective_scope}")
 
     try:
-        releases_json = fetch_json(HUB_RELEASES_URL)
+        releases_json = fetch_release_payload("hub")
         if not releases_json:
             print_error("No Hub releases found from update server.")
             return False
@@ -431,7 +509,7 @@ def update_hub(
             print_error(f"Cannot proceed with --suid-sandbox: {reason}")
             return False
 
-    download_url = get_download_url("hub", latest_ver, exec_id)
+    download_url = get_download_url("hub", latest_ver, exec_id, latest)
     if not download_url:
         print_error(f"No Hub download URL resolved for current platform ({OS_NAME}).")
         return False
@@ -443,10 +521,11 @@ def update_hub(
         try:
             download_file(download_url, archive_path, label="Downloading Antigravity Hub")
 
-            # Checksum integrity verification when provided by release server
+            # Checksum integrity verification: fail closed unless explicitly overridden.
             if latest.sha512:
                 print_status("Verifying SHA-512 checksum...")
                 actual_sha512 = compute_sha512(archive_path)
+                debug_log(f"Hub SHA-512 expected={latest.sha512} actual={actual_sha512}")
                 if actual_sha512.lower() != latest.sha512.lower():
                     print_error("Security Check Failure: Checksum mismatch on Hub download archive.")
                     return False
@@ -454,12 +533,23 @@ def update_hub(
             elif latest.sha256:
                 print_status("Verifying SHA-256 checksum...")
                 actual_sha256 = compute_sha256(archive_path)
+                debug_log(f"Hub SHA-256 expected={latest.sha256} actual={actual_sha256}")
                 if actual_sha256.lower() != latest.sha256.lower():
                     print_error("Security Check Failure: Checksum mismatch on Hub download archive.")
                     return False
                 print_success("Checksum verified.")
+            elif not allow_unverified:
+                print_error(
+                    "Security Check Failure: the Hub release server supplied no SHA-512 or SHA-256 checksum.\n"
+                    "  Refusing to install an unverified archive. Re-run with --allow-unverified only if you\n"
+                    "  understand and accept the risk."
+                )
+                return False
             else:
-                print_warning("No integrity checksum provided by release server — installing unverified archive.")
+                print_warning(
+                    "No integrity checksum provided by release server — installing unverified archive "
+                    "because --allow-unverified was set."
+                )
 
             if OS_NAME == "darwin":
                 # macOS dmg installation
@@ -544,14 +634,20 @@ def update_cli(
     dry_run: bool = False,
     force: bool = False,
     scope: Optional[str] = None,
+    ignore_self_update: bool = False,
 ) -> bool:
-    """Check and execute updates for Antigravity CLI."""
+    """Check and execute updates for Antigravity CLI.
+
+    When the official `agy` self-updater is detected as managing the binary, the update is skipped
+    to avoid fighting it, unless `force` or `ignore_self_update` is set.
+    """
     print_status("Checking for Antigravity CLI updates...")
     current_ver = get_cli_version(cli_binary)
     effective_scope = scope or ("system" if _is_system_path(cli_binary) else "user")
+    debug_log(f"CLI target={cli_binary} current={current_ver} scope={effective_scope}")
 
     try:
-        manifest_json = fetch_json(CLI_MANIFEST_URL)
+        manifest_json = fetch_release_payload("cli")
         manifest = CliManifest.model_validate(manifest_json)
         latest_ver = manifest.version
         download_url = manifest.url
@@ -570,6 +666,22 @@ def update_cli(
     if not force and parsed_latest <= parsed_current and current_ver != "0.0.0":
         print_success("Antigravity CLI is up to date.")
         return True
+
+    self_update_reason = detect_cli_self_update(cli_binary)
+    if self_update_reason:
+        if force or ignore_self_update:
+            override_flag = "--force" if force else "--ignore-self-update"
+            print_warning(
+                f"Official CLI self-updater detected ({self_update_reason}); overriding due to {override_flag}."
+            )
+        else:
+            print_info(f"Official CLI self-updater detected ({self_update_reason}).")
+            print_warning(
+                f"Skipping CLI update to {latest_ver} to avoid conflicting with the official self-updater.\n"
+                "  Run 'agy update' to update via the official channel, or force it anyway with:\n"
+                "    antigravity-updater --cli --ignore-self-update"
+            )
+            return True
 
     if dry_run:
         print_warning(f"Update available to version {latest_ver} (Dry Run: skipping installation).")
@@ -598,6 +710,7 @@ def update_cli(
             # Checksum Verification
             print_status("Verifying checksum...")
             actual_sha512 = compute_sha512(archive_path)
+            debug_log(f"CLI SHA-512 expected={expected_sha512} actual={actual_sha512}")
             if actual_sha512.lower() != expected_sha512.lower():
                 print_error("Security Check Failure: Checksum mismatch on CLI download archive.")
                 return False

@@ -3,11 +3,14 @@ import os
 from typing import Any
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from missing_ag_updater.discovery import (
     _find_binaries_in_path,
     _find_exec_from_desktop,
     _is_system_path,
     clean_duplicate_desktop_entries,
+    detect_cli_self_update,
     detect_preferred_cli,
     detect_preferred_hub,
     detect_preferred_ide,
@@ -184,6 +187,8 @@ def test_diagnose_all(
 ) -> None:
     diag = diagnose_all()
     assert diag["os"] == "linux"
+    assert diag["updater_version"]
+    assert diag["arch"]
     assert "ide_installations" in diag
     assert "hub_installations" in diag
     assert "cli_installations" in diag
@@ -319,3 +324,77 @@ def test_detect_preferred_root_and_auto(
 @patch("missing_ag_updater.discovery.OS_NAME", "darwin")
 def test_clean_duplicate_desktop_entries_non_linux() -> None:
     assert clean_duplicate_desktop_entries() == []
+
+
+@patch("missing_ag_updater.discovery.OS_NAME", "linux")
+def test_detect_cli_self_update_none_without_signals(tmp_path: Any) -> None:
+    cli_binary = tmp_path / "agy"
+    cli_binary.write_text("binary", encoding="utf-8")
+    assert detect_cli_self_update(str(cli_binary)) is None
+
+
+def test_detect_cli_self_update_empty_path() -> None:
+    assert detect_cli_self_update("") is None
+
+
+@patch("missing_ag_updater.discovery.OS_NAME", "linux")
+def test_detect_cli_self_update_backup_sibling(tmp_path: Any) -> None:
+    cli_binary = tmp_path / "agy"
+    cli_binary.write_text("binary", encoding="utf-8")
+    (tmp_path / "agy.1794543464486432375.old").write_text("old", encoding="utf-8")
+    reason = detect_cli_self_update(str(cli_binary))
+    assert reason is not None
+    assert "agy.1794543464486432375.old" in reason
+
+
+@patch("missing_ag_updater.discovery.OS_NAME", "linux")
+def test_detect_cli_self_update_ignores_non_numeric_backup(tmp_path: Any) -> None:
+    cli_binary = tmp_path / "agy"
+    cli_binary.write_text("binary", encoding="utf-8")
+    (tmp_path / "agy.manual.old").write_text("old", encoding="utf-8")
+    (tmp_path / "agy-other.123.old").write_text("old", encoding="utf-8")
+    assert detect_cli_self_update(str(cli_binary)) is None
+
+
+@patch("missing_ag_updater.discovery.OS_NAME", "linux")
+def test_detect_cli_self_update_missing_dir() -> None:
+    assert detect_cli_self_update("/nonexistent/dir/agy") is None
+
+
+@patch("missing_ag_updater.discovery.OS_NAME", "linux")
+def test_detect_cli_self_update_state_dir_user_scope(tmp_path: Any, isolated_cli_self_updater_state: Any) -> None:
+    isolated_cli_self_updater_state.mkdir()
+    (isolated_cli_self_updater_state / "update_status.json").write_text("{}", encoding="utf-8")
+    reason = detect_cli_self_update(str(tmp_path / "agy"))
+    assert reason is not None
+    assert "update_status.json" in reason
+
+
+@patch("missing_ag_updater.discovery.OS_NAME", "linux")
+def test_detect_cli_self_update_state_dir_ignored_for_system_path(isolated_cli_self_updater_state: Any) -> None:
+    isolated_cli_self_updater_state.mkdir()
+    (isolated_cli_self_updater_state / "update.lock").write_text("", encoding="utf-8")
+    assert detect_cli_self_update("/usr/local/bin/agy-missing-ag-updater-test") is None
+
+
+@patch("missing_ag_updater.discovery.get_cli_version", return_value="1.5.7")
+@patch("missing_ag_updater.discovery._find_binaries_in_path", return_value=[])
+@patch("missing_ag_updater.discovery.SYSTEM_CLI_BINARY", "/nonexistent/system/agy")
+@patch("missing_ag_updater.discovery.OS_NAME", "linux")
+def test_find_all_cli_installations_reports_self_update(
+    mock_bins: MagicMock,
+    mock_ver: MagicMock,
+    tmp_path: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cli_bin = tmp_path / "agy"
+    cli_bin.write_text("#!/bin/sh\n", encoding="utf-8")
+    (tmp_path / "agy.1794543464486432375.old").write_text("old", encoding="utf-8")
+    monkeypatch.setattr("missing_ag_updater.discovery.USER_CLI_BINARY", str(cli_bin))
+    monkeypatch.setattr("missing_ag_updater.discovery.HOME", str(tmp_path / "home"))
+
+    installs = find_all_cli_installations()
+    matched = next(inst for inst in installs if inst.launcher_path == str(cli_bin))
+    assert matched.self_update is not None
+    assert "agy.1794543464486432375.old" in matched.self_update
+    assert matched.to_dict()["self_update"] == matched.self_update

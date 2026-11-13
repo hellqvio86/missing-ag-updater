@@ -1,3 +1,4 @@
+import json
 from typing import Any
 from unittest.mock import ANY, MagicMock, patch
 
@@ -91,6 +92,7 @@ def test_main_force_and_check(
         install_desktop=True,
         install_nautilus=True,
         suid_sandbox=False,
+        allow_unverified=False,
         scope=None,
     )
     mock_exit.assert_called_once_with(0)
@@ -120,6 +122,7 @@ def test_main_apparmor_sandbox_flag(
         install_desktop=True,
         install_nautilus=True,
         suid_sandbox=True,
+        allow_unverified=False,
         scope=None,
     )
     mock_hub.assert_called_once_with(
@@ -129,6 +132,7 @@ def test_main_apparmor_sandbox_flag(
         force=False,
         install_desktop=True,
         suid_sandbox=True,
+        allow_unverified=False,
         scope=None,
     )
     mock_exit.assert_called_once_with(0)
@@ -154,6 +158,7 @@ def test_main_system_flag(
         install_desktop=True,
         install_nautilus=True,
         suid_sandbox=False,
+        allow_unverified=False,
         scope="system",
     )
     mock_exit.assert_called_once_with(0)
@@ -181,6 +186,7 @@ def test_main_no_apparmor_sandbox_flag(
         install_desktop=True,
         install_nautilus=True,
         suid_sandbox=False,
+        allow_unverified=False,
         scope=None,
     )
     mock_exit.assert_called_once_with(0)
@@ -208,6 +214,7 @@ def test_main_auto_detect_apparmor(
         install_desktop=True,
         install_nautilus=True,
         suid_sandbox=True,
+        allow_unverified=False,
         scope=None,
     )
     mock_exit.assert_called_once_with(0)
@@ -235,6 +242,7 @@ def test_main_auto_detect_no_apparmor(
         install_desktop=True,
         install_nautilus=True,
         suid_sandbox=False,
+        allow_unverified=False,
         scope=None,
     )
     mock_exit.assert_called_once_with(0)
@@ -371,7 +379,15 @@ def test_run_diagnose_full(mock_diag_all: MagicMock, capsys: Any) -> None:
                 "scope": "user",
                 "is_writable": True,
                 "launcher_path": "/home/user/.local/bin/agy",
-            }
+                "self_update": "official self-update backup found: /home/user/.local/bin/agy.123.old",
+            },
+            {
+                "version": "1.0.7",
+                "scope": "system",
+                "is_writable": False,
+                "launcher_path": "/usr/local/bin/agy",
+                "self_update": None,
+            },
         ],
         "desktop_files": [
             {
@@ -399,6 +415,8 @@ def test_run_diagnose_full(mock_diag_all: MagicMock, capsys: Any) -> None:
     assert "1.0.8" in captured
     assert "IDE PIDs: 12345" in captured
     assert "Hub PIDs: 67890" in captured
+    assert "Self-update: managed by official updater (official self-update backup found" in captured
+    assert "Self-update: not detected" in captured
 
 
 @patch("missing_ag_updater.cli.diagnose_all")
@@ -420,10 +438,79 @@ def test_run_diagnose_empty(mock_diag_all: MagicMock, capsys: Any) -> None:
     assert "No CLI installations detected." in captured
 
 
+@patch("sys.exit", side_effect=SystemExit)
+@patch("missing_ag_updater.cli.diagnose_all", return_value={"os": "linux", "arch": "x64", "updater_version": "0.6.0"})
+@patch("sys.argv", ["antigravity-updater", "--json"])
+def test_main_json_flag(
+    mock_diag: MagicMock,
+    mock_exit: MagicMock,
+    capsys: Any,
+) -> None:
+    with pytest.raises(SystemExit):
+        main()
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["os"] == "linux"
+    assert payload["arch"] == "x64"
+    assert payload["updater_version"] == "0.6.0"
+    mock_exit.assert_called_once_with(0)
+
+
+@patch("sys.exit", side_effect=SystemExit)
+@patch("missing_ag_updater.cli.set_debug_enabled")
+@patch("missing_ag_updater.cli.update_ide", return_value=True)
+@patch("missing_ag_updater.config.is_apparmor_enabled", return_value=False)
+@patch("missing_ag_updater.config.load_toml_config", return_value={})
+@patch("missing_ag_updater.cli.OS_NAME", "linux")
+@patch("sys.argv", ["antigravity-updater", "--ide", "--allow-unverified", "--debug"])
+def test_main_allow_unverified_and_debug_flags(
+    mock_toml: MagicMock,
+    mock_apparmor: MagicMock,
+    mock_ide: MagicMock,
+    mock_set_debug: MagicMock,
+    mock_exit: MagicMock,
+) -> None:
+    with pytest.raises(SystemExit):
+        main()
+    mock_ide.assert_called_once_with(
+        ANY,
+        ANY,
+        dry_run=False,
+        force=False,
+        install_desktop=True,
+        install_nautilus=True,
+        suid_sandbox=False,
+        allow_unverified=True,
+        scope=None,
+    )
+    assert mock_set_debug.call_args_list[-1].args == (True,)
+
+
 @patch("sys.argv", ["antigravity-updater", "--version"])
 def test_cli_version_flag(capsys: Any) -> None:
     with pytest.raises(SystemExit) as excinfo:
         main()
     assert excinfo.value.code == 0
     captured = capsys.readouterr().out
-    assert "0.5.2" in captured
+    assert "0.6.0" in captured
+
+
+@patch("sys.exit", side_effect=SystemExit)
+@patch("missing_ag_updater.cli.update_cli", return_value=True)
+@patch("missing_ag_updater.config.load_toml_config", return_value={})
+@patch("missing_ag_updater.cli.OS_NAME", "linux")
+@patch("sys.argv", ["antigravity-updater", "--cli", "--ignore-self-update", "--path-cli", "/custom/agy"])
+def test_main_ignore_self_update_flag(
+    mock_toml: MagicMock,
+    mock_cli: MagicMock,
+    mock_exit: MagicMock,
+) -> None:
+    with pytest.raises(SystemExit):
+        main()
+    mock_cli.assert_called_once_with(
+        "/custom/agy",
+        dry_run=False,
+        force=False,
+        scope=None,
+        ignore_self_update=True,
+    )
+    mock_exit.assert_called_once_with(0)

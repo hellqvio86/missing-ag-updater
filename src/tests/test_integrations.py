@@ -256,6 +256,7 @@ def test_cli_no_desktop_no_nautilus(
         install_desktop=False,
         install_nautilus=False,
         suid_sandbox=False,
+        allow_unverified=False,
         scope=None,
     )
     mock_exit.assert_called_once_with(0)
@@ -288,6 +289,7 @@ def test_cli_no_desktop_hub(
         force=False,
         install_desktop=False,
         suid_sandbox=False,
+        allow_unverified=False,
         scope=None,
     )
     mock_exit.assert_called_once_with(0)
@@ -321,6 +323,7 @@ def test_cli_env_variables(
         install_desktop=False,
         install_nautilus=False,
         suid_sandbox=False,
+        allow_unverified=False,
         scope=None,
     )
     mock_exit.assert_called_once_with(0)
@@ -351,6 +354,7 @@ def test_cli_env_variables_alt_prefix(
         force=True,
         install_desktop=False,
         suid_sandbox=False,
+        allow_unverified=False,
         scope=None,
     )
     mock_exit.assert_called_once_with(0)
@@ -380,6 +384,7 @@ def test_cli_override_env_variables(
         install_desktop=False,
         install_nautilus=False,
         suid_sandbox=False,
+        allow_unverified=False,
         scope=None,
     )
     mock_exit.assert_called_once_with(0)

@@ -286,6 +286,22 @@ def test_uninstall_cli_permission_denied_and_dry_run(mock_pids: MagicMock, tmp_p
         assert fail_res is False
 
 
+def test_uninstall_never_removes_opt_root(tmp_path: Any) -> None:
+    opt_root = tmp_path / "opt"
+    ide_dir = opt_root / "antigravity-ide"
+    ide_dir.mkdir(parents=True)
+
+    @patch("missing_ag_updater.uninstall.refresh_linux_desktop_caches")
+    @patch("missing_ag_updater.uninstall.get_running_pids", return_value=[])
+    def _run_test(mock_pids: MagicMock, mock_refresh: MagicMock) -> None:
+        assert uninstall_ide(ide_dir=str(ide_dir), launcher_path=None, force=True) is True
+        assert not ide_dir.exists()
+        # /opt (or the configured system opt root) must never be removed.
+        assert opt_root.exists()
+
+    _run_test()
+
+
 def test_uninstall_preserves_parent_with_sibling_files(tmp_path: Any) -> None:
     # Setup parent folder with ide_dir and an unrelated sibling file
     parent_dir = str(tmp_path / "antigravity-ide")

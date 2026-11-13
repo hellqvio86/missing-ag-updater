@@ -1,4 +1,5 @@
 import argparse
+import json
 import sys
 
 from .config import resolve_config
@@ -22,6 +23,7 @@ from .utils import (
     print_status,
     print_success,
     print_warning,
+    set_debug_enabled,
 )
 
 
@@ -62,6 +64,10 @@ def run_diagnose() -> None:
         writable_str = "writable" if inst["is_writable"] else "read-only (requires sudo)"
         print_info(f"• Version: {COLOR_BOLD}{inst['version']}{COLOR_ENDC} [{inst['scope']}] ({writable_str})")
         print_info(f"    Path:     {inst['launcher_path']}")
+        if inst.get("self_update"):
+            print_info(f"    Self-update: managed by official updater ({inst['self_update']})")
+        else:
+            print_info("    Self-update: not detected (managed by antigravity-updater)")
 
     if data.get("desktop_files"):
         print(f"\n{COLOR_BOLD}--- Desktop Entries ---{COLOR_ENDC}")
@@ -85,6 +91,11 @@ def run_diagnose() -> None:
         print_info(f"AppArmor Active:     {sandbox.get('apparmor_active', False)}")
 
     print()
+
+
+def run_diagnose_json() -> None:
+    """Print machine-readable diagnostics as JSON for agents and scripts."""
+    print(json.dumps(diagnose_all(), indent=2, sort_keys=True))
 
 
 def main() -> None:
@@ -130,6 +141,24 @@ def main() -> None:
         help="Bypass version checks and active process warnings",
     )
     parser.add_argument(
+        "--ignore-self-update",
+        action="store_true",
+        default=None,
+        help="Update the CLI even if the official 'agy' self-updater is detected (skipped by default)",
+    )
+    parser.add_argument(
+        "--allow-unverified",
+        action="store_true",
+        default=None,
+        help="Install IDE/Hub archives without a checksum (fails closed by default)",
+    )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        default=None,
+        help="Log exact URLs, checksum results, and process-detection decisions to stderr",
+    )
+    parser.add_argument(
         "--system",
         action="store_true",
         default=None,
@@ -149,6 +178,12 @@ def main() -> None:
         action="store_true",
         default=False,
         help="Scan system and display all installed Antigravity components, versions, and desktop files",
+    )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        default=False,
+        help="Print diagnostics as machine-readable JSON and exit (implies --diagnose)",
     )
     parser.add_argument(
         "--clean-duplicates",
@@ -225,6 +260,13 @@ def main() -> None:
         print_error("Unsupported operating system.")
         sys.exit(1)
 
+    if args.debug:
+        set_debug_enabled(True)
+
+    if args.json:
+        run_diagnose_json()
+        sys.exit(0)
+
     if args.diagnose:
         run_diagnose()
         sys.exit(0)
@@ -247,6 +289,8 @@ def main() -> None:
     except Exception as err:
         print_error(str(err))
         sys.exit(1)
+
+    set_debug_enabled(cfg.debug)
 
     if args.uninstall:
         print(
@@ -318,6 +362,7 @@ def main() -> None:
             install_desktop=cfg.install_desktop,
             install_nautilus=cfg.install_nautilus,
             suid_sandbox=cfg.apparmor_sandbox,
+            allow_unverified=cfg.allow_unverified,
             scope=cfg.scope,
         )
         success = success and res
@@ -331,13 +376,20 @@ def main() -> None:
             force=cfg.force,
             install_desktop=cfg.install_desktop,
             suid_sandbox=cfg.apparmor_sandbox,
+            allow_unverified=cfg.allow_unverified,
             scope=cfg.scope,
         )
         success = success and res
         print()
 
     if cfg.cli or cfg.update_all:
-        res = update_cli(cfg.path_cli, dry_run=cfg.check, force=cfg.force, scope=cfg.scope)
+        res = update_cli(
+            cfg.path_cli,
+            dry_run=cfg.check,
+            force=cfg.force,
+            scope=cfg.scope,
+            ignore_self_update=cfg.ignore_self_update,
+        )
         success = success and res
         print()
 

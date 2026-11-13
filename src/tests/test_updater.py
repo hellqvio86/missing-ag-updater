@@ -1,5 +1,4 @@
 import os
-import shutil
 import subprocess
 import tarfile
 import tempfile
@@ -7,8 +6,14 @@ import zipfile
 from typing import Any
 from unittest.mock import MagicMock, patch
 
+import pytest
+
+from missing_ag_updater.exceptions import ReleaseEndpointError
+from missing_ag_updater.models import Release
 from missing_ag_updater.updater import (
+    fetch_release_payload,
     get_download_url,
+    get_release_endpoints,
     install_macos_dmg,
     install_windows_exe,
     update_cli,
@@ -146,6 +151,82 @@ def test_get_download_url_unknown_component() -> None:
     assert get_download_url("unknown", "1.0.0", "123") == ""
 
 
+@patch("missing_ag_updater.updater.ARCH_NAME", "x64")
+@patch("missing_ag_updater.updater.OS_NAME", "linux")
+def test_get_download_url_prefers_release_download_url() -> None:
+    release = Release(
+        version="2.5.5",
+        execution_id="1234",
+        download_url="https://dl.google.com/release2/ide/custom.tar.gz",
+    )
+    assert get_download_url("ide", "2.5.5", "1234", release) == "https://dl.google.com/release2/ide/custom.tar.gz"
+
+
+@patch("missing_ag_updater.updater.ARCH_NAME", "x64")
+@patch("missing_ag_updater.updater.OS_NAME", "linux")
+def test_get_download_url_uses_platform_downloads_map() -> None:
+    release = Release(
+        version="2.5.5",
+        execution_id="1234",
+        downloads={
+            "linux-x64": "https://storage.googleapis.com/antigravity-public/linux-x64.tar.gz",
+            "default": "https://storage.googleapis.com/antigravity-public/default.tar.gz",
+        },
+    )
+    assert (
+        get_download_url("ide", "2.5.5", "1234", release)
+        == "https://storage.googleapis.com/antigravity-public/linux-x64.tar.gz"
+    )
+
+
+@patch("missing_ag_updater.updater.ARCH_NAME", "x64")
+@patch("missing_ag_updater.updater.OS_NAME", "linux")
+def test_get_download_url_ignores_non_platform_downloads_map() -> None:
+    release = Release(
+        version="2.5.5",
+        execution_id="1234",
+        downloads={"darwin-x64": "https://storage.googleapis.com/antigravity-public/mac.tar.gz"},
+    )
+    assert get_download_url("ide", "2.5.5", "1234", release).startswith(
+        "https://edgedl.me.gvt1.com/edgedl/release2/j0qc3/antigravity/stable/"
+    )
+
+
+def test_get_release_endpoints_env_override_and_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(
+        "ANTIGRAVITY_IDE_RELEASES_URL",
+        "https://storage.googleapis.com/mirror/ide.json, https://dl.google.com/backup/ide.json",
+    )
+    endpoints = get_release_endpoints("ide")
+    assert endpoints[:2] == [
+        "https://storage.googleapis.com/mirror/ide.json",
+        "https://dl.google.com/backup/ide.json",
+    ]
+    assert endpoints[-1].endswith(".run.app/releases")
+
+
+@patch("missing_ag_updater.updater.fetch_json")
+def test_fetch_release_payload_falls_back_to_next_endpoint(
+    mock_fetch: MagicMock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("ANTIGRAVITY_IDE_RELEASES_URL", "https://dl.google.com/broken.json")
+    mock_fetch.side_effect = [RuntimeError("HTTP 404"), [{"version": "2.0.4", "execution_id": "1"}]]
+    assert fetch_release_payload("ide") == [{"version": "2.0.4", "execution_id": "1"}]
+    assert mock_fetch.call_count == 2
+
+
+@patch("missing_ag_updater.updater.fetch_json", side_effect=RuntimeError("HTTP 503"))
+def test_fetch_release_payload_reports_all_failures(mock_fetch: MagicMock, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ANTIGRAVITY_HUB_RELEASES_URL", "https://dl.google.com/broken.json")
+    with pytest.raises(ReleaseEndpointError) as exc_info:
+        fetch_release_payload("hub")
+    message = str(exc_info.value)
+    assert "Could not fetch HUB release metadata" in message
+    assert "https://dl.google.com/broken.json" in message
+    assert "unofficial and reverse-engineered" in message
+    assert "ANTIGRAVITY_HUB_RELEASES_URL" in message
+
+
 @patch("subprocess.run")
 def test_install_windows_exe_success(mock_run: MagicMock) -> None:
     mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
@@ -260,7 +341,7 @@ def test_update_ide_success_linux() -> None:
     ) -> None:
         with tempfile.TemporaryDirectory() as target_ide_dir:
             launcher = os.path.join(target_ide_dir, "bin_launcher", "ide-launch")
-            res = update_ide(target_ide_dir, launcher, force=True)
+            res = update_ide(target_ide_dir, launcher, force=True, allow_unverified=True)
             assert res is True
             assert os.path.exists(os.path.join(target_ide_dir, "bin", "antigravity-ide"))
             mock_dt.assert_called_once_with(ide_dir=target_ide_dir, launcher_path=launcher, scope="user")
@@ -269,27 +350,23 @@ def test_update_ide_success_linux() -> None:
     _run_test()
 
 
-def test_update_ide_skips_legacy_cleanup_on_non_sandbox_distro() -> None:
+def test_update_ide_rolls_back_on_install_failure(tmp_path: Any) -> None:
     def mock_download_write_tar(url: str, dest_path: str, **kwargs: Any) -> None:
         with tempfile.TemporaryDirectory() as td:
             bin_dir = os.path.join(td, "Antigravity IDE", "bin")
             os.makedirs(bin_dir)
             with open(os.path.join(bin_dir, "antigravity-ide"), "w", encoding="utf-8") as fdesc:
-                fdesc.write("launcher content")
+                fdesc.write("new launcher")
             with tarfile.open(dest_path, "w:gz") as tar:
                 tar.add(os.path.join(td, "Antigravity IDE"), arcname="Antigravity IDE")
 
-    original_rmtree = shutil.rmtree
-
-    def record_rmtree(path: str, *args: Any, **kwargs: Any) -> None:
-        if path.endswith("Antigravity IDE"):
-            raise AssertionError("legacy directory should not be removed")
-        return original_rmtree(path, *args, **kwargs)
+    target_ide_dir = tmp_path / "ide"
+    target_ide_dir.mkdir()
+    (target_ide_dir / "old-marker.txt").write_text("old install", encoding="utf-8")
 
     @patch("missing_ag_updater.updater.install_ide_nautilus")
     @patch("missing_ag_updater.updater.install_ide_desktop")
-    @patch("missing_ag_updater.updater.shutil.rmtree", side_effect=record_rmtree)
-    @patch("missing_ag_updater.updater.is_ubuntu_sandbox_distro", return_value=False)
+    @patch("missing_ag_updater.updater.shutil.move", side_effect=RuntimeError("disk full"))
     @patch("missing_ag_updater.updater.download_file", side_effect=mock_download_write_tar)
     @patch("missing_ag_updater.updater.get_running_pids", return_value=[])
     @patch("missing_ag_updater.updater.fetch_json", return_value=[{"version": "2.0.4", "execution_id": "1234"}])
@@ -300,18 +377,14 @@ def test_update_ide_skips_legacy_cleanup_on_non_sandbox_distro() -> None:
         mock_fetch: MagicMock,
         mock_pids: MagicMock,
         mock_dl: MagicMock,
-        mock_distro: MagicMock,
-        mock_rm: MagicMock,
+        mock_move: MagicMock,
         mock_install_desktop: MagicMock,
         mock_naut: MagicMock,
     ) -> None:
-        with tempfile.TemporaryDirectory() as root:
-            target_ide_dir = os.path.join(root, "target-ide")
-            legacy_ide_dir = os.path.join(root, "Antigravity IDE")
-            os.makedirs(legacy_ide_dir)
-            res = update_ide(target_ide_dir, None, force=True)
-            assert res is True
-            mock_install_desktop.assert_called_once()
+        res = update_ide(str(target_ide_dir), None, force=True, allow_unverified=True)
+        assert res is False
+        assert (target_ide_dir / "old-marker.txt").read_text(encoding="utf-8") == "old install"
+        assert not list(tmp_path.glob("ide.backup.*"))
 
     _run_test()
 
@@ -337,6 +410,43 @@ def test_update_ide_checksum_verification() -> None:
         assert res is False
 
     _test_mismatch()
+
+
+@patch("missing_ag_updater.updater.is_path_writable", return_value=True)
+@patch("missing_ag_updater.updater.download_file")
+@patch("missing_ag_updater.updater.get_running_pids", return_value=[])
+@patch("missing_ag_updater.updater.fetch_json", return_value=[{"version": "2.0.4", "execution_id": "1234"}])
+@patch("missing_ag_updater.updater.get_ide_version", return_value="2.0.3")
+def test_update_ide_missing_checksum_fails_closed(
+    mock_ver: MagicMock,
+    mock_fetch: MagicMock,
+    mock_pids: MagicMock,
+    mock_download: MagicMock,
+    mock_writable: MagicMock,
+) -> None:
+    assert update_ide("/dummy/ide", None, force=True) is False
+    mock_download.assert_called_once()
+
+
+@patch("missing_ag_updater.updater.is_path_writable", return_value=True)
+@patch("missing_ag_updater.updater.install_ide_nautilus")
+@patch("missing_ag_updater.updater.install_ide_desktop")
+@patch("missing_ag_updater.updater.download_file")
+@patch("missing_ag_updater.updater.get_running_pids", return_value=[])
+@patch("missing_ag_updater.updater.fetch_json", return_value=[{"version": "2.0.4", "execution_id": "1234"}])
+@patch("missing_ag_updater.updater.get_ide_version", return_value="2.0.3")
+def test_update_ide_allow_unverified_opt_in(
+    mock_ver: MagicMock,
+    mock_fetch: MagicMock,
+    mock_pids: MagicMock,
+    mock_download: MagicMock,
+    mock_install_desktop: MagicMock,
+    mock_nautilus: MagicMock,
+    mock_writable: MagicMock,
+) -> None:
+    # The empty archive reaches extraction and fails there, proving the checksum gate was bypassed.
+    assert update_ide("/dummy/ide", None, force=True, allow_unverified=True) is False
+    mock_download.assert_called_once()
 
 
 def test_update_hub_checksum_verification() -> None:
@@ -423,10 +533,47 @@ def test_update_hub_success_linux() -> None:
     ) -> None:
         with tempfile.TemporaryDirectory() as target_hub_dir:
             launcher = os.path.join(target_hub_dir, "bin", "antigravity")
-            res = update_hub(target_hub_dir, launcher, force=True)
+            res = update_hub(target_hub_dir, launcher, force=True, allow_unverified=True)
             assert res is True
             assert os.path.exists(os.path.join(target_hub_dir, "antigravity"))
             mock_dt.assert_called_once_with(hub_dir=target_hub_dir, launcher_path=launcher, scope="user")
+
+    _run_test()
+
+
+def test_update_hub_rolls_back_on_install_failure(tmp_path: Any) -> None:
+    def mock_download_write_tar_hub(url: str, dest_path: str, **kwargs: Any) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            hub_dir = os.path.join(td, "Antigravity-x64")
+            os.makedirs(hub_dir)
+            with open(os.path.join(hub_dir, "antigravity"), "w", encoding="utf-8") as fdesc:
+                fdesc.write("new hub launcher")
+            with tarfile.open(dest_path, "w:gz") as tar:
+                tar.add(hub_dir, arcname="Antigravity-x64")
+
+    target_hub_dir = tmp_path / "hub"
+    target_hub_dir.mkdir()
+    (target_hub_dir / "old-marker.txt").write_text("old hub install", encoding="utf-8")
+
+    @patch("missing_ag_updater.updater.install_hub_desktop")
+    @patch("missing_ag_updater.updater.shutil.move", side_effect=RuntimeError("disk full"))
+    @patch("missing_ag_updater.updater.download_file", side_effect=mock_download_write_tar_hub)
+    @patch("missing_ag_updater.updater.get_running_pids", return_value=[])
+    @patch("missing_ag_updater.updater.fetch_json", return_value=[{"version": "2.1.4", "execution_id": "1234"}])
+    @patch("missing_ag_updater.updater.get_hub_version", return_value="2.1.3")
+    @patch("missing_ag_updater.updater.OS_NAME", "linux")
+    def _run_test(
+        mock_ver: MagicMock,
+        mock_fetch: MagicMock,
+        mock_pids: MagicMock,
+        mock_dl: MagicMock,
+        mock_move: MagicMock,
+        mock_install_desktop: MagicMock,
+    ) -> None:
+        res = update_hub(str(target_hub_dir), None, force=True, allow_unverified=True)
+        assert res is False
+        assert (target_hub_dir / "old-marker.txt").read_text(encoding="utf-8") == "old hub install"
+        assert not list(tmp_path.glob("hub.backup.*"))
 
     _run_test()
 
@@ -448,7 +595,7 @@ def test_update_hub_invalid_tarball() -> None:
         mock_dl: MagicMock,
     ) -> None:
         with tempfile.TemporaryDirectory() as target_hub_dir:
-            res = update_hub(target_hub_dir, None)
+            res = update_hub(target_hub_dir, None, allow_unverified=True)
             assert res is False
 
     _run_test()
@@ -699,7 +846,7 @@ def test_update_ide_symlink_failure(tmp_path: Any) -> None:
     ) -> None:
         target_ide = str(tmp_path / "ide")
         launcher = str(tmp_path / "bin" / "antigravity-ide")
-        res = update_ide(target_ide, launcher, force=True)
+        res = update_ide(target_ide, launcher, force=True, allow_unverified=True)
         assert res is False
 
     _run_test()
@@ -730,7 +877,7 @@ def test_update_hub_symlink_failure(tmp_path: Any) -> None:
     ) -> None:
         target_hub = str(tmp_path / "hub")
         launcher = str(tmp_path / "bin" / "antigravity")
-        res = update_hub(target_hub, launcher, force=True)
+        res = update_hub(target_hub, launcher, force=True, allow_unverified=True)
         assert res is False
 
     _run_test()
@@ -766,3 +913,87 @@ def test_update_ide_selects_highest_version_when_out_of_order() -> None:
         assert res is True
 
     _run_test()
+
+
+CLI_MANIFEST_NEWER = {"version": "1.0.8", "url": SAMPLE_CLI_URL, "sha512": SAMPLE_SHA512}
+SELF_UPDATE_REASON = "official self-updater state found: /home/user/.gemini/antigravity-cli/updater/update.lock"
+
+
+@patch("missing_ag_updater.updater.download_file")
+@patch("missing_ag_updater.updater.detect_cli_self_update", return_value=SELF_UPDATE_REASON)
+@patch("missing_ag_updater.updater.fetch_json", return_value=CLI_MANIFEST_NEWER)
+@patch("missing_ag_updater.updater.get_cli_version", return_value="1.0.7")
+def test_update_cli_skipped_when_official_self_update_detected(
+    mock_ver: MagicMock,
+    mock_fetch: MagicMock,
+    mock_detect: MagicMock,
+    mock_dl: MagicMock,
+) -> None:
+    assert update_cli("/dummy/cli") is True
+    mock_detect.assert_called_once_with("/dummy/cli")
+    mock_dl.assert_not_called()
+
+
+@patch("missing_ag_updater.updater.download_file")
+@patch("missing_ag_updater.updater.detect_cli_self_update", return_value=SELF_UPDATE_REASON)
+@patch("missing_ag_updater.updater.fetch_json", return_value=CLI_MANIFEST_NEWER)
+@patch("missing_ag_updater.updater.get_cli_version", return_value="1.0.8")
+def test_update_cli_up_to_date_skips_self_update_detection(
+    mock_ver: MagicMock,
+    mock_fetch: MagicMock,
+    mock_detect: MagicMock,
+    mock_dl: MagicMock,
+) -> None:
+    assert update_cli("/dummy/cli") is True
+    mock_detect.assert_not_called()
+    mock_dl.assert_not_called()
+
+
+@patch("missing_ag_updater.updater.download_file")
+@patch("missing_ag_updater.updater.detect_cli_self_update", return_value=SELF_UPDATE_REASON)
+@patch("missing_ag_updater.updater.fetch_json", return_value=CLI_MANIFEST_NEWER)
+@patch("missing_ag_updater.updater.get_cli_version", return_value="1.0.7")
+def test_update_cli_dry_run_with_ignore_self_update(
+    mock_ver: MagicMock,
+    mock_fetch: MagicMock,
+    mock_detect: MagicMock,
+    mock_dl: MagicMock,
+) -> None:
+    assert update_cli("/dummy/cli", dry_run=True, ignore_self_update=True) is True
+    mock_dl.assert_not_called()
+
+
+def _write_cli_tarball(url: str, dest_path: str, **kwargs: Any) -> None:
+    with tempfile.TemporaryDirectory() as staging_dir:
+        binary_path = os.path.join(staging_dir, "antigravity")
+        with open(binary_path, "w", encoding="utf-8") as fdesc:
+            fdesc.write("cli binary content")
+        with tarfile.open(dest_path, "w:gz") as tar:
+            tar.add(binary_path, arcname="antigravity")
+
+
+@pytest.mark.parametrize(
+    ("force", "ignore_self_update"),
+    [(True, False), (False, True)],
+    ids=["force", "ignore-self-update"],
+)
+@patch("missing_ag_updater.updater.compute_sha512", return_value=SAMPLE_SHA512)
+@patch("missing_ag_updater.updater.download_file", side_effect=_write_cli_tarball)
+@patch("missing_ag_updater.updater.detect_cli_self_update", return_value=SELF_UPDATE_REASON)
+@patch("missing_ag_updater.updater.fetch_json", return_value=CLI_MANIFEST_NEWER)
+@patch("missing_ag_updater.updater.get_cli_version", return_value="1.0.7")
+@patch("missing_ag_updater.updater.OS_NAME", "linux")
+def test_update_cli_override_self_update(
+    mock_ver: MagicMock,
+    mock_fetch: MagicMock,
+    mock_detect: MagicMock,
+    mock_dl: MagicMock,
+    mock_sha: MagicMock,
+    force: bool,
+    ignore_self_update: bool,
+    tmp_path: Any,
+) -> None:
+    cli_binary = tmp_path / "bin" / "agy"
+    assert update_cli(str(cli_binary), force=force, ignore_self_update=ignore_self_update) is True
+    mock_dl.assert_called_once()
+    assert cli_binary.exists()
