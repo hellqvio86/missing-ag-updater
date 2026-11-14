@@ -146,7 +146,7 @@ jobs:
           name: coverage-badge
 
       - name: Commit coverage badge
-        uses: stefanzweifel/git-auto-commit-action@8621497c8c39c72f3e2a999a26b4ca1b5058a842 # v5.0.1
+        uses: stefanzweifel/git-auto-commit-action@d0b01107b5db882071f96de5dd4b54961ea93f4c # v7.2.1
         with:
           commit_message: "chore: update coverage badge [skip ci]"
           file_pattern: coverage.svg
