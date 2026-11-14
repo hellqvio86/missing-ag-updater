@@ -16,13 +16,18 @@ from typing import Any
 import requests
 
 from .const import (
+    APPARMOR_ENABLED_PATH,
+    APPARMOR_USERNS_PATH,
     COLOR_BLUE,
     COLOR_ENDC,
     COLOR_FAIL,
     COLOR_GREEN,
     COLOR_WARNING,
+    HUB_PROCESS_NAMES,
+    IDE_PROCESS_NAMES,
     IGNORED_PROCESS_SUBSTRINGS,
     OS_NAME,
+    OS_RELEASE_PATH,
     SANDBOX_DISTROS,
     SYSTEM_APPLICATIONS_DIR,
     SYSTEM_OPT_DIR,
@@ -87,7 +92,7 @@ def get_linux_distro_id() -> str:
     if OS_NAME != "linux":
         return ""
     try:
-        with open("/etc/os-release", "r", encoding="utf-8") as fdesc:
+        with open(OS_RELEASE_PATH, "r", encoding="utf-8") as fdesc:
             for line in fdesc:
                 if line.startswith("ID="):
                     return line.strip().split("=", 1)[1].strip('"').lower()
@@ -105,7 +110,7 @@ def _get_linux_distro_id_like() -> list[str]:
     if OS_NAME != "linux":
         return []
     try:
-        with open("/etc/os-release", "r", encoding="utf-8") as fdesc:
+        with open(OS_RELEASE_PATH, "r", encoding="utf-8") as fdesc:
             for line in fdesc:
                 if line.startswith("ID_LIKE="):
                     raw = line.strip().split("=", 1)[1].strip('"').lower()
@@ -201,7 +206,7 @@ def _matches_component_process(keyword: str, tokens: list[str]) -> bool:
         # Hub executable should match 'antigravity' / 'antigravity-hub', not the IDE.
         if "antigravity-ide" in exe_basename or "antigravity ide" in exe_basename:
             return False
-        if any(name in exe_basename for name in ("antigravity", "antigravity-hub")):
+        if any(name in exe_basename for name in HUB_PROCESS_NAMES):
             return True
         if "electron" in exe_basename:
             # Generic Electron shell: require an Antigravity Hub path/token, not just any Electron app.
@@ -212,7 +217,7 @@ def _matches_component_process(keyword: str, tokens: list[str]) -> bool:
         return any(token == "antigravity" for token in lowered_tokens)
 
     if keyword in ("antigravity-ide", "antigravity ide"):
-        if any(name in exe_basename for name in ("antigravity-ide", "antigravity ide", "code")):
+        if any(name in exe_basename for name in IDE_PROCESS_NAMES):
             return True
         return any("antigravity-ide" in token or "antigravity ide" in token for token in lowered_tokens)
 
@@ -771,7 +776,7 @@ def is_apparmor_enabled() -> bool:
     if not is_ubuntu_sandbox_distro():
         return False
 
-    param_path = "/sys/module/apparmor/parameters/enabled"
+    param_path = APPARMOR_ENABLED_PATH
     if os.path.exists(param_path):
         try:
             with open(param_path, "r", encoding="utf-8") as fdesc:
@@ -780,7 +785,7 @@ def is_apparmor_enabled() -> bool:
         except OSError:
             pass
 
-    userns_path = "/proc/sys/kernel/apparmor_restrict_unprivileged_userns"
+    userns_path = APPARMOR_USERNS_PATH
     if os.path.exists(userns_path):
         try:
             with open(userns_path, "r", encoding="utf-8") as fdesc:

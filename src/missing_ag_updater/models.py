@@ -1,12 +1,11 @@
 """Data models for releases and CLI manifest metadata."""
 
-import re
 from typing import Optional
 from urllib.parse import urlparse
 
 from pydantic import BaseModel, field_validator
 
-from .const import ALLOWED_HOST_SUFFIXES, ALLOWED_HOSTS, HEX_64_PATTERN, HEX_128_PATTERN
+from .const import ALLOWED_HOST_SUFFIXES, ALLOWED_HOSTS, HEX_64_PATTERN, HEX_128_PATTERN, VERSION_DIGITS_PATTERN
 
 
 def is_trusted_download_url(url: str) -> bool:
@@ -122,7 +121,7 @@ def parse_version_tuple(version_str: str) -> tuple[int, ...]:
     if not version_str:
         return (0, 0, 0)
     cleaned = version_str.strip().lstrip("v")
-    numbers = re.findall(r"\d+", cleaned)
+    numbers = VERSION_DIGITS_PATTERN.findall(cleaned)
     if not numbers:
         return (0, 0, 0)
     return tuple(int(num) for num in numbers)

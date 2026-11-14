@@ -5,6 +5,10 @@ import shutil
 from typing import Optional
 
 from .const import (
+    HUB_DESKTOP_FILENAME,
+    ICON_FILENAME,
+    IDE_DESKTOP_FILENAME,
+    IDE_ICON_FILENAME,
     SYSTEM_APPLICATIONS_DIR,
     SYSTEM_ICONS_DIR,
     USER_APPLICATIONS_DIR,
@@ -29,7 +33,7 @@ def install_ide_desktop(
     app_dir = SYSTEM_APPLICATIONS_DIR if scope == "system" else USER_APPLICATIONS_DIR
     icons_dir = SYSTEM_ICONS_DIR if scope == "system" else USER_ICONS_DIR
 
-    desktop_file = os.path.join(app_dir, "antigravity-ide.desktop")
+    desktop_file = os.path.join(app_dir, IDE_DESKTOP_FILENAME)
     exec_path = launcher_path or os.path.join(ide_dir, "bin", "antigravity-ide")
 
     desktop_content = f"""[Desktop Entry]
@@ -53,13 +57,13 @@ StartupWMClass=antigravity-ide
         print_warning(f"Could not install desktop entry {desktop_file}: {de}")
 
     # Copy icon: prefer official Antigravity branding icon if available, falling back to code.png
-    dest_icon = os.path.join(icons_dir, "antigravity.png")
-    dest_ide_icon = os.path.join(icons_dir, "antigravity-ide.png")
+    dest_icon = os.path.join(icons_dir, ICON_FILENAME)
+    dest_ide_icon = os.path.join(icons_dir, IDE_ICON_FILENAME)
     installed_official_icon = False
     candidate_icons = [
-        os.path.join(icons_dir, "antigravity.png"),
-        os.path.join(USER_ICONS_DIR, "antigravity.png"),
-        os.path.join(SYSTEM_ICONS_DIR, "antigravity.png"),
+        os.path.join(icons_dir, ICON_FILENAME),
+        os.path.join(USER_ICONS_DIR, ICON_FILENAME),
+        os.path.join(SYSTEM_ICONS_DIR, ICON_FILENAME),
     ]
     for cand in candidate_icons:
         if os.path.exists(cand):
@@ -100,7 +104,7 @@ StartupWMClass=antigravity-ide
 
     # If installing to system, check and remove duplicate user desktop entry if present
     if scope == "system":
-        user_dt = os.path.join(USER_APPLICATIONS_DIR, "antigravity-ide.desktop")
+        user_dt = os.path.join(USER_APPLICATIONS_DIR, IDE_DESKTOP_FILENAME)
         if os.path.exists(user_dt):
             try:
                 os.remove(user_dt)
@@ -108,7 +112,7 @@ StartupWMClass=antigravity-ide
             except OSError:
                 pass
     elif scope == "user":
-        sys_dt = os.path.join(SYSTEM_APPLICATIONS_DIR, "antigravity-ide.desktop")
+        sys_dt = os.path.join(SYSTEM_APPLICATIONS_DIR, IDE_DESKTOP_FILENAME)
         if os.path.exists(sys_dt):
             print_info(f"Notice: System desktop entry also exists at {sys_dt}. User entry will take precedence.")
 
@@ -125,7 +129,7 @@ def install_hub_desktop(
     app_dir = SYSTEM_APPLICATIONS_DIR if scope == "system" else USER_APPLICATIONS_DIR
     icons_dir = SYSTEM_ICONS_DIR if scope == "system" else USER_ICONS_DIR
 
-    desktop_file = os.path.join(app_dir, "antigravity.desktop")
+    desktop_file = os.path.join(app_dir, HUB_DESKTOP_FILENAME)
     exec_path = launcher_path or os.path.join(hub_dir, "antigravity")
 
     desktop_content = f"""[Desktop Entry]
@@ -153,11 +157,11 @@ StartupWMClass=Antigravity
         asar_path = os.path.join(hub_dir, "Antigravity-x64", "resources", "app.asar")
 
     if os.path.exists(asar_path):
-        dest_icon = os.path.join(icons_dir, "antigravity.png")
+        dest_icon = os.path.join(icons_dir, ICON_FILENAME)
         if extract_asar_icon(asar_path, dest_icon):
             print_success(f"Extracted and installed {'system' if scope == 'system' else 'local'} Hub icon.")
             # Also ensure IDE icon has official branding if IDE desktop is present
-            ide_dest_icon = os.path.join(icons_dir, "antigravity-ide.png")
+            ide_dest_icon = os.path.join(icons_dir, IDE_ICON_FILENAME)
             try:
                 shutil.copy2(dest_icon, ide_dest_icon)
             except (OSError, shutil.Error):
@@ -166,7 +170,7 @@ StartupWMClass=Antigravity
             print_warning("Could not extract Hub icon.")
 
     if scope == "system":
-        user_dt = os.path.join(USER_APPLICATIONS_DIR, "antigravity.desktop")
+        user_dt = os.path.join(USER_APPLICATIONS_DIR, HUB_DESKTOP_FILENAME)
         if os.path.exists(user_dt):
             try:
                 os.remove(user_dt)
@@ -174,7 +178,7 @@ StartupWMClass=Antigravity
             except OSError:
                 pass
     elif scope == "user":
-        sys_dt = os.path.join(SYSTEM_APPLICATIONS_DIR, "antigravity.desktop")
+        sys_dt = os.path.join(SYSTEM_APPLICATIONS_DIR, HUB_DESKTOP_FILENAME)
         if os.path.exists(sys_dt):
             print_info(f"Notice: System desktop entry also exists at {sys_dt}. User entry will take precedence.")
 

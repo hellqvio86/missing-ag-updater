@@ -6,6 +6,12 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-11-14
+
+### Changed
+
+- Consolidated scattered module-level constants (environment variable mappings, fallback CDN base URLs, Linux/macOS discovery roots and candidate paths, AppArmor/OS-release paths, `.desktop`/icon/Nautilus filenames, version regex, and process/parent-directory marker tuples) into `src/missing_ag_updater/const.py` and imported them from `.const`.
+
 ## [0.7.0] - 2026-11-13
 
 ### Added
@@ -55,6 +61,7 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 See the GitHub releases page for changes before 0.6.0.
 
-[Unreleased]: https://github.com/hellqvio86/missing-ag-updater/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/hellqvio86/missing-ag-updater/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/hellqvio86/missing-ag-updater/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/hellqvio86/missing-ag-updater/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/hellqvio86/missing-ag-updater/compare/v0.5.3...v0.6.0

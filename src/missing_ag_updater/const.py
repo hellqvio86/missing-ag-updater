@@ -6,12 +6,14 @@ import re
 import sys
 from typing import Optional
 
+OS_RELEASE_PATH = "/etc/os-release"
+
 
 def _is_ubuntu_style_distro() -> bool:
     if OS_NAME != "linux":
         return False
     try:
-        with open("/etc/os-release", "r", encoding="utf-8") as fdesc:
+        with open(OS_RELEASE_PATH, "r", encoding="utf-8") as fdesc:
             for line in fdesc:
                 if line.startswith("ID="):
                     distro_id = line.strip().split("=", 1)[1].strip('"').lower()
@@ -28,7 +30,7 @@ def _is_ubuntu_style_distro() -> bool:
 
 # Single source of truth for the package version. `pyproject.toml` reads this
 # value dynamically via Hatchling (`[tool.hatch.version]`), so bump only here.
-__version__ = "0.7.0"
+__version__ = "0.7.1"
 
 # Truthy and falsy string values for environment variables and config parsing
 TRUTHY_VALUES: tuple[str, ...] = ("1", "true", "yes", "on")
@@ -234,3 +236,74 @@ IGNORED_PROCESS_SUBSTRINGS: tuple[str, ...] = (
     ".gemini/antigravity",
     "pytest",
 )
+
+# Legacy CDN download base URLs (fallback when release JSON omits explicit URLs)
+IDE_DOWNLOAD_BASE_URL = "https://edgedl.me.gvt1.com/edgedl/release2/j0qc3/antigravity/stable"
+HUB_DOWNLOAD_BASE_URL = "https://storage.googleapis.com/antigravity-public/antigravity-hub"
+
+# Version parsing pattern
+VERSION_DIGITS_PATTERN = re.compile(r"\d+")
+
+# Configuration paths & environment variable mappings
+APP_CONFIG_DIR_NAME = "missing-ag-updater"
+CONFIG_FILE_NAME = "config.toml"
+FALLBACK_CONFIG_FILE_NAME = ".missing-ag-updater.toml"
+
+CONFIG_ENV_VARS: dict[str, tuple[str, ...]] = {
+    "config": ("ANTIGRAVITY_CONFIG", "AG_CONFIG"),
+    "system": ("ANTIGRAVITY_SYSTEM", "AG_SYSTEM"),
+    "user": ("ANTIGRAVITY_USER", "AG_USER"),
+    "check": ("ANTIGRAVITY_CHECK", "AG_CHECK"),
+    "ide": ("ANTIGRAVITY_IDE", "AG_IDE"),
+    "hub": ("ANTIGRAVITY_HUB", "AG_HUB"),
+    "cli": ("ANTIGRAVITY_CLI", "AG_CLI"),
+    "force": ("ANTIGRAVITY_FORCE", "AG_FORCE"),
+    "ignore_self_update": ("ANTIGRAVITY_IGNORE_SELF_UPDATE", "AG_IGNORE_SELF_UPDATE"),
+    "allow_unverified": ("ANTIGRAVITY_ALLOW_UNVERIFIED", "AG_ALLOW_UNVERIFIED"),
+    "debug": ("ANTIGRAVITY_DEBUG", "AG_DEBUG"),
+    "apparmor_sandbox": ("ANTIGRAVITY_APPARMOR_SANDBOX", "AG_APPARMOR_SANDBOX"),
+    "dir_ide": ("ANTIGRAVITY_DIR_IDE", "AG_DIR_IDE"),
+    "dir_hub": ("ANTIGRAVITY_DIR_HUB", "AG_DIR_HUB"),
+    "path_cli": ("ANTIGRAVITY_PATH_CLI", "AG_PATH_CLI"),
+    "no_desktop": ("ANTIGRAVITY_NO_DESKTOP", "AG_NO_DESKTOP"),
+    "desktop": ("ANTIGRAVITY_DESKTOP", "AG_DESKTOP"),
+    "no_nautilus": ("ANTIGRAVITY_NO_NAUTILUS", "AG_NO_NAUTILUS"),
+    "nautilus": ("ANTIGRAVITY_NAUTILUS", "AG_NAUTILUS"),
+}
+
+# Linux AppArmor sysfs/procfs paths
+APPARMOR_ENABLED_PATH = "/sys/module/apparmor/parameters/enabled"
+APPARMOR_USERNS_PATH = "/proc/sys/kernel/apparmor_restrict_unprivileged_userns"
+
+# Discovery roots & candidate paths
+LINUX_SYSTEM_PATH_ROOTS: tuple[str, ...] = ("/opt", "/usr", "/etc", "/var")
+DARWIN_SYSTEM_PATH_ROOTS: tuple[str, ...] = ("/Applications", "/Library", "/usr", "/System")
+LINUX_IDE_SYSTEM_CANDIDATES: tuple[str, ...] = (
+    "/opt/antigravity-ide/Antigravity-IDE",
+    "/opt/Antigravity-IDE",
+    "/opt/Antigravity IDE",
+    "/usr/lib/antigravity-ide",
+    "/usr/share/antigravity-ide",
+)
+LINUX_HUB_SYSTEM_CANDIDATES: tuple[str, ...] = (
+    "/opt/antigravity/Antigravity-x64",
+    "/opt/Antigravity-x64",
+    "/opt/Antigravity Hub",
+    "/usr/lib/antigravity",
+)
+LINUX_CLI_SYSTEM_CANDIDATES: tuple[str, ...] = ("/usr/bin/agy",)
+CLI_SELF_UPDATER_BACKUP_SUFFIX = ".old"
+
+# Desktop, icon, Nautilus, and uninstall naming constants
+IDE_DESKTOP_FILENAME = "antigravity-ide.desktop"
+HUB_DESKTOP_FILENAME = "antigravity.desktop"
+ICON_FILENAME = "antigravity.png"
+IDE_ICON_FILENAME = "antigravity-ide.png"
+NAUTILUS_EXTENSION_FILENAME = "open-in-antigravity-ide.py"
+
+IDE_PARENT_DIR_NAMES: tuple[str, ...] = ("antigravity-ide", "Antigravity-IDE")
+HUB_PARENT_DIR_NAMES: tuple[str, ...] = ("antigravity", "Antigravity")
+
+# Process matching executable name markers
+HUB_PROCESS_NAMES: tuple[str, ...] = ("antigravity", "antigravity-hub")
+IDE_PROCESS_NAMES: tuple[str, ...] = ("antigravity-ide", "antigravity ide", "code")

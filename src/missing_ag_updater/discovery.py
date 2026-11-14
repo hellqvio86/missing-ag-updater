@@ -7,9 +7,17 @@ from typing import Any, Optional
 
 from .const import (
     ARCH_NAME,
+    CLI_SELF_UPDATER_BACKUP_SUFFIX,
     CLI_SELF_UPDATER_MARKERS,
     CLI_SELF_UPDATER_STATE_DIR,
+    DARWIN_SYSTEM_PATH_ROOTS,
     HOME,
+    HUB_DESKTOP_FILENAME,
+    IDE_DESKTOP_FILENAME,
+    LINUX_CLI_SYSTEM_CANDIDATES,
+    LINUX_HUB_SYSTEM_CANDIDATES,
+    LINUX_IDE_SYSTEM_CANDIDATES,
+    LINUX_SYSTEM_PATH_ROOTS,
     OS_NAME,
     SYSTEM_APPLICATIONS_DIR,
     SYSTEM_CLI_BINARY,
@@ -69,11 +77,9 @@ def _is_system_path(path: str) -> bool:
         return False
     norm = os.path.normpath(path)
     if OS_NAME == "linux":
-        return any(norm == root or norm.startswith(root + "/") for root in ("/opt", "/usr", "/etc", "/var"))
+        return any(norm == root or norm.startswith(root + "/") for root in LINUX_SYSTEM_PATH_ROOTS)
     if OS_NAME == "darwin":
-        return any(
-            norm == root or norm.startswith(root + "/") for root in ("/Applications", "/Library", "/usr", "/System")
-        )
+        return any(norm == root or norm.startswith(root + "/") for root in DARWIN_SYSTEM_PATH_ROOTS)
     if OS_NAME == "windows":
         prog_files = os.environ.get("ProgramFiles", "C:\\Program Files").lower()
         prog_files_x86 = os.environ.get("ProgramFiles(x86)", "C:\\Program Files (x86)").lower()
@@ -105,9 +111,9 @@ def detect_cli_self_update(cli_binary: str) -> Optional[str]:
     except OSError:
         sibling_names = []
     for sibling_name in sorted(sibling_names):
-        if not (sibling_name.startswith(backup_prefix) and sibling_name.endswith(".old")):
+        if not (sibling_name.startswith(backup_prefix) and sibling_name.endswith(CLI_SELF_UPDATER_BACKUP_SUFFIX)):
             continue
-        backup_token = sibling_name[len(backup_prefix) : -len(".old")]
+        backup_token = sibling_name[len(backup_prefix) : -len(CLI_SELF_UPDATER_BACKUP_SUFFIX)]
         if backup_token.isdigit():
             return f"official self-update backup found: {os.path.join(binary_dir, sibling_name)}"
 
@@ -169,11 +175,7 @@ def find_all_ide_installations() -> list[InstallationInfo]:
         candidate_dirs.extend(
             [
                 (SYSTEM_IDE_DIR, "system", SYSTEM_IDE_LAUNCHER),
-                ("/opt/antigravity-ide/Antigravity-IDE", "system", SYSTEM_IDE_LAUNCHER),
-                ("/opt/Antigravity-IDE", "system", SYSTEM_IDE_LAUNCHER),
-                ("/opt/Antigravity IDE", "system", SYSTEM_IDE_LAUNCHER),
-                ("/usr/lib/antigravity-ide", "system", SYSTEM_IDE_LAUNCHER),
-                ("/usr/share/antigravity-ide", "system", SYSTEM_IDE_LAUNCHER),
+                *((cand, "system", SYSTEM_IDE_LAUNCHER) for cand in LINUX_IDE_SYSTEM_CANDIDATES),
                 (USER_IDE_DIR, "user", USER_IDE_LAUNCHER),
                 (
                     os.path.join(USER_OPT_DIR, "Antigravity-IDE"),
@@ -206,10 +208,10 @@ def find_all_ide_installations() -> list[InstallationInfo]:
         # Check desktop files
         desktop_candidates = [
             (
-                os.path.join(SYSTEM_APPLICATIONS_DIR, "antigravity-ide.desktop"),
+                os.path.join(SYSTEM_APPLICATIONS_DIR, IDE_DESKTOP_FILENAME),
                 "system",
             ),
-            (os.path.join(USER_APPLICATIONS_DIR, "antigravity-ide.desktop"), "user"),
+            (os.path.join(USER_APPLICATIONS_DIR, IDE_DESKTOP_FILENAME), "user"),
         ]
         for dt_path, dt_scope in desktop_candidates:
             exec_bin = _find_exec_from_desktop(dt_path)
@@ -250,8 +252,8 @@ def find_all_ide_installations() -> list[InstallationInfo]:
 
             dt_file = None
             if OS_NAME == "linux":
-                dt_user = os.path.join(USER_APPLICATIONS_DIR, "antigravity-ide.desktop")
-                dt_sys = os.path.join(SYSTEM_APPLICATIONS_DIR, "antigravity-ide.desktop")
+                dt_user = os.path.join(USER_APPLICATIONS_DIR, IDE_DESKTOP_FILENAME)
+                dt_sys = os.path.join(SYSTEM_APPLICATIONS_DIR, IDE_DESKTOP_FILENAME)
                 if scope == "user" and os.path.exists(dt_user):
                     dt_file = dt_user
                 elif os.path.exists(dt_sys):
@@ -284,10 +286,7 @@ def find_all_hub_installations() -> list[InstallationInfo]:
         candidate_dirs.extend(
             [
                 (SYSTEM_HUB_DIR, "system", SYSTEM_HUB_LAUNCHER),
-                ("/opt/antigravity/Antigravity-x64", "system", SYSTEM_HUB_LAUNCHER),
-                ("/opt/Antigravity-x64", "system", SYSTEM_HUB_LAUNCHER),
-                ("/opt/Antigravity Hub", "system", SYSTEM_HUB_LAUNCHER),
-                ("/usr/lib/antigravity", "system", SYSTEM_HUB_LAUNCHER),
+                *((cand, "system", SYSTEM_HUB_LAUNCHER) for cand in LINUX_HUB_SYSTEM_CANDIDATES),
                 (USER_HUB_DIR, "user", USER_HUB_LAUNCHER),
                 (
                     os.path.join(USER_OPT_DIR, "Antigravity-x64"),
@@ -314,8 +313,8 @@ def find_all_hub_installations() -> list[InstallationInfo]:
             candidate_dirs.append((parent1, scope, bin_path))
 
         desktop_candidates = [
-            (os.path.join(SYSTEM_APPLICATIONS_DIR, "antigravity.desktop"), "system"),
-            (os.path.join(USER_APPLICATIONS_DIR, "antigravity.desktop"), "user"),
+            (os.path.join(SYSTEM_APPLICATIONS_DIR, HUB_DESKTOP_FILENAME), "system"),
+            (os.path.join(USER_APPLICATIONS_DIR, HUB_DESKTOP_FILENAME), "user"),
         ]
         for dt_path, dt_scope in desktop_candidates:
             exec_bin = _find_exec_from_desktop(dt_path)
@@ -353,8 +352,8 @@ def find_all_hub_installations() -> list[InstallationInfo]:
 
             dt_file = None
             if OS_NAME == "linux":
-                dt_user = os.path.join(USER_APPLICATIONS_DIR, "antigravity.desktop")
-                dt_sys = os.path.join(SYSTEM_APPLICATIONS_DIR, "antigravity.desktop")
+                dt_user = os.path.join(USER_APPLICATIONS_DIR, HUB_DESKTOP_FILENAME)
+                dt_sys = os.path.join(SYSTEM_APPLICATIONS_DIR, HUB_DESKTOP_FILENAME)
                 if scope == "user" and os.path.exists(dt_user):
                     dt_file = dt_user
                 elif os.path.exists(dt_sys):
@@ -387,7 +386,7 @@ def find_all_cli_installations() -> list[InstallationInfo]:
         candidate_bins.extend(
             [
                 (SYSTEM_CLI_BINARY, "system"),
-                ("/usr/bin/agy", "system"),
+                *((cand, "system") for cand in LINUX_CLI_SYSTEM_CANDIDATES),
                 (USER_CLI_BINARY, "user"),
                 (os.path.join(HOME, ".antigravity", "bin", "agy"), "user"),
             ]
@@ -592,21 +591,21 @@ def diagnose_all() -> dict[str, Any]:
     if OS_NAME == "linux":
         dt_paths = [
             (
-                os.path.join(SYSTEM_APPLICATIONS_DIR, "antigravity-ide.desktop"),
+                os.path.join(SYSTEM_APPLICATIONS_DIR, IDE_DESKTOP_FILENAME),
                 "system",
                 "IDE",
             ),
             (
-                os.path.join(SYSTEM_APPLICATIONS_DIR, "antigravity.desktop"),
+                os.path.join(SYSTEM_APPLICATIONS_DIR, HUB_DESKTOP_FILENAME),
                 "system",
                 "Hub",
             ),
             (
-                os.path.join(USER_APPLICATIONS_DIR, "antigravity-ide.desktop"),
+                os.path.join(USER_APPLICATIONS_DIR, IDE_DESKTOP_FILENAME),
                 "user",
                 "IDE",
             ),
-            (os.path.join(USER_APPLICATIONS_DIR, "antigravity.desktop"), "user", "Hub"),
+            (os.path.join(USER_APPLICATIONS_DIR, HUB_DESKTOP_FILENAME), "user", "Hub"),
         ]
         for desktop_path, scope, comp in dt_paths:
             if os.path.exists(desktop_path):
@@ -665,8 +664,8 @@ def clean_duplicate_desktop_entries(
 
     if keep_scope == "system":
         # Check user desktop entries
-        user_dt_ide = os.path.join(USER_APPLICATIONS_DIR, "antigravity-ide.desktop")
-        user_dt_hub = os.path.join(USER_APPLICATIONS_DIR, "antigravity.desktop")
+        user_dt_ide = os.path.join(USER_APPLICATIONS_DIR, IDE_DESKTOP_FILENAME)
+        user_dt_hub = os.path.join(USER_APPLICATIONS_DIR, HUB_DESKTOP_FILENAME)
 
         for dt in [user_dt_ide, user_dt_hub]:
             if os.path.exists(dt):

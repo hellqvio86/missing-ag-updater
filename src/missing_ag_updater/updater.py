@@ -10,6 +10,8 @@ from .const import (
     ARCH_NAME,
     COLOR_BOLD,
     COLOR_ENDC,
+    HUB_DOWNLOAD_BASE_URL,
+    IDE_DOWNLOAD_BASE_URL,
     OS_NAME,
     RELEASE_ENDPOINT_ENV_VARS,
     RELEASE_ENDPOINTS,
@@ -120,43 +122,22 @@ def get_download_url(component: str, version: str, exec_id: str, release: Option
 
     if component == "ide":
         if OS_NAME == "linux":
-            return (
-                f"https://edgedl.me.gvt1.com/edgedl/release2/j0qc3/antigravity/stable/"
-                f"{version}-{exec_id}/linux-{arch}/Antigravity%20IDE.tar.gz"
-            )
+            return f"{IDE_DOWNLOAD_BASE_URL}/{version}-{exec_id}/linux-{arch}/Antigravity%20IDE.tar.gz"
         elif OS_NAME == "darwin":
-            return (
-                f"https://edgedl.me.gvt1.com/edgedl/release2/j0qc3/antigravity/stable/"
-                f"{version}-{exec_id}/darwin-{arch}/Antigravity%20IDE.dmg"
-            )
+            return f"{IDE_DOWNLOAD_BASE_URL}/{version}-{exec_id}/darwin-{arch}/Antigravity%20IDE.dmg"
         elif OS_NAME == "windows":
             win_arch = "arm64" if ARCH_NAME == "arm64" else "x64"
-            return (
-                f"https://edgedl.me.gvt1.com/edgedl/release2/j0qc3/antigravity/stable/"
-                f"{version}-{exec_id}/windows-{win_arch}/Antigravity%20IDE.exe"
-            )
+            return f"{IDE_DOWNLOAD_BASE_URL}/{version}-{exec_id}/windows-{win_arch}/Antigravity%20IDE.exe"
 
     elif component == "hub":
         if OS_NAME == "linux":
-            return (
-                f"https://storage.googleapis.com/antigravity-public/antigravity-hub/"
-                f"{version}-{exec_id}/linux-{arch}/Antigravity.tar.gz"
-            )
+            return f"{HUB_DOWNLOAD_BASE_URL}/{version}-{exec_id}/linux-{arch}/Antigravity.tar.gz"
         elif OS_NAME == "darwin":
-            return (
-                f"https://storage.googleapis.com/antigravity-public/antigravity-hub/"
-                f"{version}-{exec_id}/darwin-{arch}/Antigravity.dmg"
-            )
+            return f"{HUB_DOWNLOAD_BASE_URL}/{version}-{exec_id}/darwin-{arch}/Antigravity.dmg"
         elif OS_NAME == "windows":
             if ARCH_NAME == "arm64":
-                return (
-                    f"https://storage.googleapis.com/antigravity-public/antigravity-hub/"
-                    f"{version}-{exec_id}/windows-arm/Antigravity-arm64.exe"
-                )
-            return (
-                f"https://storage.googleapis.com/antigravity-public/antigravity-hub/"
-                f"{version}-{exec_id}/windows-x64/Antigravity-x64.exe"
-            )
+                return f"{HUB_DOWNLOAD_BASE_URL}/{version}-{exec_id}/windows-arm/Antigravity-arm64.exe"
+            return f"{HUB_DOWNLOAD_BASE_URL}/{version}-{exec_id}/windows-x64/Antigravity-x64.exe"
 
     return ""
 

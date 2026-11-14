@@ -3,6 +3,12 @@ import shutil
 from typing import Optional
 
 from .const import (
+    HUB_DESKTOP_FILENAME,
+    HUB_PARENT_DIR_NAMES,
+    ICON_FILENAME,
+    IDE_DESKTOP_FILENAME,
+    IDE_ICON_FILENAME,
+    IDE_PARENT_DIR_NAMES,
     OS_NAME,
     SYSTEM_APPLICATIONS_DIR,
     SYSTEM_ICONS_DIR,
@@ -64,7 +70,7 @@ def uninstall_ide(
         targets_to_remove.append(resolved_ide_dir)
         parent_dir = os.path.dirname(os.path.abspath(resolved_ide_dir))
         if (
-            os.path.basename(parent_dir) in ("antigravity-ide", "Antigravity-IDE")
+            os.path.basename(parent_dir) in IDE_PARENT_DIR_NAMES
             and parent_dir != resolved_ide_dir
             and os.path.exists(parent_dir)
         ):
@@ -91,12 +97,12 @@ def uninstall_ide(
             nautilus_dirs = [USER_NAUTILUS_DIR]
 
         for app_d in app_dirs:
-            dt = os.path.join(app_d, "antigravity-ide.desktop")
+            dt = os.path.join(app_d, IDE_DESKTOP_FILENAME)
             if os.path.exists(dt):
                 targets_to_remove.append(dt)
 
         for icon_d in icon_dirs:
-            icon = os.path.join(icon_d, "antigravity-ide.png")
+            icon = os.path.join(icon_d, IDE_ICON_FILENAME)
             if os.path.exists(icon):
                 targets_to_remove.append(icon)
 
@@ -176,7 +182,7 @@ def uninstall_hub(
         targets_to_remove.append(resolved_hub_dir)
         parent_dir = os.path.dirname(os.path.abspath(resolved_hub_dir))
         if (
-            os.path.basename(parent_dir) in ("antigravity", "Antigravity")
+            os.path.basename(parent_dir) in HUB_PARENT_DIR_NAMES
             and parent_dir != resolved_hub_dir
             and os.path.exists(parent_dir)
         ):
@@ -201,12 +207,12 @@ def uninstall_hub(
             icon_dirs = [USER_ICONS_DIR]
 
         for app_d in app_dirs:
-            dt = os.path.join(app_d, "antigravity.desktop")
+            dt = os.path.join(app_d, HUB_DESKTOP_FILENAME)
             if os.path.exists(dt):
                 targets_to_remove.append(dt)
 
         for icon_d in icon_dirs:
-            icon = os.path.join(icon_d, "antigravity.png")
+            icon = os.path.join(icon_d, ICON_FILENAME)
             if os.path.exists(icon):
                 targets_to_remove.append(icon)
 

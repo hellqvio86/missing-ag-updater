@@ -97,7 +97,7 @@ def test_truthy_values_tuple() -> None:
 
 def test_version_constant() -> None:
     """Version constant is the single source of truth for the package version."""
-    assert constants.__version__ == "0.7.0"
+    assert constants.__version__ == "0.7.1"
 
 
 def test_version_is_read_by_hatch() -> None:

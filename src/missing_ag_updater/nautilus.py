@@ -4,7 +4,7 @@ import json
 import os
 from typing import Optional
 
-from .const import SYSTEM_NAUTILUS_DIR, USER_NAUTILUS_DIR
+from .const import NAUTILUS_EXTENSION_FILENAME, SYSTEM_NAUTILUS_DIR, USER_NAUTILUS_DIR
 from .utils import print_success, print_warning, refresh_linux_desktop_caches
 
 
@@ -16,7 +16,7 @@ def install_ide_nautilus(
 ) -> None:
     """Install Nautilus context-menu integration script for user or system."""
     target_dir = SYSTEM_NAUTILUS_DIR if scope == "system" else USER_NAUTILUS_DIR
-    nautilus_file = os.path.join(target_dir, "open-in-antigravity-ide.py")
+    nautilus_file = os.path.join(target_dir, NAUTILUS_EXTENSION_FILENAME)
     exec_path = launcher_path or os.path.join(ide_dir, "bin", "antigravity-ide")
     exec_path_escaped = json.dumps(exec_path)
     nautilus_content = f"""import subprocess

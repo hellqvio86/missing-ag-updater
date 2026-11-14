@@ -3,14 +3,19 @@
 import argparse
 import os
 import tomllib
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from . import utils
 from .const import (
+    APP_CONFIG_DIR_NAME,
+    CONFIG_ENV_VARS,
+    CONFIG_FILE_NAME,
     DEFAULT_HUB_LAUNCHER,
     DEFAULT_IDE_LAUNCHER,
+    FALLBACK_CONFIG_FILE_NAME,
     FALSY_VALUES,
     HOME,
     OS_NAME,
@@ -62,10 +67,10 @@ def get_default_config_path() -> Path:
             base_dir = Path(xdg_config)
         else:
             base_dir = home_path / ".config"
-        return base_dir / "missing-ag-updater" / "config.toml"
+        return base_dir / APP_CONFIG_DIR_NAME / CONFIG_FILE_NAME
 
     elif OS_NAME == "darwin":
-        return home_path / "Library" / "Application Support" / "missing-ag-updater" / "config.toml"
+        return home_path / "Library" / "Application Support" / APP_CONFIG_DIR_NAME / CONFIG_FILE_NAME
 
     elif OS_NAME == "windows":
         appdata = os.environ.get("APPDATA")
@@ -73,10 +78,10 @@ def get_default_config_path() -> Path:
             base_dir = Path(appdata)
         else:
             base_dir = home_path / "AppData" / "Roaming"
-        return base_dir / "missing-ag-updater" / "config.toml"
+        return base_dir / APP_CONFIG_DIR_NAME / CONFIG_FILE_NAME
 
     else:
-        return home_path / ".missing-ag-updater.toml"
+        return home_path / FALLBACK_CONFIG_FILE_NAME
 
 
 def load_toml_config(path: str | Path, *, explicit: bool = False) -> Dict[str, Any]:
@@ -101,7 +106,7 @@ def load_toml_config(path: str | Path, *, explicit: bool = False) -> Dict[str, A
         return {}
 
 
-def get_env_bool(names: List[str], default: bool) -> bool:
+def get_env_bool(names: Sequence[str], default: bool) -> bool:
     """Check a list of environment variable names for a boolean value."""
     for name in names:
         val = os.environ.get(name)
@@ -119,7 +124,7 @@ def get_env_bool(names: List[str], default: bool) -> bool:
     return default
 
 
-def get_env_str(names: List[str], default: str) -> str:
+def get_env_str(names: Sequence[str], default: str) -> str:
     """Check a list of environment variable names for a string value."""
     for name in names:
         val = os.environ.get(name)
@@ -138,22 +143,21 @@ def resolve_config(
     # 1. Resolve configuration file path
     cli_config = getattr(args, "config", None) if args else None
     explicit_config = True
+    env_config = get_env_str(CONFIG_ENV_VARS["config"], "")
     if cli_config:
         config_path_str = cli_config
+    elif env_config:
+        config_path_str = env_config
+        explicit_config = True
     else:
-        env_config = os.environ.get("ANTIGRAVITY_CONFIG") or os.environ.get("AG_CONFIG")
-        if env_config:
-            config_path_str = env_config
-            explicit_config = True
-        else:
-            config_path_str = str(get_default_config_path())
-            explicit_config = False
+        config_path_str = str(get_default_config_path())
+        explicit_config = False
 
     # 2. Load TOML configuration if exists
     config_dict = load_toml_config(config_path_str, explicit=explicit_config)
 
     # 3. Helpers
-    def _resolve_bool(cli_val: Optional[bool], env_names: List[str], toml_key: str, default_val: bool) -> bool:
+    def _resolve_bool(cli_val: Optional[bool], env_names: Sequence[str], toml_key: str, default_val: bool) -> bool:
         if cli_val is not None:
             return cli_val
         for name in env_names:
@@ -168,7 +172,7 @@ def resolve_config(
                 return toml_val.lower() in TRUTHY_VALUES
         return default_val
 
-    def _resolve_str(cli_val: Optional[str], env_names: List[str], toml_key: str, default_val: str) -> str:
+    def _resolve_str(cli_val: Optional[str], env_names: Sequence[str], toml_key: str, default_val: str) -> str:
         if cli_val is not None:
             return cli_val
         for name in env_names:
@@ -183,8 +187,8 @@ def resolve_config(
     # Scope resolution
     arg_system = getattr(args, "system", None) if args else None
     arg_user = getattr(args, "user", None) if args else None
-    is_system = _resolve_bool(arg_system, ["ANTIGRAVITY_SYSTEM", "AG_SYSTEM"], "system", False)
-    is_user = _resolve_bool(arg_user, ["ANTIGRAVITY_USER", "AG_USER"], "user", False)
+    is_system = _resolve_bool(arg_system, CONFIG_ENV_VARS["system"], "system", False)
+    is_user = _resolve_bool(arg_user, CONFIG_ENV_VARS["user"], "user", False)
     scope: Optional[str] = "system" if is_system else ("user" if is_user else None)
 
     # Auto-detect preferred locations based on scope
@@ -193,30 +197,26 @@ def resolve_config(
     detected_cli_binary, _ = detect_preferred_cli(scope=scope)
 
     # Basic Flags
-    check = _resolve_bool(
-        getattr(args, "check", None) if args else None, ["ANTIGRAVITY_CHECK", "AG_CHECK"], "check", False
-    )
-    ide = _resolve_bool(getattr(args, "ide", None) if args else None, ["ANTIGRAVITY_IDE", "AG_IDE"], "ide", False)
-    hub = _resolve_bool(getattr(args, "hub", None) if args else None, ["ANTIGRAVITY_HUB", "AG_HUB"], "hub", False)
-    cli = _resolve_bool(getattr(args, "cli", None) if args else None, ["ANTIGRAVITY_CLI", "AG_CLI"], "cli", False)
-    force = _resolve_bool(
-        getattr(args, "force", None) if args else None, ["ANTIGRAVITY_FORCE", "AG_FORCE"], "force", False
-    )
+    check = _resolve_bool(getattr(args, "check", None) if args else None, CONFIG_ENV_VARS["check"], "check", False)
+    ide = _resolve_bool(getattr(args, "ide", None) if args else None, CONFIG_ENV_VARS["ide"], "ide", False)
+    hub = _resolve_bool(getattr(args, "hub", None) if args else None, CONFIG_ENV_VARS["hub"], "hub", False)
+    cli = _resolve_bool(getattr(args, "cli", None) if args else None, CONFIG_ENV_VARS["cli"], "cli", False)
+    force = _resolve_bool(getattr(args, "force", None) if args else None, CONFIG_ENV_VARS["force"], "force", False)
     ignore_self_update = _resolve_bool(
         getattr(args, "ignore_self_update", None) if args else None,
-        ["ANTIGRAVITY_IGNORE_SELF_UPDATE", "AG_IGNORE_SELF_UPDATE"],
+        CONFIG_ENV_VARS["ignore_self_update"],
         "ignore_self_update",
         False,
     )
     allow_unverified = _resolve_bool(
         getattr(args, "allow_unverified", None) if args else None,
-        ["ANTIGRAVITY_ALLOW_UNVERIFIED", "AG_ALLOW_UNVERIFIED"],
+        CONFIG_ENV_VARS["allow_unverified"],
         "allow_unverified",
         False,
     )
     debug = _resolve_bool(
         getattr(args, "debug", None) if args else None,
-        ["ANTIGRAVITY_DEBUG", "AG_DEBUG"],
+        CONFIG_ENV_VARS["debug"],
         "debug",
         False,
     )
@@ -227,7 +227,7 @@ def resolve_config(
         apparmor_sandbox = arg_apparmor
     else:
         sandbox_env = None
-        for name in ["ANTIGRAVITY_APPARMOR_SANDBOX", "AG_APPARMOR_SANDBOX"]:
+        for name in CONFIG_ENV_VARS["apparmor_sandbox"]:
             val = os.environ.get(name)
             if val is not None:
                 sandbox_env = val.lower() in TRUTHY_VALUES
@@ -250,9 +250,9 @@ def resolve_config(
     arg_dir_hub = getattr(args, "dir_hub", None) if args else None
     arg_path_cli = getattr(args, "path_cli", None) if args else None
 
-    dir_ide = _resolve_str(arg_dir_ide, ["ANTIGRAVITY_DIR_IDE", "AG_DIR_IDE"], "dir_ide", detected_ide_dir)
-    dir_hub = _resolve_str(arg_dir_hub, ["ANTIGRAVITY_DIR_HUB", "AG_DIR_HUB"], "dir_hub", detected_hub_dir)
-    path_cli = _resolve_str(arg_path_cli, ["ANTIGRAVITY_PATH_CLI", "AG_PATH_CLI"], "path_cli", detected_cli_binary)
+    dir_ide = _resolve_str(arg_dir_ide, CONFIG_ENV_VARS["dir_ide"], "dir_ide", detected_ide_dir)
+    dir_hub = _resolve_str(arg_dir_hub, CONFIG_ENV_VARS["dir_hub"], "dir_hub", detected_hub_dir)
+    path_cli = _resolve_str(arg_path_cli, CONFIG_ENV_VARS["path_cli"], "path_cli", detected_cli_binary)
 
     ide_launcher = (
         detected_ide_launcher
@@ -270,11 +270,11 @@ def resolve_config(
     if arg_desktop is not None:
         install_desktop = arg_desktop
     else:
-        if get_env_bool(["ANTIGRAVITY_NO_DESKTOP", "AG_NO_DESKTOP"], False):
+        if get_env_bool(CONFIG_ENV_VARS["no_desktop"], False):
             install_desktop = False
         else:
             desktop_env = None
-            for name in ["ANTIGRAVITY_DESKTOP", "AG_DESKTOP"]:
+            for name in CONFIG_ENV_VARS["desktop"]:
                 val = os.environ.get(name)
                 if val is not None:
                     desktop_env = val.lower() in TRUTHY_VALUES
@@ -303,11 +303,11 @@ def resolve_config(
     if arg_nautilus is not None:
         install_nautilus = arg_nautilus
     else:
-        if get_env_bool(["ANTIGRAVITY_NO_NAUTILUS", "AG_NO_NAUTILUS"], False):
+        if get_env_bool(CONFIG_ENV_VARS["no_nautilus"], False):
             install_nautilus = False
         else:
             nautilus_env = None
-            for name in ["ANTIGRAVITY_NAUTILUS", "AG_NAUTILUS"]:
+            for name in CONFIG_ENV_VARS["nautilus"]:
                 val = os.environ.get(name)
                 if val is not None:
                     nautilus_env = val.lower() in TRUTHY_VALUES
@@ -364,7 +364,5 @@ def resolve_config(
         update_all=update_all,
         wsl=wsl,
         wsl_cli_only=wsl_cli_only,
-        config_path=config_path_str
-        if (cli_config or os.environ.get("ANTIGRAVITY_CONFIG") or os.environ.get("AG_CONFIG"))
-        else None,
+        config_path=config_path_str if (cli_config or env_config) else None,
     )
