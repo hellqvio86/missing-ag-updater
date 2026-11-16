@@ -709,6 +709,45 @@ def test_update_cli_zip_success_windows() -> None:
     _run_test()
 
 
+def test_update_cli_exe_success_windows() -> None:
+    def mock_download_write_exe_cli(url: str, dest_path: str, **kwargs: Any) -> None:
+        with open(dest_path, "wb") as fdesc:
+            fdesc.write(b"MZ_FAKE_WINDOWS_CLI_EXE")
+
+    @patch("missing_ag_updater.updater.safe_extract_zip")
+    @patch("missing_ag_updater.updater.safe_extract_tar")
+    @patch("missing_ag_updater.updater.compute_sha512", return_value=SAMPLE_SHA512)
+    @patch("missing_ag_updater.updater.download_file", side_effect=mock_download_write_exe_cli)
+    @patch(
+        "missing_ag_updater.updater.fetch_json",
+        return_value={
+            "version": "1.5.9",
+            "url": "https://storage.googleapis.com/antigravity-public/antigravity-cli/1.5.9-1234/windows-x64/cli_windows_x64.exe",
+            "sha512": SAMPLE_SHA512,
+        },
+    )
+    @patch("missing_ag_updater.updater.get_cli_version", return_value="0.0.0")
+    @patch("missing_ag_updater.updater.OS_NAME", "windows")
+    def _run_test(
+        mock_ver: MagicMock,
+        mock_fetch: MagicMock,
+        mock_dl: MagicMock,
+        mock_sha: MagicMock,
+        mock_tar: MagicMock,
+        mock_zip: MagicMock,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as target_dir:
+            cli_binary = os.path.join(target_dir, "agy.exe")
+            res = update_cli(cli_binary)
+            assert res is True
+            mock_tar.assert_not_called()
+            mock_zip.assert_not_called()
+            with open(cli_binary, "rb") as fdesc:
+                assert fdesc.read() == b"MZ_FAKE_WINDOWS_CLI_EXE"
+
+    _run_test()
+
+
 def test_update_cli_missing_extracted_binary() -> None:
     def mock_download_empty_tar(url: str, dest_path: str, **kwargs: Any) -> None:
         with tarfile.open(dest_path, "w:gz"):

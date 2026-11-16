@@ -6,7 +6,7 @@ import subprocess
 import tempfile
 from io import StringIO
 from typing import Any
-from unittest.mock import mock_open, patch
+from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
 import responses
@@ -218,6 +218,16 @@ def test_get_running_pids() -> None:
             current_pid = str(os.getpid())
             expected = [pid for pid in ["4321"] if pid != current_pid]
             assert pids == expected
+
+
+@patch("missing_ag_updater.utils.OS_NAME", "windows")
+@patch("subprocess.run")
+def test_get_running_pids_windows_uses_utf8_replace(mock_run: MagicMock) -> None:
+    mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="")
+    get_running_pids("antigravity")
+    _, kwargs = mock_run.call_args
+    assert kwargs.get("encoding") == "utf-8"
+    assert kwargs.get("errors") == "replace"
 
 
 @pytest.mark.parametrize(
