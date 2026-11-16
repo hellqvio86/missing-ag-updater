@@ -5,6 +5,7 @@ import shutil
 import subprocess  # nosec B404
 import tempfile
 from typing import Any, Optional
+from urllib.parse import urlparse
 
 from .const import (
     ARCH_NAME,
@@ -697,16 +698,19 @@ def update_cli(
                 return False
             print_success("Checksum verified.")
 
-            print_status("Extracting archive...")
-
             binary_name = "agy.exe" if OS_NAME == "windows" else "antigravity"
             extracted_binary = os.path.join(tmpdir, binary_name)
 
-            # Handle Windows .zip vs Unix .tar.gz
-            if download_url.endswith(".zip"):
+            # Handle standalone .exe (Windows CLI), .zip, and .tar.gz archives
+            url_path = urlparse(download_url).path.lower()
+            if url_path.endswith(".exe"):
+                extracted_binary = archive_path
+            elif url_path.endswith(".zip"):
+                print_status("Extracting archive...")
                 if not safe_extract_zip(archive_path, tmpdir):
                     return False
             else:
+                print_status("Extracting archive...")
                 if not safe_extract_tar(archive_path, tmpdir):
                     return False
 

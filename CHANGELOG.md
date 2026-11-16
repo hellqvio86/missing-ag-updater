@@ -6,6 +6,13 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [0.7.2] - 2026-11-16
+
+### Fixed
+
+- Handle standalone `.exe` downloads in `update_cli()` on Windows instead of attempting `.tar.gz` extraction.
+- Pass `encoding="utf-8"` and `errors="replace"` to `subprocess.run(..., text=True)` calls in `utils.py` to prevent `UnicodeDecodeError` in Python 3.15+ when Windows tools (such as `tasklist`) emit non-UTF-8 bytes.
+
 ## [0.7.1] - 2026-11-14
 
 ### Changed
@@ -61,7 +68,8 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 See the GitHub releases page for changes before 0.6.0.
 
-[Unreleased]: https://github.com/hellqvio86/missing-ag-updater/compare/v0.7.1...HEAD
+[Unreleased]: https://github.com/hellqvio86/missing-ag-updater/compare/v0.7.2...HEAD
+[0.7.2]: https://github.com/hellqvio86/missing-ag-updater/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/hellqvio86/missing-ag-updater/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/hellqvio86/missing-ag-updater/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/hellqvio86/missing-ag-updater/compare/v0.5.3...v0.6.0

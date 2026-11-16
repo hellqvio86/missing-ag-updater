@@ -30,7 +30,7 @@ def _is_ubuntu_style_distro() -> bool:
 
 # Single source of truth for the package version. `pyproject.toml` reads this
 # value dynamically via Hatchling (`[tool.hatch.version]`), so bump only here.
-__version__ = "0.7.1"
+__version__ = "0.7.2"
 
 # Truthy and falsy string values for environment variables and config parsing
 TRUTHY_VALUES: tuple[str, ...] = ("1", "true", "yes", "on")

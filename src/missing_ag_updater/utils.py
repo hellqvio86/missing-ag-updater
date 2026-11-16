@@ -249,6 +249,8 @@ def get_running_pids(keyword: str) -> list[str]:
                 ["tasklist", "/NH", "/FO", "CSV"],
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 check=False,
             )  # nosec B603, B607
             for line in res.stdout.strip().split("\n"):
@@ -272,6 +274,8 @@ def get_running_pids(keyword: str) -> list[str]:
                 ["pgrep", "-f", keyword_clean],
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 check=False,
             )  # nosec B603, B607
             if res.returncode == 0:
@@ -512,6 +516,8 @@ def get_cli_version(cli_binary: str) -> str:
             [cli_binary, "--version"],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             check=True,
         )  # nosec B603
         lines = res.stdout.strip().split("\n")
@@ -799,6 +805,8 @@ def is_apparmor_enabled() -> bool:
             ["aa-enabled"],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             check=False,
         )  # nosec B603, B607
         if res.returncode == 0:
