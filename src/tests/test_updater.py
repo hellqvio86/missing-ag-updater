@@ -11,6 +11,7 @@ import pytest
 from missing_ag_updater.exceptions import ReleaseEndpointError
 from missing_ag_updater.models import Release
 from missing_ag_updater.updater import (
+    check_for_updater_update,
     fetch_release_payload,
     get_download_url,
     get_release_endpoints,
@@ -19,6 +20,7 @@ from missing_ag_updater.updater import (
     update_cli,
     update_hub,
     update_ide,
+    warn_if_updater_outdated,
 )
 
 SAMPLE_SHA512 = "a" * 128
@@ -1112,3 +1114,45 @@ def test_update_cli_override_self_update(
     assert update_cli(str(cli_binary), force=force, ignore_self_update=ignore_self_update) is True
     mock_dl.assert_called_once()
     assert cli_binary.exists()
+
+
+@patch("missing_ag_updater.updater.print_warning")
+@patch("missing_ag_updater.updater.requests.get")
+def test_warn_if_updater_outdated_warns_on_newer_release(
+    mock_get: MagicMock,
+    mock_warn: MagicMock,
+) -> None:
+    response = MagicMock()
+    response.json.return_value = {"info": {"version": "99.0.0"}}
+    mock_get.return_value = response
+
+    warn_if_updater_outdated()
+
+    mock_warn.assert_called_once()
+    assert "99.0.0" in mock_warn.call_args.args[0]
+
+
+@patch("missing_ag_updater.updater.print_warning")
+@patch("missing_ag_updater.updater.requests.get")
+def test_check_for_updater_update_silent_when_current(
+    mock_get: MagicMock,
+    mock_warn: MagicMock,
+) -> None:
+    response = MagicMock()
+    response.json.return_value = {"info": {"version": "0.1.0"}}
+    mock_get.return_value = response
+
+    assert check_for_updater_update() is None
+    warn_if_updater_outdated()
+    mock_warn.assert_not_called()
+
+
+@patch("missing_ag_updater.updater.print_warning")
+@patch("missing_ag_updater.updater.requests.get", side_effect=OSError("offline"))
+def test_check_for_updater_update_fails_open_on_network_error(
+    mock_get: MagicMock,
+    mock_warn: MagicMock,
+) -> None:
+    assert check_for_updater_update() is None
+    warn_if_updater_outdated()
+    mock_warn.assert_not_called()

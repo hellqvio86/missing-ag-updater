@@ -7,6 +7,8 @@ import tempfile
 from typing import Any, Optional
 from urllib.parse import urlparse
 
+import requests
+
 from .const import (
     ARCH_NAME,
     COLOR_BOLD,
@@ -16,6 +18,10 @@ from .const import (
     OS_NAME,
     RELEASE_ENDPOINT_ENV_VARS,
     RELEASE_ENDPOINTS,
+    UPDATER_CHECK_TIMEOUT_SECONDS,
+    UPDATER_PYPI_URL,
+    USER_AGENT,
+    __version__,
 )
 from .desktop import install_hub_desktop, install_ide_desktop
 from .discovery import _is_system_path, detect_cli_self_update
@@ -47,6 +53,36 @@ from .utils import (
     safe_extract_zip,
     update_symlink,
 )
+
+
+def check_for_updater_update() -> Optional[str]:
+    """Return the latest PyPI version of missing-ag-updater if newer than __version__, else None."""
+    try:
+        response = requests.get(
+            UPDATER_PYPI_URL,
+            headers={"User-Agent": USER_AGENT},
+            timeout=UPDATER_CHECK_TIMEOUT_SECONDS,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        latest_version = str(payload.get("info", {}).get("version", "")).strip()
+        if not latest_version:
+            return None
+        if parse_version_tuple(latest_version) > parse_version_tuple(__version__):
+            return latest_version
+    except Exception as err:
+        debug_log(f"updater self-version check skipped: {err}")
+    return None
+
+
+def warn_if_updater_outdated() -> None:
+    """Print a non-fatal warning if a newer release of missing-ag-updater is on PyPI."""
+    latest_version = check_for_updater_update()
+    if latest_version:
+        print_warning(
+            f"A newer version of missing-ag-updater is available: {latest_version} (current: {__version__}).\n"
+            "  Upgrade with: uv tool upgrade missing-ag-updater  (or: pip install -U missing-ag-updater)\n"
+        )
 
 
 def get_release_endpoints(component: str) -> list[str]:

@@ -4,6 +4,12 @@ All notable changes to `missing-ag-updater` are documented in this file.
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-11-21
+
+### Added
+
+- **Outdated Updater Warning (`updater.py`, `cli.py`):** Added a non-blocking PyPI version check (`check_for_updater_update()` / `warn_if_updater_outdated()`) that warns when a newer release of `missing-ag-updater` is available and fails open when offline.
+
 ## [0.8.0] - 2026-11-21
 
 ### Added
@@ -177,7 +183,8 @@ All notable changes to `missing-ag-updater` are documented in this file.
 
 - **Initial Release:** Unofficial auto-updater for Google Antigravity IDE, Hub, and CLI across Linux, macOS, and Windows.
 
-[Unreleased]: https://github.com/hellqvio86/missing-ag-updater/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/hellqvio86/missing-ag-updater/compare/v0.8.1...HEAD
+[0.8.1]: https://github.com/hellqvio86/missing-ag-updater/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/hellqvio86/missing-ag-updater/compare/v0.7.3...v0.8.0
 [0.7.3]: https://github.com/hellqvio86/missing-ag-updater/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/hellqvio86/missing-ag-updater/compare/v0.7.1...v0.7.2
