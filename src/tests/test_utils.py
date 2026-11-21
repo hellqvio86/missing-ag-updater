@@ -116,6 +116,10 @@ def test_resolve_existing_dirs() -> None:
         os.makedirs(spaced_ide)
         assert resolve_existing_ide_dir(hyphen_ide) == spaced_ide
 
+        # Lowercase antigravity-ide also resolves to spaced Antigravity IDE when present
+        lower_hyphen_ide = os.path.join(tmpdir, "antigravity-ide")
+        assert resolve_existing_ide_dir(lower_hyphen_ide) == spaced_ide
+
         # Creating hyphen dir takes precedence
         os.makedirs(hyphen_ide)
         assert resolve_existing_ide_dir(hyphen_ide) == hyphen_ide

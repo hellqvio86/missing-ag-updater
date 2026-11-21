@@ -30,7 +30,7 @@ def _is_ubuntu_style_distro() -> bool:
 
 # Single source of truth for the package version. `pyproject.toml` reads this
 # value dynamically via Hatchling (`[tool.hatch.version]`), so bump only here.
-__version__ = "0.8.1"
+__version__ = "0.8.2"
 
 # Truthy and falsy string values for environment variables and config parsing
 TRUTHY_VALUES: tuple[str, ...] = ("1", "true", "yes", "on")
@@ -149,7 +149,7 @@ elif OS_NAME == "windows":
     LOCALAPPDATA = os.environ.get("LOCALAPPDATA", os.path.join(HOME, "AppData", "Local"))
     PROGRAMFILES = os.environ.get("ProgramFiles", "C:\\Program Files")
 
-    USER_IDE_DIR = os.path.join(LOCALAPPDATA, "Programs", "antigravity-ide")
+    USER_IDE_DIR = os.path.join(LOCALAPPDATA, "Programs", "Antigravity IDE")
     USER_HUB_DIR = os.path.join(LOCALAPPDATA, "Programs", "antigravity")
     USER_CLI_BINARY = os.path.join(LOCALAPPDATA, "Microsoft", "WindowsApps", "agy.exe")
 

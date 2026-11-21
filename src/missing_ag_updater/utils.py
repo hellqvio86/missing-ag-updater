@@ -321,6 +321,7 @@ def resolve_existing_ide_dir(ide_dir: str) -> str:
     elif "antigravity-ide" in ide_dir:
         candidates.append(os.path.join(ide_dir, "Antigravity-IDE"))
         candidates.append(os.path.join(ide_dir, "Antigravity IDE"))
+        candidates.append(ide_dir.replace("antigravity-ide", "Antigravity IDE"))
 
     for cand in candidates:
         if OS_NAME == "darwin":

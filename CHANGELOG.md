@@ -4,6 +4,12 @@ All notable changes to `missing-ag-updater` are documented in this file.
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-11-21
+
+### Bug Fixes
+
+- **Windows IDE Path & Version Detection (`const.py`, `discovery.py`, `utils.py`):** Updated Windows `USER_IDE_DIR` from `%LOCALAPPDATA%\Programs\antigravity-ide` to `%LOCALAPPDATA%\Programs\Antigravity IDE` (matching the official Windows installer's `win32DirName`) with fallback discovery and path resolution for `antigravity-ide`, fixing `Local IDE Version: 0.0.0` false-positive updates on Windows.
+
 ## [0.8.1] - 2026-11-21
 
 ### Added
@@ -178,7 +184,8 @@ All notable changes to `missing-ag-updater` are documented in this file.
 
 - **Initial Release:** Unofficial auto-updater for Google Antigravity IDE, Hub, and CLI across Linux, macOS, and Windows.
 
-[Unreleased]: https://github.com/hellqvio86/missing-ag-updater/compare/v0.8.1...HEAD
+[Unreleased]: https://github.com/hellqvio86/missing-ag-updater/compare/v0.8.2...HEAD
+[0.8.2]: https://github.com/hellqvio86/missing-ag-updater/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/hellqvio86/missing-ag-updater/compare/v0.7.3...v0.8.1
 [0.7.3]: https://github.com/hellqvio86/missing-ag-updater/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/hellqvio86/missing-ag-updater/compare/v0.7.1...v0.7.2

@@ -37,7 +37,7 @@ On Windows, `missing-ag-updater` handles `.exe` installers and sets up binary pa
 
 | Component | Default Path |
 | :--- | :--- |
-| **Antigravity IDE** | `%LOCALAPPDATA%\Programs\antigravity-ide` |
+| **Antigravity IDE** | `%LOCALAPPDATA%\Programs\Antigravity IDE` |
 | **Antigravity Hub** | `%LOCALAPPDATA%\Programs\antigravity` |
 | **Antigravity CLI** | `%LOCALAPPDATA%\Microsoft\WindowsApps\agy.exe` |
 

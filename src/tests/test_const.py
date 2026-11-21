@@ -42,6 +42,9 @@ def test_constants_windows_x64(
     assert constants.OS_NAME == "windows"
     assert constants.ARCH_NAME == "x64"
     assert constants.COLOR_BOLD == ""
+    assert constants.USER_IDE_DIR.endswith("Programs\\Antigravity IDE") or constants.USER_IDE_DIR.endswith(
+        "Programs/Antigravity IDE"
+    )
 
 
 @patch("platform.machine", return_value="x86_64")
@@ -97,7 +100,7 @@ def test_truthy_values_tuple() -> None:
 
 def test_version_constant() -> None:
     """Version constant is the single source of truth for the package version."""
-    assert constants.__version__ == "0.8.1"
+    assert constants.__version__ == "0.8.2"
 
 
 def test_version_is_read_by_hatch() -> None:

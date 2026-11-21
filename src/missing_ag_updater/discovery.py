@@ -234,6 +234,7 @@ def find_all_ide_installations() -> list[InstallationInfo]:
         candidate_dirs.extend(
             [
                 (USER_IDE_DIR, "user", None),
+                (os.path.join(os.path.dirname(USER_IDE_DIR), "antigravity-ide"), "user", None),
                 (SYSTEM_IDE_DIR, "system", None),
             ]
         )

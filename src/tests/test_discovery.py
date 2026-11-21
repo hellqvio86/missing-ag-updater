@@ -398,3 +398,26 @@ def test_find_all_cli_installations_reports_self_update(
     assert matched.self_update is not None
     assert "agy.1794543464486432375.old" in matched.self_update
     assert matched.to_dict()["self_update"] == matched.self_update
+
+
+def test_find_all_ide_installations_windows_user_dir(
+    tmp_path: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Windows IDE discovery should detect `%LOCALAPPDATA%\\Programs\\Antigravity IDE`."""
+    ide_dir = tmp_path / "Programs" / "Antigravity IDE"
+    app_dir = ide_dir / "resources" / "app"
+    app_dir.mkdir(parents=True)
+    (app_dir / "product.json").write_text('{"ideVersion": "2.8.0"}', encoding="utf-8")
+
+    monkeypatch.setattr("missing_ag_updater.discovery.OS_NAME", "windows")
+    monkeypatch.setattr("missing_ag_updater.utils.OS_NAME", "windows")
+    monkeypatch.setattr("missing_ag_updater.discovery.USER_IDE_DIR", str(ide_dir))
+    sys_ide_dir = tmp_path / "ProgramFiles" / "Antigravity IDE"
+    monkeypatch.setattr("missing_ag_updater.discovery.SYSTEM_IDE_DIR", str(sys_ide_dir))
+
+    installs = find_all_ide_installations()
+    assert len(installs) == 1
+    assert installs[0].install_dir == str(ide_dir)
+    assert installs[0].version == "2.8.0"
+    assert installs[0].scope == "user"
