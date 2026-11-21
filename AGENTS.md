@@ -383,6 +383,7 @@ The full release sequence (version bump, changelog, tag, GitHub release, PyPI pu
 - Never remove the download domain allowlist or introduce `shell=True`.
 - Tests must be hermetic: never depend on host state such as `~/.gemini/antigravity-cli`. The autouse fixture in `src/tests/conftest.py` already isolates the official CLI updater state folder.
 - Keep the version in `src/missing_ag_updater/const.py` only; `pyproject.toml` reads it dynamically. Use `make version BUMP=minor`.
+- Keep `CHANGELOG.md` updated for every release (and notable changes under `## [Unreleased]`) using `## [X.Y.Z] - YYYY-MM-DD` sections, category headings (`### Added`, `### Bug Fixes`, `### Changed & Improved`, `### Security & Architecture`, `### Maintenance & Dependencies`), `- **Short Title:** Description` bullets, and bottom compare links.
 - All module-level constants (paths, allowlists, patterns, env var names, marker tuples) belong in `src/missing_ag_updater/const.py`, never in other modules. Import them from `.const`.
 
 All contributions must maintain:
