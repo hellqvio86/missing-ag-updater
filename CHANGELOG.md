@@ -6,6 +6,12 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [0.7.3] - 2026-11-21
+
+### Fixed
+
+- Warn instead of failing closed on Windows when the IDE or Hub release endpoint omits SHA-512/SHA-256 checksums (checksum mismatches still fail).
+
 ## [0.7.2] - 2026-11-16
 
 ### Fixed
@@ -68,7 +74,8 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 See the GitHub releases page for changes before 0.6.0.
 
-[Unreleased]: https://github.com/hellqvio86/missing-ag-updater/compare/v0.7.2...HEAD
+[Unreleased]: https://github.com/hellqvio86/missing-ag-updater/compare/v0.7.3...HEAD
+[0.7.3]: https://github.com/hellqvio86/missing-ag-updater/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/hellqvio86/missing-ag-updater/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/hellqvio86/missing-ag-updater/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/hellqvio86/missing-ag-updater/compare/v0.6.0...v0.7.0

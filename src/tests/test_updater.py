@@ -412,6 +412,7 @@ def test_update_ide_checksum_verification() -> None:
     _test_mismatch()
 
 
+@patch("missing_ag_updater.updater.OS_NAME", "linux")
 @patch("missing_ag_updater.updater.is_path_writable", return_value=True)
 @patch("missing_ag_updater.updater.download_file")
 @patch("missing_ag_updater.updater.get_running_pids", return_value=[])
@@ -428,6 +429,71 @@ def test_update_ide_missing_checksum_fails_closed(
     mock_download.assert_called_once()
 
 
+@patch("missing_ag_updater.updater.install_windows_exe", return_value=True)
+@patch("missing_ag_updater.updater.is_path_writable", return_value=True)
+@patch("missing_ag_updater.updater.download_file")
+@patch("missing_ag_updater.updater.get_running_pids", return_value=[])
+@patch("missing_ag_updater.updater.fetch_json", return_value=[{"version": "2.0.4", "execution_id": "1234"}])
+@patch("missing_ag_updater.updater.get_ide_version", return_value="2.0.3")
+@patch("missing_ag_updater.updater.OS_NAME", "windows")
+def test_update_ide_missing_checksum_warns_on_windows(
+    mock_ver: MagicMock,
+    mock_fetch: MagicMock,
+    mock_pids: MagicMock,
+    mock_download: MagicMock,
+    mock_writable: MagicMock,
+    mock_install_exe: MagicMock,
+) -> None:
+    assert update_ide("/dummy/ide", None, force=True) is True
+    mock_download.assert_called_once()
+    mock_install_exe.assert_called_once()
+
+
+@patch("missing_ag_updater.updater.install_windows_exe", return_value=True)
+@patch("missing_ag_updater.updater.is_path_writable", return_value=True)
+@patch("missing_ag_updater.updater.download_file")
+@patch("missing_ag_updater.updater.get_running_pids", return_value=[])
+@patch("missing_ag_updater.updater.fetch_json", return_value=[{"version": "2.1.4", "execution_id": "1234"}])
+@patch("missing_ag_updater.updater.get_hub_version", return_value="2.1.3")
+@patch("missing_ag_updater.updater.OS_NAME", "windows")
+def test_update_hub_missing_checksum_warns_on_windows(
+    mock_ver: MagicMock,
+    mock_fetch: MagicMock,
+    mock_pids: MagicMock,
+    mock_download: MagicMock,
+    mock_writable: MagicMock,
+    mock_install_exe: MagicMock,
+) -> None:
+    assert update_hub("/dummy/hub", None, force=True) is True
+    mock_download.assert_called_once()
+    mock_install_exe.assert_called_once()
+
+
+@patch("missing_ag_updater.updater.install_windows_exe")
+@patch("missing_ag_updater.updater.compute_sha512", return_value="different_hash")
+@patch("missing_ag_updater.updater.is_path_writable", return_value=True)
+@patch("missing_ag_updater.updater.download_file")
+@patch("missing_ag_updater.updater.get_running_pids", return_value=[])
+@patch(
+    "missing_ag_updater.updater.fetch_json",
+    return_value=[{"version": "2.0.4", "execution_id": "1234", "sha512": SAMPLE_SHA512}],
+)
+@patch("missing_ag_updater.updater.get_ide_version", return_value="2.0.3")
+@patch("missing_ag_updater.updater.OS_NAME", "windows")
+def test_update_ide_checksum_mismatch_still_fails_on_windows(
+    mock_ver: MagicMock,
+    mock_fetch: MagicMock,
+    mock_pids: MagicMock,
+    mock_download: MagicMock,
+    mock_writable: MagicMock,
+    mock_sha: MagicMock,
+    mock_install_exe: MagicMock,
+) -> None:
+    assert update_ide("/dummy/ide", None, force=True) is False
+    mock_install_exe.assert_not_called()
+
+
+@patch("missing_ag_updater.updater.OS_NAME", "linux")
 @patch("missing_ag_updater.updater.is_path_writable", return_value=True)
 @patch("missing_ag_updater.updater.install_ide_nautilus")
 @patch("missing_ag_updater.updater.install_ide_desktop")

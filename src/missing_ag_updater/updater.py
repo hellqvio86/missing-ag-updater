@@ -199,6 +199,55 @@ def install_macos_dmg(dmg_path: str, target_app_dir: str) -> bool:
             pass
 
 
+def _verify_release_checksum(
+    component: str,
+    archive_path: str,
+    release: Release,
+    allow_unverified: bool,
+) -> bool:
+    """Verify archive checksum when supplied; warn on Windows or fail closed elsewhere."""
+    if release.sha512:
+        print_status("Verifying SHA-512 checksum...")
+        actual_sha512 = compute_sha512(archive_path)
+        debug_log(f"{component} SHA-512 expected={release.sha512} actual={actual_sha512}")
+        if actual_sha512.lower() != release.sha512.lower():
+            print_error(f"Security Check Failure: Checksum mismatch on {component} download archive.")
+            return False
+        print_success("Checksum verified.")
+        return True
+
+    if release.sha256:
+        print_status("Verifying SHA-256 checksum...")
+        actual_sha256 = compute_sha256(archive_path)
+        debug_log(f"{component} SHA-256 expected={release.sha256} actual={actual_sha256}")
+        if actual_sha256.lower() != release.sha256.lower():
+            print_error(f"Security Check Failure: Checksum mismatch on {component} download archive.")
+            return False
+        print_success("Checksum verified.")
+        return True
+
+    if allow_unverified:
+        print_warning(
+            "No integrity checksum provided by release server — installing unverified archive "
+            "because --allow-unverified was set."
+        )
+        return True
+
+    if OS_NAME == "windows":
+        print_warning(
+            f"No integrity checksum provided by the {component} release server; "
+            "proceeding with Windows installer anyway."
+        )
+        return True
+
+    print_error(
+        f"Security Check Failure: the {component} release server supplied no SHA-512 or SHA-256 checksum.\n"
+        "  Refusing to install an unverified archive. Re-run with --allow-unverified only if you\n"
+        "  understand and accept the risk."
+    )
+    return False
+
+
 def update_ide(
     ide_dir: str,
     launcher_path: Optional[str],
@@ -293,35 +342,9 @@ def update_ide(
         try:
             download_file(download_url, archive_path, label="Downloading Antigravity IDE")
 
-            # Checksum integrity verification: fail closed unless explicitly overridden.
-            if latest.sha512:
-                print_status("Verifying SHA-512 checksum...")
-                actual_sha512 = compute_sha512(archive_path)
-                debug_log(f"IDE SHA-512 expected={latest.sha512} actual={actual_sha512}")
-                if actual_sha512.lower() != latest.sha512.lower():
-                    print_error("Security Check Failure: Checksum mismatch on IDE download archive.")
-                    return False
-                print_success("Checksum verified.")
-            elif latest.sha256:
-                print_status("Verifying SHA-256 checksum...")
-                actual_sha256 = compute_sha256(archive_path)
-                debug_log(f"IDE SHA-256 expected={latest.sha256} actual={actual_sha256}")
-                if actual_sha256.lower() != latest.sha256.lower():
-                    print_error("Security Check Failure: Checksum mismatch on IDE download archive.")
-                    return False
-                print_success("Checksum verified.")
-            elif not allow_unverified:
-                print_error(
-                    "Security Check Failure: the IDE release server supplied no SHA-512 or SHA-256 checksum.\n"
-                    "  Refusing to install an unverified archive. Re-run with --allow-unverified only if you\n"
-                    "  understand and accept the risk."
-                )
+            # Checksum integrity verification: warn on Windows when absent, fail closed elsewhere.
+            if not _verify_release_checksum("IDE", archive_path, latest, allow_unverified):
                 return False
-            else:
-                print_warning(
-                    "No integrity checksum provided by release server — installing unverified archive "
-                    "because --allow-unverified was set."
-                )
 
             if OS_NAME == "darwin":
                 # macOS dmg installation
@@ -503,35 +526,9 @@ def update_hub(
         try:
             download_file(download_url, archive_path, label="Downloading Antigravity Hub")
 
-            # Checksum integrity verification: fail closed unless explicitly overridden.
-            if latest.sha512:
-                print_status("Verifying SHA-512 checksum...")
-                actual_sha512 = compute_sha512(archive_path)
-                debug_log(f"Hub SHA-512 expected={latest.sha512} actual={actual_sha512}")
-                if actual_sha512.lower() != latest.sha512.lower():
-                    print_error("Security Check Failure: Checksum mismatch on Hub download archive.")
-                    return False
-                print_success("Checksum verified.")
-            elif latest.sha256:
-                print_status("Verifying SHA-256 checksum...")
-                actual_sha256 = compute_sha256(archive_path)
-                debug_log(f"Hub SHA-256 expected={latest.sha256} actual={actual_sha256}")
-                if actual_sha256.lower() != latest.sha256.lower():
-                    print_error("Security Check Failure: Checksum mismatch on Hub download archive.")
-                    return False
-                print_success("Checksum verified.")
-            elif not allow_unverified:
-                print_error(
-                    "Security Check Failure: the Hub release server supplied no SHA-512 or SHA-256 checksum.\n"
-                    "  Refusing to install an unverified archive. Re-run with --allow-unverified only if you\n"
-                    "  understand and accept the risk."
-                )
+            # Checksum integrity verification: warn on Windows when absent, fail closed elsewhere.
+            if not _verify_release_checksum("Hub", archive_path, latest, allow_unverified):
                 return False
-            else:
-                print_warning(
-                    "No integrity checksum provided by release server — installing unverified archive "
-                    "because --allow-unverified was set."
-                )
 
             if OS_NAME == "darwin":
                 # macOS dmg installation
