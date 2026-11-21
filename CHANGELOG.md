@@ -4,7 +4,7 @@ All notable changes to `missing-ag-updater` are documented in this file.
 
 ## [Unreleased]
 
-## [0.8.2] - 2026-11-21
+## [0.8.3] - 2026-11-21
 
 ### Bug Fixes
 
@@ -184,8 +184,8 @@ All notable changes to `missing-ag-updater` are documented in this file.
 
 - **Initial Release:** Unofficial auto-updater for Google Antigravity IDE, Hub, and CLI across Linux, macOS, and Windows.
 
-[Unreleased]: https://github.com/hellqvio86/missing-ag-updater/compare/v0.8.2...HEAD
-[0.8.2]: https://github.com/hellqvio86/missing-ag-updater/compare/v0.8.1...v0.8.2
+[Unreleased]: https://github.com/hellqvio86/missing-ag-updater/compare/v0.8.3...HEAD
+[0.8.3]: https://github.com/hellqvio86/missing-ag-updater/compare/v0.8.1...v0.8.3
 [0.8.1]: https://github.com/hellqvio86/missing-ag-updater/compare/v0.7.3...v0.8.1
 [0.7.3]: https://github.com/hellqvio86/missing-ag-updater/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/hellqvio86/missing-ag-updater/compare/v0.7.1...v0.7.2

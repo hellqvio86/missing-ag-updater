@@ -523,11 +523,13 @@ def test_main_interactive_flag(
 
 @patch("sys.argv", ["antigravity-updater", "--version"])
 def test_cli_version_flag(capsys: Any) -> None:
+    from missing_ag_updater.const import __version__
+
     with pytest.raises(SystemExit) as excinfo:
         main()
     assert excinfo.value.code == 0
     captured = capsys.readouterr().out
-    assert "0.8.1" in captured
+    assert __version__ in captured
 
 
 @patch("sys.exit", side_effect=SystemExit)
