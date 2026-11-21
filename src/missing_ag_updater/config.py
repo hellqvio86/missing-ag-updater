@@ -40,6 +40,7 @@ class ResolvedConfig:
     force: bool = False
     ignore_self_update: bool = False
     allow_unverified: bool = False
+    interactive: bool = False
     debug: bool = False
     system: bool = False
     user: bool = False
@@ -214,6 +215,12 @@ def resolve_config(
         "allow_unverified",
         False,
     )
+    interactive = _resolve_bool(
+        getattr(args, "interactive", None) if args else None,
+        CONFIG_ENV_VARS["interactive"],
+        "interactive",
+        False,
+    )
     debug = _resolve_bool(
         getattr(args, "debug", None) if args else None,
         CONFIG_ENV_VARS["debug"],
@@ -349,6 +356,7 @@ def resolve_config(
         force=force,
         ignore_self_update=ignore_self_update,
         allow_unverified=allow_unverified,
+        interactive=interactive,
         debug=debug,
         system=is_system,
         user=is_user,

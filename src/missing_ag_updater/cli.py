@@ -155,6 +155,18 @@ def main() -> None:
         help="Install IDE/Hub archives without a checksum (fails closed by default)",
     )
     parser.add_argument(
+        "--interactive",
+        action="store_true",
+        default=None,
+        help="Run Windows installers interactively instead of silently",
+    )
+    parser.add_argument(
+        "--silent",
+        action="store_false",
+        dest="interactive",
+        help="Run Windows installers silently (default)",
+    )
+    parser.add_argument(
         "--debug",
         action="store_true",
         default=None,
@@ -375,6 +387,7 @@ def main() -> None:
             install_nautilus=cfg.install_nautilus,
             suid_sandbox=cfg.apparmor_sandbox,
             allow_unverified=cfg.allow_unverified,
+            interactive=cfg.interactive,
             scope=cfg.scope,
         )
         success = success and res
@@ -389,6 +402,7 @@ def main() -> None:
             install_desktop=cfg.install_desktop,
             suid_sandbox=cfg.apparmor_sandbox,
             allow_unverified=cfg.allow_unverified,
+            interactive=cfg.interactive,
             scope=cfg.scope,
         )
         success = success and res

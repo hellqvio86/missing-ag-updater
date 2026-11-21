@@ -231,7 +231,17 @@ def test_fetch_release_payload_reports_all_failures(mock_fetch: MagicMock, monke
 def test_install_windows_exe_success(mock_run: MagicMock) -> None:
     mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
     assert install_windows_exe("dummy.exe") is True
-    mock_run.assert_called_once_with(["dummy.exe", "/S"], check=True)
+    mock_run.assert_called_once_with(
+        ["dummy.exe", "/S", "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART"],
+        check=True,
+    )
+
+
+@patch("subprocess.run")
+def test_install_windows_exe_interactive(mock_run: MagicMock) -> None:
+    mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
+    assert install_windows_exe("dummy.exe", interactive=True) is True
+    mock_run.assert_called_once_with(["dummy.exe"], check=True)
 
 
 @patch("subprocess.run", side_effect=Exception("error"))

@@ -100,6 +100,7 @@ def test_cli_config_integration(tmp_path: Any) -> None:
             install_nautilus=False,
             suid_sandbox=False,
             allow_unverified=False,
+            interactive=False,
             scope=None,
         )
         mock_exit.assert_called_once_with(0)
@@ -295,6 +296,7 @@ def test_resolve_config_ignore_self_update_env_overrides_toml(
         ("check", "ANTIGRAVITY_CHECK"),
         ("ignore_self_update", "ANTIGRAVITY_IGNORE_SELF_UPDATE"),
         ("allow_unverified", "ANTIGRAVITY_ALLOW_UNVERIFIED"),
+        ("interactive", "ANTIGRAVITY_INTERACTIVE"),
         ("debug", "ANTIGRAVITY_DEBUG"),
     ],
 )

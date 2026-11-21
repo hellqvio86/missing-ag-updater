@@ -143,13 +143,18 @@ def get_download_url(component: str, version: str, exec_id: str, release: Option
     return ""
 
 
-def install_windows_exe(exe_path: str) -> bool:
-    """Run Windows silent installer executable with fixed argument vector."""
-    print_status("Running Windows installer silently...")
+def install_windows_exe(exe_path: str, *, interactive: bool = False) -> bool:
+    """Run Windows installer executable silently (default) or interactively."""
+    if interactive:
+        print_status("Running Windows installer interactively...")
+        cmd = [exe_path]
+    else:
+        print_status("Running Windows installer silently...")
+        # Fixed literal flags cover both NSIS (/S) and Inno Setup (/VERYSILENT).
+        cmd = [exe_path, "/S", "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART"]
     try:
         # Structured argv execution without shell interpretation prevents shell injection attacks.
-        # Fixed arguments execute the verified installer binary directly in silent mode.
-        subprocess.run([exe_path, "/S"], check=True)  # nosec B603
+        subprocess.run(cmd, check=True)  # nosec B603
         print_success("Windows installer completed.")
         return True
     except (subprocess.SubprocessError, OSError, Exception) as err:
@@ -258,6 +263,7 @@ def update_ide(
     install_nautilus: bool = True,
     suid_sandbox: bool = False,
     allow_unverified: bool = False,
+    interactive: bool = False,
     scope: Optional[str] = None,
 ) -> bool:
     """Check and execute updates for Antigravity IDE."""
@@ -353,7 +359,7 @@ def update_ide(
                     return False
             elif OS_NAME == "windows":
                 # Windows exe installation
-                res = install_windows_exe(archive_path)
+                res = install_windows_exe(archive_path, interactive=interactive)
                 if not res:
                     return False
             else:
@@ -442,6 +448,7 @@ def update_hub(
     install_desktop: bool = True,
     suid_sandbox: bool = False,
     allow_unverified: bool = False,
+    interactive: bool = False,
     scope: Optional[str] = None,
 ) -> bool:
     """Check and execute updates for Antigravity Hub."""
@@ -537,7 +544,7 @@ def update_hub(
                     return False
             elif OS_NAME == "windows":
                 # Windows exe installation
-                res = install_windows_exe(archive_path)
+                res = install_windows_exe(archive_path, interactive=interactive)
                 if not res:
                     return False
             else:

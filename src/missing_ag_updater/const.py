@@ -30,7 +30,7 @@ def _is_ubuntu_style_distro() -> bool:
 
 # Single source of truth for the package version. `pyproject.toml` reads this
 # value dynamically via Hatchling (`[tool.hatch.version]`), so bump only here.
-__version__ = "0.7.3"
+__version__ = "0.8.0"
 
 # Truthy and falsy string values for environment variables and config parsing
 TRUTHY_VALUES: tuple[str, ...] = ("1", "true", "yes", "on")
@@ -260,6 +260,7 @@ CONFIG_ENV_VARS: dict[str, tuple[str, ...]] = {
     "force": ("ANTIGRAVITY_FORCE", "AG_FORCE"),
     "ignore_self_update": ("ANTIGRAVITY_IGNORE_SELF_UPDATE", "AG_IGNORE_SELF_UPDATE"),
     "allow_unverified": ("ANTIGRAVITY_ALLOW_UNVERIFIED", "AG_ALLOW_UNVERIFIED"),
+    "interactive": ("ANTIGRAVITY_INTERACTIVE", "AG_INTERACTIVE"),
     "debug": ("ANTIGRAVITY_DEBUG", "AG_DEBUG"),
     "apparmor_sandbox": ("ANTIGRAVITY_APPARMOR_SANDBOX", "AG_APPARMOR_SANDBOX"),
     "dir_ide": ("ANTIGRAVITY_DIR_IDE", "AG_DIR_IDE"),

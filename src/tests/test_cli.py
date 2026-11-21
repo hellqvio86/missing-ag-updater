@@ -93,6 +93,7 @@ def test_main_force_and_check(
         install_nautilus=True,
         suid_sandbox=False,
         allow_unverified=False,
+        interactive=False,
         scope=None,
     )
     mock_exit.assert_called_once_with(0)
@@ -123,6 +124,7 @@ def test_main_apparmor_sandbox_flag(
         install_nautilus=True,
         suid_sandbox=True,
         allow_unverified=False,
+        interactive=False,
         scope=None,
     )
     mock_hub.assert_called_once_with(
@@ -133,6 +135,7 @@ def test_main_apparmor_sandbox_flag(
         install_desktop=True,
         suid_sandbox=True,
         allow_unverified=False,
+        interactive=False,
         scope=None,
     )
     mock_exit.assert_called_once_with(0)
@@ -159,6 +162,7 @@ def test_main_system_flag(
         install_nautilus=True,
         suid_sandbox=False,
         allow_unverified=False,
+        interactive=False,
         scope="system",
     )
     mock_exit.assert_called_once_with(0)
@@ -187,6 +191,7 @@ def test_main_no_apparmor_sandbox_flag(
         install_nautilus=True,
         suid_sandbox=False,
         allow_unverified=False,
+        interactive=False,
         scope=None,
     )
     mock_exit.assert_called_once_with(0)
@@ -215,6 +220,7 @@ def test_main_auto_detect_apparmor(
         install_nautilus=True,
         suid_sandbox=True,
         allow_unverified=False,
+        interactive=False,
         scope=None,
     )
     mock_exit.assert_called_once_with(0)
@@ -243,6 +249,7 @@ def test_main_auto_detect_no_apparmor(
         install_nautilus=True,
         suid_sandbox=False,
         allow_unverified=False,
+        interactive=False,
         scope=None,
     )
     mock_exit.assert_called_once_with(0)
@@ -480,9 +487,38 @@ def test_main_allow_unverified_and_debug_flags(
         install_nautilus=True,
         suid_sandbox=False,
         allow_unverified=True,
+        interactive=False,
         scope=None,
     )
     assert mock_set_debug.call_args_list[-1].args == (True,)
+
+
+@patch("sys.exit", side_effect=SystemExit)
+@patch("missing_ag_updater.cli.update_ide", return_value=True)
+@patch("missing_ag_updater.config.is_apparmor_enabled", return_value=False)
+@patch("missing_ag_updater.config.load_toml_config", return_value={})
+@patch("missing_ag_updater.cli.OS_NAME", "windows")
+@patch("sys.argv", ["antigravity-updater", "--ide", "--interactive"])
+def test_main_interactive_flag(
+    mock_toml: MagicMock,
+    mock_apparmor: MagicMock,
+    mock_ide: MagicMock,
+    mock_exit: MagicMock,
+) -> None:
+    with pytest.raises(SystemExit):
+        main()
+    mock_ide.assert_called_once_with(
+        ANY,
+        ANY,
+        dry_run=False,
+        force=False,
+        install_desktop=True,
+        install_nautilus=True,
+        suid_sandbox=False,
+        allow_unverified=False,
+        interactive=True,
+        scope=None,
+    )
 
 
 @patch("sys.argv", ["antigravity-updater", "--version"])
@@ -491,7 +527,7 @@ def test_cli_version_flag(capsys: Any) -> None:
         main()
     assert excinfo.value.code == 0
     captured = capsys.readouterr().out
-    assert "0.7.3" in captured
+    assert "0.8.0" in captured
 
 
 @patch("sys.exit", side_effect=SystemExit)

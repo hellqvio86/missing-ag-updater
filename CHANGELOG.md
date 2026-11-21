@@ -6,6 +6,16 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-21
+
+### Added
+
+- Windows installer mode configuration (`--interactive` / `--silent` CLI flags, `ANTIGRAVITY_INTERACTIVE` / `AG_INTERACTIVE` environment variables, and `interactive` TOML config key), defaulting to silent installation.
+
+### Fixed
+
+- Pass both NSIS (`/S`) and Inno Setup (`/VERYSILENT /SUPPRESSMSGBOXES /NORESTART`) silent flags in `install_windows_exe()` when running silently.
+
 ## [0.7.3] - 2026-11-21
 
 ### Fixed
@@ -74,7 +84,8 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 See the GitHub releases page for changes before 0.6.0.
 
-[Unreleased]: https://github.com/hellqvio86/missing-ag-updater/compare/v0.7.3...HEAD
+[Unreleased]: https://github.com/hellqvio86/missing-ag-updater/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/hellqvio86/missing-ag-updater/compare/v0.7.3...v0.8.0
 [0.7.3]: https://github.com/hellqvio86/missing-ag-updater/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/hellqvio86/missing-ag-updater/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/hellqvio86/missing-ag-updater/compare/v0.7.0...v0.7.1
