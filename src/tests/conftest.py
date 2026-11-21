@@ -17,3 +17,9 @@ def isolated_wsl_detection(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("WSL_DISTRO_NAME", raising=False)
     monkeypatch.delenv("WSL_INTEROP", raising=False)
     monkeypatch.setattr("missing_ag_updater.utils.WSL_KERNEL_RELEASE_FILES", ())
+
+
+@pytest.fixture(autouse=True)
+def isolated_updater_version_check(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Prevent CLI tests from hitting PyPI during the startup version check."""
+    monkeypatch.setattr("missing_ag_updater.cli.start_updater_version_check", lambda: lambda: None)

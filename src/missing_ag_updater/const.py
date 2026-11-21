@@ -30,7 +30,7 @@ def _is_ubuntu_style_distro() -> bool:
 
 # Single source of truth for the package version. `pyproject.toml` reads this
 # value dynamically via Hatchling (`[tool.hatch.version]`), so bump only here.
-__version__ = "0.8.0"
+__version__ = "0.8.1"
 
 # Truthy and falsy string values for environment variables and config parsing
 TRUTHY_VALUES: tuple[str, ...] = ("1", "true", "yes", "on")
@@ -179,6 +179,8 @@ CLI_SELF_UPDATER_MARKERS = ("update_status.json", "update.lock")
 # RELEASE_ENDPOINT_ENV_VARS. The updater reports the attempted URLs and HTTP
 # status codes when every endpoint fails.
 USER_AGENT = f"missing-ag-updater/{__version__}"
+UPDATER_PYPI_URL = "https://pypi.org/pypi/missing-ag-updater/json"
+UPDATER_CHECK_TIMEOUT_SECONDS = 2
 IDE_RELEASES_URL = "https://antigravity-ide-auto-updater-974169037036.us-central1.run.app/releases"
 HUB_RELEASES_URL = "https://antigravity-hub-auto-updater-974169037036.us-central1.run.app/releases"
 CLI_MANIFEST_URL = (

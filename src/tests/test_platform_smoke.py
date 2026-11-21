@@ -67,7 +67,10 @@ def test_platform_smoke_arguments_are_structured() -> None:
 
     with patch("subprocess.run") as mock_run:
         assert install_windows_exe("installer.exe") is True
-    mock_run.assert_called_once_with(["installer.exe", "/S"], check=True)
+    mock_run.assert_called_once_with(
+        ["installer.exe", "/S", "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART"],
+        check=True,
+    )
 
 
 def test_download_payload_is_not_trusted_by_default() -> None:
