@@ -22,4 +22,4 @@ def isolated_wsl_detection(monkeypatch: pytest.MonkeyPatch) -> None:
 @pytest.fixture(autouse=True)
 def isolated_updater_version_check(monkeypatch: pytest.MonkeyPatch) -> None:
     """Prevent CLI tests from hitting PyPI during the startup version check."""
-    monkeypatch.setattr("missing_ag_updater.cli.warn_if_updater_outdated", lambda: None)
+    monkeypatch.setattr("missing_ag_updater.cli.start_updater_version_check", lambda: lambda: None)

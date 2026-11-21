@@ -4,6 +4,8 @@ import os
 import shutil
 import subprocess  # nosec B404
 import tempfile
+import threading
+from collections.abc import Callable
 from typing import Any, Optional
 from urllib.parse import urlparse
 
@@ -83,6 +85,33 @@ def warn_if_updater_outdated() -> None:
             f"A newer version of missing-ag-updater is available: {latest_version} (current: {__version__}).\n"
             "  Upgrade with: uv tool upgrade missing-ag-updater  (or: pip install -U missing-ag-updater)\n"
         )
+
+
+def start_updater_version_check() -> Callable[[], None]:
+    """Start a non-blocking, best-effort PyPI version check in a daemon thread.
+
+    Returns a zero-wait callback that prints the warning if the background
+    check has already completed with a newer version.
+    """
+    result: list[str] = []
+
+    def _worker() -> None:
+        latest_version = check_for_updater_update()
+        if latest_version:
+            result.append(latest_version)
+
+    worker = threading.Thread(target=_worker, name="updater-version-check", daemon=True)
+    worker.start()
+
+    def _emit_if_ready() -> None:
+        if result:
+            latest_version = result[0]
+            print_warning(
+                f"A newer version of missing-ag-updater is available: {latest_version} (current: {__version__}).\n"
+                "  Upgrade with: uv tool upgrade missing-ag-updater  (or: pip install -U missing-ag-updater)"
+            )
+
+    return _emit_if_ready
 
 
 def get_release_endpoints(component: str) -> list[str]:

@@ -17,6 +17,7 @@ from missing_ag_updater.updater import (
     get_release_endpoints,
     install_macos_dmg,
     install_windows_exe,
+    start_updater_version_check,
     update_cli,
     update_hub,
     update_ide,
@@ -1156,3 +1157,22 @@ def test_check_for_updater_update_fails_open_on_network_error(
     assert check_for_updater_update() is None
     warn_if_updater_outdated()
     mock_warn.assert_not_called()
+
+
+@patch("missing_ag_updater.updater.print_warning")
+@patch("missing_ag_updater.updater.check_for_updater_update", return_value="99.0.0")
+def test_start_updater_version_check_non_blocking(
+    mock_check: MagicMock,
+    mock_warn: MagicMock,
+) -> None:
+    emit_warning = start_updater_version_check()
+    # Wait briefly for the in-memory mock thread to finish; never blocks on real I/O.
+    for _ in range(50):
+        emit_warning()
+        if mock_warn.called:
+            break
+        import time
+
+        time.sleep(0.01)
+    mock_warn.assert_called()
+    assert "99.0.0" in mock_warn.call_args.args[0]

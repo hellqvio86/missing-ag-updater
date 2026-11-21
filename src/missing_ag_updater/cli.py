@@ -16,7 +16,7 @@ from .discovery import (
     diagnose_all,
 )
 from .uninstall import uninstall_cli, uninstall_hub, uninstall_ide
-from .updater import update_cli, update_hub, update_ide, warn_if_updater_outdated
+from .updater import start_updater_version_check, update_cli, update_hub, update_ide
 from .utils import (
     print_error,
     print_info,
@@ -368,7 +368,7 @@ def main() -> None:
     )
     print_warning("This project is a community tool and is NOT affiliated with, sponsored by, or supported by Google.")
     print_info(f"Target Platform: {COLOR_BOLD}{OS_NAME} ({ARCH_NAME}){COLOR_ENDC}\n")
-    warn_if_updater_outdated()
+    emit_updater_warning = start_updater_version_check()
 
     if cfg.wsl_cli_only:
         print_info(
@@ -420,6 +420,7 @@ def main() -> None:
         success = success and res
         print()
 
+    emit_updater_warning()
     if success:
         print_success("Operation completed successfully.")
         sys.exit(0)
