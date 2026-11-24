@@ -425,21 +425,51 @@ def test_update_ide_checksum_verification() -> None:
     _test_mismatch()
 
 
+@patch("missing_ag_updater.updater.safe_extract_tar", return_value=False)
+@patch("missing_ag_updater.updater.print_warning")
 @patch("missing_ag_updater.updater.OS_NAME", "linux")
 @patch("missing_ag_updater.updater.is_path_writable", return_value=True)
 @patch("missing_ag_updater.updater.download_file")
 @patch("missing_ag_updater.updater.get_running_pids", return_value=[])
 @patch("missing_ag_updater.updater.fetch_json", return_value=[{"version": "2.0.4", "execution_id": "1234"}])
 @patch("missing_ag_updater.updater.get_ide_version", return_value="2.0.3")
-def test_update_ide_missing_checksum_fails_closed(
+def test_update_ide_missing_checksum_warns_and_proceeds_on_linux(
     mock_ver: MagicMock,
     mock_fetch: MagicMock,
     mock_pids: MagicMock,
     mock_download: MagicMock,
     mock_writable: MagicMock,
+    mock_warning: MagicMock,
+    mock_extract: MagicMock,
 ) -> None:
+    # Missing checksum warns and proceeds to extraction (which fails here on the mocked archive).
     assert update_ide("/dummy/ide", None, force=True) is False
     mock_download.assert_called_once()
+    mock_extract.assert_called_once()
+    assert any("No integrity checksum provided" in str(call) for call in mock_warning.call_args_list)
+
+
+@patch("missing_ag_updater.updater.safe_extract_tar", return_value=False)
+@patch("missing_ag_updater.updater.print_warning")
+@patch("missing_ag_updater.updater.OS_NAME", "linux")
+@patch("missing_ag_updater.updater.is_path_writable", return_value=True)
+@patch("missing_ag_updater.updater.download_file")
+@patch("missing_ag_updater.updater.get_running_pids", return_value=[])
+@patch("missing_ag_updater.updater.fetch_json", return_value=[{"version": "2.1.4", "execution_id": "1234"}])
+@patch("missing_ag_updater.updater.get_hub_version", return_value="2.1.3")
+def test_update_hub_missing_checksum_warns_and_proceeds_on_linux(
+    mock_ver: MagicMock,
+    mock_fetch: MagicMock,
+    mock_pids: MagicMock,
+    mock_download: MagicMock,
+    mock_writable: MagicMock,
+    mock_warning: MagicMock,
+    mock_extract: MagicMock,
+) -> None:
+    assert update_hub("/dummy/hub", None, force=True) is False
+    mock_download.assert_called_once()
+    mock_extract.assert_called_once()
+    assert any("No integrity checksum provided" in str(call) for call in mock_warning.call_args_list)
 
 
 @patch("missing_ag_updater.updater.install_windows_exe", return_value=True)

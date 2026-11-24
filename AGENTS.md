@@ -39,7 +39,7 @@ When assisting a user with setup, unexpected duplicate icons, hanging processes,
    - **Uninstallation Requested**: Run `antigravity-updater --uninstall` (with `--user` or `--system`).
    - **Out of date versions**: Run `antigravity-updater` (or target specific components with `--ide`, `--hub`, `--cli`). Preview first with `--check`.
    - **Release endpoint failure**: Read the `ReleaseEndpointError` output, which lists every attempted URL and HTTP status. Re-run with `--debug`, then override endpoints with the `ANTIGRAVITY_*_URL` variables if Google moved them.
-   - **Checksum refusal (`Refusing to install an unverified archive`)**: The release endpoint supplied no SHA-512/SHA-256. Prefer waiting for metadata to recover; use `--allow-unverified` only when the endpoint is explicitly trusted.
+   - **Missing IDE/Hub checksum warning**: Google's IDE/Hub `/releases` endpoints currently omit SHA-512/SHA-256 hashes, so the updater warns and proceeds (while still failing closed on any checksum mismatch and enforcing the HTTPS Google domain allowlist). CLI archives always require SHA-512.
    - **CLI shows `Self-update: managed by official updater`**: The CLI update is skipped on purpose. Follow [Recipe 7](#recipe-7-official-cli-self-update-conflicts) instead of forcing it.
    - **Running inside WSL** (`"wsl": true` in `--json`): Only the CLI is managed by default. Pass `--ide` / `--hub` explicitly only if the user actually wants GUI apps under WSLg. `--uninstall` still covers all components.
 
@@ -220,11 +220,7 @@ antigravity-updater --check
 
 `--json` prints diagnostics only and exits; it does not update anything. The payload includes `updater_version`, `os`, `arch`, `wsl`, `ide_installations`, `hub_installations`, `cli_installations`, `running_processes`, `desktop_files`, and `sandbox_status`.
 
-If the updater refuses an IDE/Hub archive because no checksum was supplied, do **not** immediately reach for `--allow-unverified`. First confirm the endpoint is the expected Google URL. Only opt out when the user explicitly trusts that source:
-```bash
-antigravity-updater --ide --allow-unverified
-export ANTIGRAVITY_ALLOW_UNVERIFIED=1
-```
+If the updater warns that an IDE/Hub release supplied no checksum, that is currently expected for Google's `/releases` endpoints (downloads remain restricted to official HTTPS Google domains, and any explicit checksum mismatch still fails closed). `--allow-unverified` / `ANTIGRAVITY_ALLOW_UNVERIFIED` is retained for backwards compatibility.
 
 ---
 
@@ -255,7 +251,7 @@ Because `missing-ag-updater` downloads binaries, extracts archives, and can muta
 
 1. **Integrity Verification**:
    - **CLI**: Mandatory SHA-512 checksum validation against the manifest before extraction.
-   - **IDE & Hub**: SHA-512 and SHA-256 checksum verification when supplied by release endpoints. Missing checksums **fail closed**; the explicit `--allow-unverified` / `ANTIGRAVITY_ALLOW_UNVERIFIED` / TOML `allow_unverified` opt-out exists only for trusted private endpoints.
+   - **IDE & Hub**: SHA-512 and SHA-256 checksum verification when supplied by release endpoints (fails closed on mismatch; warns and proceeds when omitted, as Google's `/releases` endpoints currently do not publish checksums). `--allow-unverified` / `ANTIGRAVITY_ALLOW_UNVERIFIED` / TOML `allow_unverified` is retained for backwards compatibility.
    - Full download URLs from release metadata (`download_url`, `url`, `downloads`) are used only after the Google domain allowlist check; hard-coded CDN construction is a fallback.
 2. **Strict Domain Allowlists**:
    - Downloads are restricted exclusively to official Google HTTPS distribution endpoints (`dl.google.com`, `edgedl.me.gvt1.com`, `storage.googleapis.com`, and `*.google.com` / `*.googleapis.com` / `*.gvt1.com` / `*.googleusercontent.com`).

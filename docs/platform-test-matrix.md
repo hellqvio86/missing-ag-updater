@@ -80,7 +80,7 @@ antigravity-updater --json | python3 -m json.tool > /dev/null
 
 - [ ] All release endpoints unreachable: `ReleaseEndpointError` lists each URL and status.
 - [ ] Endpoint override with a valid URL succeeds: `ANTIGRAVITY_IDE_RELEASES_URL=... antigravity-updater --ide --check`.
-- [ ] Metadata without checksums refuses IDE/Hub installs; `--allow-unverified` overrides.
+- [ ] Metadata without checksums warns and proceeds for IDE/Hub installs; checksum mismatches fail closed.
 - [ ] CLI archive with a bad SHA-512 is rejected.
 - [ ] Official `agy` self-update detected: CLI update is skipped; `--ignore-self-update` overrides.
 - [ ] `--debug` output contains no secrets, tokens, or credentials.

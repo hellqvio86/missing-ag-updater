@@ -152,7 +152,7 @@ def main() -> None:
         "--allow-unverified",
         action="store_true",
         default=None,
-        help="Install IDE/Hub archives without a checksum (fails closed by default)",
+        help="Acknowledge installing IDE/Hub archives without a checksum (default behavior with a warning)",
     )
     parser.add_argument(
         "--interactive",

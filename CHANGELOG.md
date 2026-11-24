@@ -4,6 +4,12 @@ All notable changes to `missing-ag-updater` are documented in this file.
 
 ## [Unreleased]
 
+## [0.8.4] - 2026-11-24
+
+### Bug Fixes
+
+- **Cross-Platform Missing-Checksum Handling (`updater.py`):** Warn and proceed on all platforms (matching Windows behavior) when the IDE or Hub release endpoint omits SHA-512/SHA-256 checksums, since Google's IDE and Hub `/releases` feeds do not publish checksums; explicit checksum mismatches still fail closed, and CLI manifests still require SHA-512.
+
 ## [0.8.3] - 2026-11-21
 
 ### Bug Fixes
@@ -184,7 +190,8 @@ All notable changes to `missing-ag-updater` are documented in this file.
 
 - **Initial Release:** Unofficial auto-updater for Google Antigravity IDE, Hub, and CLI across Linux, macOS, and Windows.
 
-[Unreleased]: https://github.com/hellqvio86/missing-ag-updater/compare/v0.8.3...HEAD
+[Unreleased]: https://github.com/hellqvio86/missing-ag-updater/compare/v0.8.4...HEAD
+[0.8.4]: https://github.com/hellqvio86/missing-ag-updater/compare/v0.8.3...v0.8.4
 [0.8.3]: https://github.com/hellqvio86/missing-ag-updater/compare/v0.8.1...v0.8.3
 [0.8.1]: https://github.com/hellqvio86/missing-ag-updater/compare/v0.7.3...v0.8.1
 [0.7.3]: https://github.com/hellqvio86/missing-ag-updater/compare/v0.7.2...v0.7.3

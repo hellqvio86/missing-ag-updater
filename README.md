@@ -79,7 +79,7 @@ This leads to several developer pain points that this project solves:
 - **Clean Uninstallation:** One-command removal (`--uninstall`) of components, launcher symlinks, desktop entries, and Nautilus extensions.
 - **Safe Installation:** Warns if target applications are actively running before attempting file operations (override with `--force`).
 - **Official CLI Self-Update Awareness:** Detects when the official `agy` self-updater manages the CLI binary and skips updating it to avoid conflicts (override with `--ignore-self-update` or `--force`).
-- **Checksum Verification:** Verifies SHA-512/SHA-256 hashes and **fails closed** when IDE/Hub metadata supplies no checksum (opt out explicitly with `--allow-unverified`). CLI archives always require SHA-512.
+- **Checksum Verification:** Verifies SHA-512/SHA-256 hashes whenever supplied by IDE/Hub metadata (failing closed on mismatch and warning when omitted). CLI archives always require SHA-512.
 - **Machine-Readable Diagnostics:** `--json` prints structured diagnostics for agents and scripts.
 - **Verbose Debugging:** `--debug` logs exact URLs, checksum results, and process-detection decisions to stderr (stdout stays machine-readable).
 - **Resilient Endpoints:** Release endpoints can be overridden with environment variables and comma-separated fallbacks; failures list every attempted URL and HTTP status.
@@ -238,7 +238,7 @@ options:
   --cli                 Update/operate only on the Antigravity CLI
   --force               Bypass version checks and active process warnings
   --ignore-self-update  Update the CLI even if the official 'agy' self-updater is detected
-  --allow-unverified    Install IDE/Hub archives without a checksum (fails closed by default)
+  --allow-unverified    Acknowledge installing IDE/Hub archives without a checksum (default behavior with a warning)
   --debug               Log exact URLs, checksum results, and process decisions to stderr
   --system              Install/manage system-wide (/opt and /usr/local/bin)
   --user                Install/manage for current user (~/opt and ~/.local/bin)
@@ -377,7 +377,7 @@ hub = true
 cli = true
 force = false
 ignore_self_update = false
-allow_unverified = false   # fail closed on missing IDE/Hub checksums (default)
+allow_unverified = false   # retained for compatibility; missing IDE/Hub checksums warn and proceed
 debug = false              # log URLs, checksums, and process decisions to stderr
 system = false
 user = true
@@ -433,7 +433,7 @@ When release metadata supplies a full download URL (`download_url`, `url`, or a 
    Before modifying files, inspects whether the IDE, Hub, or CLI is actively running. If active PIDs are detected, the update safely aborts (unless overridden with `--force`).
 4. **Integrity Verification**:
    - **CLI**: mandates a SHA-512 checksum from the manifest before extraction.
-   - **IDE & Hub**: verifies SHA-512/SHA-256 when supplied by release metadata and **fails closed** when neither is present. Use `--allow-unverified` only when you explicitly trust the endpoint.
+   - **IDE & Hub**: verifies SHA-512/SHA-256 when supplied by release metadata (failing closed on mismatch) and warns before proceeding when neither is present.
 5. **Platform-Specific Installation**:
    - **Linux**: Extracts tarballs to temporary directories, replaces target installation directories under `~/opt` or `/opt`, and creates/updates symlinks in `~/.local/bin` or `/usr/local/bin`.
    - **macOS**: Mounts `.dmg` disk images securely via `hdiutil attach`, syncs `.app` bundles under `/Applications`, and unmounts the volume.

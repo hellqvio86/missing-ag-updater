@@ -86,7 +86,7 @@ options:
   --cli                 Target only the Antigravity CLI
   --force               Bypass version checks and active process warnings
   --ignore-self-update  Update the CLI even if the official 'agy' self-updater is detected
-  --allow-unverified    Install IDE/Hub archives without a checksum (fails closed by default)
+  --allow-unverified    Acknowledge installing IDE/Hub archives without a checksum (default behavior with a warning)
   --debug               Log exact URLs, checksum results, and process decisions to stderr
   --system              Target system-wide installation (/opt, /usr/local/bin)
   --user                Target user-level installation (~/opt, ~/.local/bin)
@@ -135,7 +135,7 @@ You can persist your preferences across runs using a TOML file. The updater sear
 check = false
 force = false
 ignore_self_update = false
-allow_unverified = false  # only for explicitly trusted endpoints
+allow_unverified = false  # retained for backwards compatibility
 debug = false
 
 # Component selection
@@ -178,7 +178,7 @@ You can configure updater defaults using environment variables. These are useful
 | `--cli` | `ANTIGRAVITY_CLI` or `AG_CLI` | Boolean | Target only Antigravity CLI |
 | `--force` | `ANTIGRAVITY_FORCE` or `AG_FORCE` | Boolean | Bypass version and active process checks |
 | `--ignore-self-update` | `ANTIGRAVITY_IGNORE_SELF_UPDATE` or `AG_IGNORE_SELF_UPDATE` | Boolean | Update the CLI even when the official `agy` self-updater is detected |
-| `--allow-unverified` | `ANTIGRAVITY_ALLOW_UNVERIFIED` or `AG_ALLOW_UNVERIFIED` | Boolean | Install IDE/Hub archives even without a checksum (default: fail closed) |
+| `--allow-unverified` | `ANTIGRAVITY_ALLOW_UNVERIFIED` or `AG_ALLOW_UNVERIFIED` | Boolean | Acknowledge installing IDE/Hub archives without a checksum (now default with a warning) |
 | `--debug` | `ANTIGRAVITY_DEBUG` or `AG_DEBUG` | Boolean | Log URLs, checksum results, and process decisions to stderr |
 | `--system` | `ANTIGRAVITY_SYSTEM` or `AG_SYSTEM` | Boolean | Target system-wide installation scope |
 | `--user` | `ANTIGRAVITY_USER` or `AG_USER` | Boolean | Target user-level installation scope |
@@ -225,7 +225,7 @@ print(f"Discovered {len(diagnostics['ide_installations'])} IDE installations.")
 # 2. Resolve paths exactly like the CLI (flags > env > TOML > auto-detect).
 cfg = resolve_config()
 
-# 3. Dry-run an IDE update. `allow_unverified` defaults to False (fail closed).
+# 3. Dry-run an IDE update. Missing IDE/Hub checksums warn and proceed; mismatches fail closed.
 try:
     fetch_release_payload("ide")
     ide_success = update_ide(

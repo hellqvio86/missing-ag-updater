@@ -275,7 +275,7 @@ def _verify_release_checksum(
     release: Release,
     allow_unverified: bool,
 ) -> bool:
-    """Verify archive checksum when supplied; warn on Windows or fail closed elsewhere."""
+    """Verify archive checksum when supplied; warn and proceed when omitted."""
     if release.sha512:
         print_status("Verifying SHA-512 checksum...")
         actual_sha512 = compute_sha512(archive_path)
@@ -297,25 +297,11 @@ def _verify_release_checksum(
         return True
 
     if allow_unverified:
-        print_warning(
-            "No integrity checksum provided by release server — installing unverified archive "
-            "because --allow-unverified was set."
-        )
-        return True
-
-    if OS_NAME == "windows":
-        print_warning(
-            f"No integrity checksum provided by the {component} release server; "
-            "proceeding with Windows installer anyway."
-        )
-        return True
-
-    print_error(
-        f"Security Check Failure: the {component} release server supplied no SHA-512 or SHA-256 checksum.\n"
-        "  Refusing to install an unverified archive. Re-run with --allow-unverified only if you\n"
-        "  understand and accept the risk."
+        debug_log(f"{component} release server omitted checksum; proceeding (--allow-unverified set).")
+    print_warning(
+        f"No integrity checksum provided by the {component} release server; proceeding without checksum verification."
     )
-    return False
+    return True
 
 
 def update_ide(
@@ -413,7 +399,7 @@ def update_ide(
         try:
             download_file(download_url, archive_path, label="Downloading Antigravity IDE")
 
-            # Checksum integrity verification: warn on Windows when absent, fail closed elsewhere.
+            # Checksum integrity verification: verify when supplied; warn and proceed when absent.
             if not _verify_release_checksum("IDE", archive_path, latest, allow_unverified):
                 return False
 
@@ -598,7 +584,7 @@ def update_hub(
         try:
             download_file(download_url, archive_path, label="Downloading Antigravity Hub")
 
-            # Checksum integrity verification: warn on Windows when absent, fail closed elsewhere.
+            # Checksum integrity verification: verify when supplied; warn and proceed when absent.
             if not _verify_release_checksum("Hub", archive_path, latest, allow_unverified):
                 return False
 

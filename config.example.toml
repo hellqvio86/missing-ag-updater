@@ -16,8 +16,8 @@ force = false
 # Set true only if you intentionally want this tool to own the CLI.
 ignore_self_update = false
 
-# Integrity: IDE/Hub installs fail closed when the release endpoint supplies no
-# checksum. Set this to true only if you explicitly trust the endpoint.
+# Integrity: IDE/Hub installs verify SHA-512/SHA-256 when supplied and warn
+# when omitted. Retained for backwards compatibility.
 allow_unverified = false
 
 # Verbose diagnostics: log exact URLs, checksum results, and process decisions

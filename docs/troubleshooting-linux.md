@@ -202,15 +202,9 @@ Updating files while an Electron application or VS Code instance is actively run
 Failed to check IDE updates: Could not fetch release metadata for 'ide' from any endpoint ...
 ```
 
-or
-
-```text
-Refusing to install an unverified archive. Re-run with --allow-unverified ...
-```
-
 ### Cause
 
-Release metadata comes from unofficial Cloud Run endpoints that Google may move or retire. IDE/Hub installs also fail closed when the endpoint supplies no SHA checksum.
+Release metadata comes from unofficial Cloud Run endpoints that Google may move or retire.
 
 ### Solution
 
@@ -222,8 +216,7 @@ Release metadata comes from unofficial Cloud Run endpoints that Google may move 
    export ANTIGRAVITY_CLI_MANIFEST_URL="https://primary.example/manifests/linux_amd64.json"
    antigravity-updater --check
    ```
-3. **Checksum refusal:** prefer waiting for metadata to recover. Use `--allow-unverified` (or `allow_unverified = true`) only if you explicitly trust the endpoint.
-4. **Report the outage** on GitHub with the failed URLs and status codes so the defaults can be updated.
+3. **Report the outage** on GitHub with the failed URLs and status codes so the defaults can be updated.
 
 ---
 
